@@ -936,6 +936,8 @@ local g_yieldString = {
 [YieldTypes.YIELD_FAITH or false] = "TXT_KEY_BUILD_FAITH_STRING",
 [YieldTypes.YIELD_TOURISM or false] = "TXT_KEY_BUILD_TOURISM_STRING",
 [YieldTypes.YIELD_GOLDEN_AGE_POINTS or false] = "TXT_KEY_BUILD_GAP_STRING",
+[YieldTypes.YIELD_GREAT_GENERAL_POINTS or false] = "TXT_KEY_BUILD_GGP_STRING",
+[YieldTypes.YIELD_GREAT_ADMIRAL_POINTS or false] = "TXT_KEY_BUILD_GAP2_STRING",
 } g_yieldString[false] = nil
 --------------------------------------------------------------------------------
 --------------------------------------------------------------------------------
@@ -1533,7 +1535,7 @@ function ActionToolTipHandler( control )
 			end
 
 				-- if we can't upgrade due to stacking
-			if plot:GetNumFriendlyUnitsOfType(unit) > 1 then
+			if plot:getNumFriendlyUnitsOfType(unit) > 1 then
 
 				disabledTip:insertLocalized( "TXT_KEY_UPGRADE_HELP_DISABLED_STACKING" )
 

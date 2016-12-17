@@ -270,6 +270,9 @@ void CvLuaCity::PushMethods(lua_State* L, int t)
 #if defined(MOD_BALANCE_CORE)
 	Method(GetYieldPerTurnFromTraits);
 #endif
+#if defined(MOD_BUGFIX_LUA_API)
+	Method(ChangeJONSCulturePerTurnFromReligion);
+#endif
 	Method(GetJONSCulturePerTurnFromReligion);
 	Method(GetJONSCulturePerTurnFromLeagues);
 
@@ -305,6 +308,9 @@ void CvLuaCity::PushMethods(lua_State* L, int t)
 	Method(GetFaithPerTurnFromPolicies);
 	Method(GetFaithPerTurnFromTraits);
 	Method(GetFaithPerTurnFromReligion);
+#if defined(MOD_BUGFIX_LUA_API)
+	Method(ChangeFaithPerTurnFromReligion);
+#endif
 
 	Method(IsReligionInCity);
 	Method(IsHolyCityForReligion);
@@ -326,6 +332,9 @@ void CvLuaCity::PushMethods(lua_State* L, int t)
 	Method(GetNumTeamWonders);
 	Method(GetNumNationalWonders);
 	Method(GetNumBuildings);
+#if defined(MOD_BALANCE_CORE)
+	Method(GetNumTotalBuildings);
+#endif
 
 	Method(GetWonderProductionModifier);
 	Method(ChangeWonderProductionModifier);
@@ -571,11 +580,13 @@ void CvLuaCity::PushMethods(lua_State* L, int t)
 #endif
 #if defined(MOD_API_LUA_EXTENSIONS) && defined(MOD_BALANCE_CORE)
 	Method(GetBaseYieldRateFromCSAlliance);
-	Method(GetCorporationYieldChange);
-	Method(GetCorporationYieldModChange);
-	Method(GetCorporationResourceQuantity);
-	Method(GetCorporationGPChange);
+	Method(GetBuildingYieldChangeFromCorporationFranchises);
+	Method(GetYieldChangeFromCorporationFranchises);
+	Method(GetTradeRouteCityMod);
+	Method(GetResourceQuantityPerXFranchises);
+	Method(GetGPRateModifierPerXFranchises);
 	Method(IsFranchised);
+	Method(DoFranchiseAtCity);
 	Method(HasOffice);
 	Method(GetYieldChangeTradeRoute);
 	Method(GetSpecialistYieldChange);
@@ -683,6 +694,7 @@ void CvLuaCity::PushMethods(lua_State* L, int t)
 	Method(SetAdditionalFood);
 #endif
 #if defined(MOD_BALANCE_CORE_EVENTS)
+	Method(GetDisabledTooltip);
 	Method(GetScaledEventChoiceValue);
 	Method(IsCityEventChoiceActive);
 	Method(DoCityEventChoice);
@@ -3193,6 +3205,38 @@ int CvLuaCity::lGetNumBuildings(lua_State* L)
 	lua_pushinteger(L, iResult);
 	return 1;
 }
+#if defined(MOD_BALANCE_CORE)
+int CvLuaCity::lGetNumTotalBuildings(lua_State* L)
+{
+	CvCity* pkCity = GetInstance(L);
+	int iResult = 0;
+	const bool bSkipDummy = luaL_optbool(L, 2, true);
+	const bool bSkipWW = luaL_optbool(L, 3, true);
+	const bool bSkipNW = luaL_optbool(L, 4, true);
+	for(int iBuildingLoop = 0; iBuildingLoop < GC.getNumBuildingInfos(); iBuildingLoop++)
+	{
+		const BuildingTypes eBuilding = static_cast<BuildingTypes>(iBuildingLoop);
+		CvBuildingEntry* pkBuildingInfo = GC.getBuildingInfo(eBuilding);
+
+		if(pkBuildingInfo)
+		{
+			if(bSkipDummy && pkBuildingInfo->IsDummy())
+				continue;
+
+			if(bSkipWW && ::isWorldWonderClass(pkBuildingInfo->GetBuildingClassInfo()))
+				continue;
+
+			if(bSkipNW && ::isNationalWonderClass(pkBuildingInfo->GetBuildingClassInfo()))
+				continue;
+
+			iResult += pkCity->GetCityBuildings()->GetNumBuilding(eBuilding);
+		}
+	}
+
+	lua_pushinteger(L, iResult);
+	return 1;
+}
+#endif
 
 //------------------------------------------------------------------------------
 //int GetWonderProductionModifier();
@@ -4355,7 +4399,17 @@ int CvLuaCity::lGetSpecialistCityModifier(lua_State* L)
 {
 	CvCity* pkCity = GetInstance(L);
 	const int iIndex = lua_tointeger(L, 2);
-	const int iResult = pkCity->GetSpecialistRateModifier(toValue<SpecialistTypes>(L, 2));
+	int iResult = pkCity->GetSpecialistRateModifier(toValue<SpecialistTypes>(L, 2));
+
+	int iNumPuppets = GET_PLAYER(pkCity->getOwner()).GetNumPuppetCities();
+	if(iNumPuppets > 0)
+	{
+		GreatPersonTypes eGreatPerson = GetGreatPersonFromSpecialist((SpecialistTypes)toValue<SpecialistTypes>(L, 2));
+		if(eGreatPerson != NO_GREATPERSON)
+		{
+			iResult += (iNumPuppets * GET_PLAYER(pkCity->getOwner()).GetPlayerTraits()->GetPerPuppetGreatPersonRateModifier(eGreatPerson));			
+		}
+	}
 
 	lua_pushinteger(L, iResult);
 	return 1;
@@ -4892,7 +4946,11 @@ int CvLuaCity::lGetOrderFromQueue(lua_State* L)
 		{
 			lua_pushinteger(L, pkOrder->eOrderType);
 			lua_pushinteger(L, pkOrder->iData1);
+#if defined(MOD_BUGFIX_LUA_API)
+			lua_pushinteger(L, pkOrder->iData2);
+#else
 			lua_pushinteger(L, pkOrder->iData1);
+#endif
 			lua_pushboolean(L, pkOrder->bSave);
 			lua_pushboolean(L, pkOrder->bRush);
 			return 5;
@@ -4980,31 +5038,38 @@ int CvLuaCity::lGetBaseYieldRateFromCSAlliance(lua_State* L)
 	lua_pushinteger(L, iResult);
 	return 1;
 }
-int CvLuaCity::lGetCorporationYieldChange(lua_State* L)
+int CvLuaCity::lGetBuildingYieldChangeFromCorporationFranchises(lua_State* L)
+{
+	CvCity* pkCity = GetInstance(L);
+	const BuildingClassTypes eBuildingClass = (BuildingClassTypes)lua_tointeger(L, 2);
+	const YieldTypes eIndex = (YieldTypes)lua_tointeger(L, 3);
+	int iResult = pkCity->GetBuildingYieldChangeFromCorporationFranchises(eBuildingClass, eIndex);
+	lua_pushinteger(L, iResult);
+	return 1;
+}
+int CvLuaCity::lGetYieldChangeFromCorporationFranchises(lua_State* L)
 {
 	CvCity* pkCity = GetInstance(L);
 	const YieldTypes eIndex = (YieldTypes)lua_tointeger(L, 2);
-	int iFranchises = GET_PLAYER(pkCity->getOwner()).GetCorporateFranchisesWorldwide();
-	const int iResult = (pkCity->GetCorporationYieldChange(eIndex) * iFranchises);
+	int iResult = pkCity->GetYieldChangeFromCorporationFranchises(eIndex);
+	lua_pushinteger(L, iResult);
+	return 1;
+}
+int CvLuaCity::lGetTradeRouteCityMod(lua_State* L)
+{
+	CvCity* pkCity = GetInstance(L);
+	const YieldTypes eIndex = (YieldTypes)lua_tointeger(L, 2);
+	const int iResult = (pkCity->GetTradeRouteCityMod(eIndex));
 
 	lua_pushinteger(L, iResult);
 	return 1;
 }
-int CvLuaCity::lGetCorporationYieldModChange(lua_State* L)
-{
-	CvCity* pkCity = GetInstance(L);
-	const YieldTypes eIndex = (YieldTypes)lua_tointeger(L, 2);
-	const int iResult = (pkCity->GetCorporationYieldModChange(eIndex));
-
-	lua_pushinteger(L, iResult);
-	return 1;
-}
-int CvLuaCity::lGetCorporationResourceQuantity(lua_State* L)
+int CvLuaCity::lGetResourceQuantityPerXFranchises(lua_State* L)
 {
 	CvCity* pkCity = GetInstance(L);
 	const int iResource = lua_tointeger(L, 2);
-	int iFranchises = GET_PLAYER(pkCity->getOwner()).GetCorporateFranchisesWorldwide();
-	int iCorpResource = pkCity->GetCorporationResourceQuantity((ResourceTypes)iResource);
+	int iFranchises = GET_PLAYER(pkCity->getOwner()).GetCorporations()->GetNumFranchises();
+	int iCorpResource = pkCity->GetResourceQuantityPerXFranchises((ResourceTypes)iResource);
 	int iResult = 0;
 	if(iCorpResource > 0)
 	{
@@ -5014,11 +5079,10 @@ int CvLuaCity::lGetCorporationResourceQuantity(lua_State* L)
 	lua_pushinteger(L, iResult);
 	return 1;
 }
-int CvLuaCity::lGetCorporationGPChange(lua_State* L)
+int CvLuaCity::lGetGPRateModifierPerXFranchises(lua_State* L)
 {
 	CvCity* pkCity = GetInstance(L);
-	int iFranchises = GET_PLAYER(pkCity->getOwner()).GetCorporateFranchisesWorldwide();
-	const int iResult = (pkCity->GetCorporationGPChange() * iFranchises);
+	const int iResult = (pkCity->GetGPRateModifierPerXFranchises());
 
 	lua_pushinteger(L, iResult);
 	return 1;
@@ -5028,15 +5092,23 @@ int CvLuaCity::lIsFranchised(lua_State* L)
 	bool bResult = false;
 	CvCity* pkCity = GetInstance(L);
 	const PlayerTypes ePlayer = (PlayerTypes)lua_tointeger(L, 2);
-	bResult = pkCity->IsFranchised(ePlayer);
+	bResult = pkCity->IsHasFranchise(GET_PLAYER(ePlayer).GetCorporations()->GetFoundedCorporation());
 	lua_pushboolean(L, bResult);
+	return 1;
+}
+int CvLuaCity::lDoFranchiseAtCity(lua_State* L)
+{
+	bool bResult = false;
+	CvCity* pkCity = GetInstance(L);
+	CvCity* pkDestCity = GetInstance(L, 2);
+	GET_PLAYER(pkCity->getOwner()).GetCorporations()->BuildFranchiseInCity(pkCity, pkDestCity);
 	return 1;
 }
 int CvLuaCity::lHasOffice(lua_State* L)
 {
 	bool bResult = false;
 	CvCity* pkCity = GetInstance(L);
-	bResult = pkCity->HasOffice();
+	bResult = pkCity->IsHasOffice();
 	lua_pushboolean(L, bResult);
 	return 1;
 }
@@ -5072,6 +5144,9 @@ int CvLuaCity::lGetSpecialistYieldChange(lua_State* L)
 	{
 		iRtnValue += GC.GetGameBeliefs()->GetEntry(eSecondaryPantheon)->GetSpecialistYieldChange(eSpecialist, eYield);
 	}
+#if defined(MOD_BALANCE_CORE_EVENTS)
+	iRtnValue += pkCity->GetEventSpecialistYield(eSpecialist, eYield);
+#endif
 
 	lua_pushinteger(L, iRtnValue);
 
@@ -5087,12 +5162,14 @@ int CvLuaCity::lGetModFromWLTKD(lua_State* L)
 	{
 		const PlayerTypes ePlayer = pkCity->getOwner();
 		CvGameReligions* pReligions = GC.getGame().GetGameReligions();
-		ReligionTypes eReligion = GET_PLAYER(ePlayer).GetReligions()->GetReligionCreatedByPlayer();
+		ReligionTypes eReligion = pkCity->GetCityReligions()->GetReligiousMajority();
 		if(eReligion != NO_RELIGION)
 		{
 			const CvReligion* pReligion = pReligions->GetReligion(eReligion, ePlayer);
 			iRtnValue = pReligion->m_Beliefs.GetYieldFromWLTKD((YieldTypes)eYield);
 		}
+		iRtnValue += GET_PLAYER(ePlayer).GetYieldFromWLTKD((YieldTypes)eYield);
+		iRtnValue += pkCity->GetYieldFromWLTKD((YieldTypes)eYield);
 	}
 	lua_pushinteger(L, iRtnValue);
 
@@ -5300,7 +5377,7 @@ int CvLuaCity::lGetSpecialistYield(lua_State* L)
 
 	const PlayerTypes ePlayer = pkCity->getOwner();
 
-	const int iValue = GET_PLAYER(ePlayer).specialistYield(eSpecialist, eYield);
+	const int iValue = (GET_PLAYER(ePlayer).specialistYield(eSpecialist, eYield) + pkCity->getSpecialistExtraYield(eSpecialist, eYield));
 
 	lua_pushinteger(L, iValue);
 
@@ -5485,6 +5562,19 @@ int CvLuaCity::lSetAdditionalFood(lua_State* L)
 }
 #endif
 #if defined(MOD_BALANCE_CORE_EVENTS)
+int CvLuaCity::lGetDisabledTooltip(lua_State* L)
+{
+	CvString DisabledTT = "";
+	CvCity* pkCity = GetInstance(L);
+	const CityEventChoiceTypes eEventChoice = (CityEventChoiceTypes)lua_tointeger(L, 2);
+	if(eEventChoice != NO_EVENT_CHOICE_CITY)
+	{
+		DisabledTT = pkCity->GetDisabledTooltip(eEventChoice);
+	}
+
+	lua_pushstring(L, DisabledTT.c_str());
+	return 1;
+}
 int CvLuaCity::lGetScaledEventChoiceValue(lua_State* L)
 {
 	CvString CoreYieldTip = "";
@@ -5531,14 +5621,6 @@ int CvLuaCity::lIsCityEventChoiceActive(lua_State* L)
 										{
 											if(pkEventInfo->getNumChoices() == 1)
 											{
-												if(pkCity->GetEventCooldown(eEvent) > 0)
-												{
-													bResult = true;
-													break;
-												}
-											}
-											else
-											{
 												bResult = true;
 												break;
 											}
@@ -5551,11 +5633,7 @@ int CvLuaCity::lIsCityEventChoiceActive(lua_State* L)
 				}
 				else
 				{		
-					if(pkEventChoiceInfo->isOneShot() && pkCity->IsEventChoiceFired(eEventChoice))
-					{
-						bResult = true;
-					}
-					else if(pkEventChoiceInfo->Expires())
+					if(pkEventChoiceInfo->isOneShot() || pkEventChoiceInfo->Expires())
 					{
 						bResult = true;
 					}

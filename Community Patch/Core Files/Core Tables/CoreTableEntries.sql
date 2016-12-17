@@ -55,15 +55,37 @@ ALTER TABLE Beliefs ADD COLUMN 'RequiresResource' BOOLEAN DEFAULT 0;
 
 -- NOTE: THESE TWO (RequiresImprovement and RequiresResource) interact, and can be used to refine belief yields.
 
--- Belief requires no improvement on a terrain type to grant its yield.
+-- Belief requires no improvement to grant its yield on a tile.
 
 ALTER TABLE Beliefs ADD COLUMN 'RequiresNoImprovement' BOOLEAN DEFAULT 0;
 
--- Belief requires no improvement on a feature type to grant its yield.
+-- Belief requires no feature to grant its yield on a tile. Ignore the 'improvement' part.
 
 ALTER TABLE Beliefs ADD COLUMN 'RequiresNoImprovementFeature' BOOLEAN DEFAULT 0;
 
 -- NOTE: THESE TWO (RequiresNoImprovement and RequiresNoImprovementFeature) interact, and can be used to refine belief yields.
+
+-- Belief - reduces policy cost of Wonders by 1 for every x cities following religion
+
+ALTER TABLE Beliefs ADD COLUMN 'PolicyReductionWonderXFollowerCities' INTEGER DEFAULT 0;
+
+-- Policy - increases potency of beakers for GSs
+ALTER TABLE Policies ADD COLUMN 'GreatScientistBeakerModifier' INTEGER DEFAULT 0;
+
+-- Policy - reduces policy cost of Wonders by 1 for every x CS allies
+ALTER TABLE Policies ADD COLUMN 'XCSAlliesLowersPolicyNeedWonders' INTEGER DEFAULT 0;
+
+-- Policy - reduce speed of people stealing Great Works from you.
+ALTER TABLE Policies ADD COLUMN 'StealGWSlowerModifier' INTEGER DEFAULT 0;
+-- Policy - increase speed of your Great Work theft rate.
+ALTER TABLE Policies ADD COLUMN 'StealGWFasterModifier' INTEGER DEFAULT 0;
+
+-- Policy Branch - number of unlocked policies (finishers excluded) before branch is unlocked.
+ALTER TABLE PolicyBranchTypes ADD COLUMN 'NumPolicyRequirement' INTEGER DEFAULT 100;
+
+-- Belief - increases pressure from trade routes
+
+ALTER TABLE Beliefs ADD COLUMN 'PressureChangeTradeRoute' INTEGER DEFAULT 0;
 
 -- Give CSs defensive units at the beginning of the game.
 
@@ -99,6 +121,10 @@ ALTER TABLE Traits ADD COLUMN 'IsOddEraScaler' BOOLEAN DEFAULT 0;
 -- No natural religion spread to/from unowned cities
 
 ALTER TABLE Traits ADD COLUMN 'NoNaturalReligionSpread' BOOLEAN DEFAULT 0;
+
+-- No trade routes to player if not already trading w/ you, tourism penalty if not trading (-50%)
+
+ALTER TABLE Traits ADD COLUMN 'NoOpenTrade' BOOLEAN DEFAULT 0;
 
 -- Earn a free building only in your capital as your trait. No tech requirement.
 
@@ -144,12 +170,33 @@ ALTER TABLE Traits ADD COLUMN 'EventTourismBoost' INTEGER DEFAULT 0;
 
 ALTER TABLE Traits ADD COLUMN 'EventGP' INTEGER DEFAULT 0;
 
+-- Picks a random Great Engineer, Great Scietist, or Great Merchant Points to Player Cities (scaling with era) when you adopt a new social policy, ideology, or branch.
+ALTER TABLE Traits ADD COLUMN 'PolicyGEorGM' INTEGER DEFAULT 0;
+
+-- Changes City Ranged Strike during Golden Ages
+ALTER TABLE Traits ADD COLUMN 'GAGarrisonCityRangeStrikeModifier' INTEGER DEFAULT 0;
+
+-- Player enters a golden age on a declaration of war, either as attacking or defending
+ALTER TABLE Traits ADD COLUMN 'GoldenAgeOnWar' BOOLEAN DEFAULT 0;
+
 -- Grants a free valid promotion to a unit when it is on a type of improvement (farm, mine, etc.).
 
 ALTER TABLE Improvements ADD COLUMN 'UnitFreePromotion' TEXT DEFAULT NULL;
 
+-- Grants Free Experience when Unit is On Improvement plot (must be owned) on Do Turn.
+ALTER TABLE Improvements ADD COLUMN 'UnitPlotExperience' INTEGER DEFAULT 0;
+
+-- Grants Free Experience when Unit is On Improvement plot during Golden Ages (must be owned) on Do Turn.
+ALTER TABLE Improvements ADD COLUMN 'GAUnitPlotExperience' INTEGER DEFAULT 0;
+
+-- Activates the above two, UnitPlotExperience and GAUnitPlotExperience.
+ALTER TABLE Improvements ADD COLUMN 'IsExperience' BOOLEAN DEFAULT 0;
+
 -- Allows you to set a tech that makes an impassable terrain/feature element passable.
 ALTER TABLE Features ADD COLUMN 'PassableTechFeature' TEXT DEFAULT NULL;
+
+-- Allows you to set a promotion gained for owning a feature. Applies to new units.
+ALTER TABLE Features ADD COLUMN 'FreePromotionIfOwned' TEXT DEFAULT NULL;
 
 -- Allows you to set a tech that makes an impassable terrain/feature element passable.
 ALTER TABLE Terrains ADD COLUMN 'PassableTechTerrain' TEXT DEFAULT NULL;
@@ -165,6 +212,9 @@ ALTER TABLE Features ADD COLUMN 'SpawnLocationUnitFreePromotion' TEXT DEFAULT NU
 -- Grants a free valid promotion to a unit when it spawns adjacent to a type of feature (forest, marsh, etc.). Generally used for barbarians.
 
 ALTER TABLE Features ADD COLUMN 'AdjacentSpawnLocationUnitFreePromotion' TEXT DEFAULT NULL;
+
+--Ability to add additional Natural Wonders with Graphics
+ALTER TABLE Features ADD PseudoNaturalWonder INTEGER DEFAULT 0;
 
 -- Grants a free valid promotion to a unit when it enters a type of terrain (grassland, plains, coast, etc.).
 
@@ -190,6 +240,9 @@ ALTER TABLE Units ADD COLUMN 'FoundLate' BOOLEAN DEFAULT 0;
 -- Adds marker for city attack only units (for AI)
 ALTER TABLE Units ADD COLUMN 'CityAttackOnly' BOOLEAN DEFAULT 0;
 
+-- Adds Culture from experience to owner of unit when disbanded or upgraded
+ALTER TABLE Units ADD COLUMN 'CulExpOnDisbandUpgrade' BOOLEAN DEFAULT 0;
+
 -- Adds minimum national population requirement for a building.
 ALTER TABLE Buildings ADD COLUMN 'NationalPopRequired' INTEGER DEFAULT 0;
 
@@ -206,9 +259,9 @@ ALTER TABLE Buildings ADD COLUMN 'BorderObstacleWater' INTEGER DEFAULT 0;
 ALTER TABLE Policies ADD COLUMN 'UpgradeCSTerritory' BOOLEAN DEFAULT 0;
 
 -- Adds event tourism from digging up sites.
-ALTER TABLE Policies ADD COLUMN 'ArchaeologicalDigTourism' BOOLEAN DEFAULT 0;
+ALTER TABLE Policies ADD COLUMN 'ArchaeologicalDigTourism' INTEGER DEFAULT 0;
 -- Adds event tourism from golden ages starting.
-ALTER TABLE Policies ADD COLUMN 'GoldenAgeTourism' BOOLEAN DEFAULT 0;
+ALTER TABLE Policies ADD COLUMN 'GoldenAgeTourism' INTEGER DEFAULT 0;
 
 -- Reduces specialist unhappiness in cities by a set amount, either in capital or in all cities.
 
@@ -218,14 +271,14 @@ ALTER TABLE Policies ADD COLUMN 'NoUnhappfromXSpecialistsCapital' INTEGER DEFAUL
 -- Half specialist food in just capital
 ALTER TABLE Policies ADD COLUMN 'HalfSpecialistFoodCapital' BOOLEAN DEFAULT 0;
 
--- Flat boosts to city yield for happiness sources (buildings) - values should be positive to be good!
+-- % modifiers to city unhappiness sources - values should be negative to be good!
 ALTER TABLE Buildings ADD COLUMN 'PovertyHappinessChange' INTEGER DEFAULT 0;
 ALTER TABLE Buildings ADD COLUMN 'DefenseHappinessChange' INTEGER DEFAULT 0;
 ALTER TABLE Buildings ADD COLUMN 'IlliteracyHappinessChange' INTEGER DEFAULT 0;
 ALTER TABLE Buildings ADD COLUMN 'UnculturedHappinessChange' INTEGER DEFAULT 0;
 ALTER TABLE Buildings ADD COLUMN 'MinorityHappinessChange' INTEGER DEFAULT 0;
 
--- Flat global boosts to city yield for happiness sources (buildings) - values should be positive to be good!
+-- % global modifiers to city unhappiness sources - values should be negative to be good!
 ALTER TABLE Buildings ADD COLUMN 'PovertyHappinessChangeGlobal' INTEGER DEFAULT 0;
 ALTER TABLE Buildings ADD COLUMN 'DefenseHappinessChangeGlobal' INTEGER DEFAULT 0;
 ALTER TABLE Buildings ADD COLUMN 'IlliteracyHappinessChangeGlobal' INTEGER DEFAULT 0;
@@ -353,7 +406,7 @@ ALTER TABLE Policies ADD COLUMN 'DoubleBorderGA' BOOLEAN DEFAULT 0;
 -- Free Population
 ALTER TABLE Policies ADD COLUMN 'FreePopulation' INTEGER DEFAULT 0;
 
--- Extra Votes
+-- Extra Moves for Civilian Units
 ALTER TABLE Policies ADD COLUMN 'ExtraMoves' INTEGER DEFAULT 0;
 
 -- Religious Pressure Mod Trade Route
@@ -453,6 +506,9 @@ ALTER TABLE Buildings ADD COLUMN 'AllowsPuppetPurchase' BOOLEAN DEFAULT 0;
 -- Creates a resource unique to this civ (i.e. Indonesian Candi) in the territory around the city. To make this work with a civ, you'll need to create a new resource modelled on the Indonesian resources and assign them to the civ. Value is indicative of the number of resources that will be granted.
 ALTER TABLE Buildings ADD COLUMN 'GrantsRandomResourceTerritory' INTEGER DEFAULT 0;
 
+-- Quantity of Resources to place in your Territory. Must be used with 'Building_ResourcePlotsToPlace'. Works like "GrantsRandomResourceTerritory", but any resource in table Resources can be used.
+ALTER TABLE Buildings ADD COLUMN 'ResourceQuantityToPlace' INTEGER DEFAULT 0;
+
 -- Boosts trade route religious pressure on buildings
 ALTER TABLE Buildings ADD COLUMN 'TradeReligionModifier' INTEGER DEFAULT 0;
 
@@ -511,6 +567,7 @@ ALTER TABLE Units ADD COLUMN 'PuppetPurchaseOverride' BOOLEAN DEFAULT 0;
 
 -- Grants resource to improvement
 ALTER TABLE Improvements ADD COLUMN 'ImprovementResource' TEXT DEFAULT NULL;
+ALTER TABLE Improvements ADD COLUMN 'ImprovementResourceQuantity' INTEGER DEFAULT 0;
 
 -- Grants obsoletion tech to build (tie to improvement below for function)
 ALTER TABLE Builds ADD COLUMN 'ObsoleteTech' TEXT DEFAULT NULL;
@@ -588,9 +645,47 @@ ALTER TABLE UnitPromotions ADD COLUMN 'BarbarianOnly' BOOLEAN DEFAULT 0;
 
 ALTER TABLE UnitPromotions ADD COLUMN 'CityStateOnly' BOOLEAN DEFAULT 0;
 
+-- Promotion grants the same bonus as the Japan UA
+ALTER TABLE UnitPromotions ADD COLUMN 'StrongerDamaged' BOOLEAN DEFAULT 0;
+
+-- Double Movement on Mountains
+ALTER TABLE UnitPromotions ADD COLUMN 'MountainsDoubleMove' BOOLEAN DEFAULT 0;
+
 -- Double Heal in Feature/Terrain
 ALTER TABLE UnitPromotions_Features ADD COLUMN 'DoubleHeal' BOOLEAN DEFAULT 0;
 ALTER TABLE UnitPromotions_Terrains ADD COLUMN 'DoubleHeal' BOOLEAN DEFAULT 0;
+
+-- Combat Modifier for determined range near a defined UnitClass
+ALTER TABLE UnitPromotions ADD CombatBonusFromNearbyUnitClass INTEGER DEFAULT -1;
+ALTER TABLE UnitPromotions ADD NearbyUnitClassBonusRange INTEGER DEFAULT 0;
+ALTER TABLE UnitPromotions ADD NearbyUnitClassBonus INTEGER DEFAULT 0;
+
+-- Requres some Explanation: Unit A has X promotion, Unit B gains promotion by adding these Values to a Promotion that it wishes to gain when near some distance
+-- AddedFromNearbyPromotion = 'Unit A's promotion' IsNearbyPromotion must be set to 1 or true, and NearbyRange is distance in which the promotion triggers.
+ALTER TABLE UnitPromotions ADD AddedFromNearbyPromotion INTEGER DEFAULT -1;
+ALTER TABLE UnitPromotions ADD IsNearbyPromotion BOOLEAN DEFAULT 0;
+ALTER TABLE UnitPromotions ADD NearbyRange INTEGER DEFAULT 0;
+
+-- A unit gains a promotion if "NearbyRange" is set to a distance from City, RequiredUnit must be set to the unit that you wish to give the promotion to.
+ALTER TABLE UnitPromotions ADD IsNearbyCityPromotion BOOLEAN DEFAULT 0;
+ALTER TABLE UnitPromotions ADD IsNearbyFriendlyCityPromotion BOOLEAN DEFAULT 0;
+ALTER TABLE UnitPromotions ADD IsNearbyEnemyCityPromotion BOOLEAN DEFAULT 0;
+ALTER TABLE UnitPromotions ADD IsFriendlyLands BOOLEAN DEFAULT 0;
+ALTER TABLE UnitPromotions ADD RequiredUnit TEXT DEFAULT NULL REFERENCES Units(Type);
+
+-- Allows you to Convert a unit when it X plot is a different domain, e.g. A great general becomes a great admiral, etc.
+ALTER TABLE UnitPromotions ADD ConvertDomainUnit TEXT DEFAULT NULL REFERENCES Units(Type);
+ALTER TABLE UnitPromotions ADD ConvertDomain TEXT DEFAULT NULL REFERENCES Domains(Type);
+ALTER TABLE Units ADD IsConvertUnit BOOLEAN DEFAULT 0;
+
+-- City Gains Wonder Production Modifier while this Unit is stationed in this City
+ALTER TABLE UnitPromotions ADD WonderProductionModifier INTEGER DEFAULT 0;
+
+-- % of Total Wonder Production Modifier from traits, policies, beliefs, units, improvements, etc. is added to building production modifier when building non-wonderclass buildings, value of 100 is all, 50 is 50%, etc.
+ALTER TABLE Traits ADD WonderProductionModifierToBuilding INTEGER DEFAULT 0;
+
+--Grants Wonder Production Modifier based on number of City Improvements. Value is % gained.
+ALTER TABLE Improvements ADD WonderProductionModifier INTEGER DEFAULT 0;
 
 -- Unit stuff for minor civs
 ALTER TABLE Units ADD COLUMN 'MinorCivGift' BOOLEAN DEFAULT 0;
@@ -619,6 +714,9 @@ ALTER TABLE Buildings ADD COLUMN 'PurchaseCooldown' INTEGER DEFAULT 0;
 -- Allows Courthouses to be built in any city
 ALTER TABLE Buildings ADD COLUMN 'BuildAnywhere' BOOLEAN DEFAULT 0;
 
+-- Builds 1+ artifact in the building, up to the number of artifact slots in the building.
+ALTER TABLE Buildings ADD COLUMN 'FreeArtifacts' INTEGER DEFAULT 0;
+
 -- Adds Mounted trait to a unit that isn't in the unitcombat_mounted combat class
 ALTER TABLE Units ADD COLUMN 'IsMounted' BOOLEAN DEFAULT 0;
 
@@ -643,11 +741,27 @@ ALTER TABLE Traits ADD COLUMN 'StartingSpies' INTEGER DEFAULT 0;
 -- Spies begin at x rank
 ALTER TABLE Traits ADD COLUMN 'StartingSpyRank' INTEGER DEFAULT 0;
 
+-- Boost CS Quest Value
+ALTER TABLE Traits ADD COLUMN 'MinorQuestYieldModifier' INTEGER DEFAULT 0;
+
 -- Limits the amount that can be built of a Unit class per city
 ALTER TABLE UnitClasses ADD COLUMN 'UnitInstancePerCity' INTEGER DEFAULT -1;
 
 -- Trade Route Internal Capital Bonus -- policy -- Internal TR from Capital stronger!
 ALTER TABLE Policies ADD COLUMN 'InternalTradeRouteYieldModifierCapital' INTEGER DEFAULT 0;
+
+-- Great Engineer Policy bonus - rate modifier.
+ALTER TABLE Policies ADD COLUMN 'GreatEngineerRateModifier' INTEGER DEFAULT 0;
+
+-- Great Engineer Policy bonus - rate modifier.
+ALTER TABLE Policies ADD COLUMN 'CityStateCombatModifier' INTEGER DEFAULT 0;
+
+-- Trade Route Modifiers for Policies
+ALTER TABLE Policies ADD COLUMN 'TradeRouteLandDistanceModifier' INTEGER DEFAULT 0;
+ALTER TABLE Policies ADD COLUMN 'TradeRouteSeaDistanceModifier' INTEGER DEFAULT 0;
+
+--Espionage Modifier for Policies - should be negative for player benefit!
+ALTER TABLE Policies ADD COLUMN 'EspionageModifier' INTEGER DEFAULT 0;
 
 -- C4DF Function
 
@@ -685,27 +799,22 @@ ALTER TABLE Buildings ADD COLUMN 'BlockScienceTheft' INTEGER DEFAULT 0;
 ALTER TABLE Buildings ADD COLUMN 'BlockGoldTheft' INTEGER DEFAULT 0;
 
 
-
--- CORPORATIONS
-ALTER TABLE Policies ADD COLUMN 'MaxCorporations' INTEGER DEFAULT 0;
-ALTER TABLE Buildings ADD COLUMN 'CorporationMaxFranchises' INTEGER DEFAULT 0;
-ALTER TABLE Buildings ADD COLUMN 'FreeBuildingTradeTargetCity' TEXT DEFAULT NULL;
-ALTER TABLE Buildings ADD COLUMN 'CorporationID' INTEGER DEFAULT 0;
-ALTER TABLE Buildings ADD COLUMN 'CorporationHQID' INTEGER DEFAULT 0;
-ALTER TABLE Buildings ADD COLUMN 'CorporationGPChange' INTEGER DEFAULT 0;
-ALTER TABLE Buildings ADD COLUMN 'TradeRouteInvulnerable' BOOLEAN DEFAULT 0;
-ALTER TABLE Buildings ADD COLUMN 'TRSpeedBoost' INTEGER DEFAULT 0;
-ALTER TABLE Buildings ADD COLUMN 'TRVisionBoost' INTEGER DEFAULT 0;
-ALTER TABLE Buildings ADD COLUMN 'CorporationResourceBonusHelp' TEXT DEFAULT NULL;
-ALTER TABLE Buildings ADD COLUMN 'CorporationOfficeBonusHelp' TEXT DEFAULT NULL;
-ALTER TABLE Buildings ADD COLUMN 'CorporationTradeRouteBonusHelp' TEXT DEFAULT NULL;
-ALTER TABLE Buildings ADD COLUMN 'CorporationHelper' TEXT DEFAULT NULL;
-ALTER TABLE Buildings ADD COLUMN 'OfficeBenefitHelper' TEXT DEFAULT NULL;
+-- Resources
 ALTER TABLE Resources ADD COLUMN 'StrategicHelp' TEXT DEFAULT NULL;
 
-ALTER TABLE Policies ADD COLUMN 'OrderCorporation' BOOLEAN DEFAULT 0;
-ALTER TABLE Policies ADD COLUMN 'AutocracyCorporation' BOOLEAN DEFAULT 0;
-ALTER TABLE Policies ADD COLUMN 'FreedomCorporation' BOOLEAN DEFAULT 0;
+-- CORPORATIONS
+ALTER TABLE Technologies ADD COLUMN 'CorporationsEnabled' BOOLEAN;
+
+ALTER TABLE Buildings ADD COLUMN 'IsCorporation' BOOLEAN DEFAULT 0;
+ALTER TABLE Buildings ADD COLUMN 'GPRateModifierPerXFranchises' INTEGER DEFAULT 0;
+ALTER TABLE Buildings ADD COLUMN 'TRSpeedBoost' INTEGER DEFAULT 0;
+ALTER TABLE Buildings ADD COLUMN 'TRVisionBoost' INTEGER DEFAULT 0;
+ALTER TABLE Buildings ADD COLUMN 'OfficeBenefitHelper' TEXT DEFAULT NULL;
+-- Corporation Policies
+ALTER TABLE Policies ADD COLUMN 'CorporationOfficesAsFranchises' BOOLEAN DEFAULT 0;
+ALTER TABLE Policies ADD COLUMN 'CorporationFreeFranchiseAbovePopular' BOOLEAN DEFAULT 0;
+ALTER TABLE Policies ADD COLUMN 'CorporationRandomForeignFranchise' BOOLEAN DEFAULT 0;
+ALTER TABLE Policies ADD COLUMN 'AdditionalNumFranchisesMod' INTEGER DEFAULT 0;				-- 20 = 20% additional, NOT 1/5 of existing value. this stacks, so 120%, 140%, 160%, etc...
 
 -- Minor Civs
 ALTER TABLE MinorCivilizations ADD COLUMN 'BullyUnitClass' TEXT DEFAULT NULL;
@@ -731,7 +840,159 @@ ALTER TABLE Policies ADD COLUMN 'ExtraNaturalWonderHappiness' INTEGER DEFAULT 0;
 -- Worlds
 ALTER TABLE Worlds ADD COLUMN 'MinDistanceCities' INTEGER DEFAULT 0;
 ALTER TABLE Worlds ADD COLUMN 'MinDistanceCityStates' INTEGER DEFAULT 0;
-ALTER TABLE Worlds ADD COLUMN 'ReformationPercentRequired' INTEGER DEFAULT 0;
+ALTER TABLE Worlds ADD COLUMN 'ReformationPercentRequired' INTEGER DEFAULT 100;
+
+-- New City Plot Yields Method
+ALTER TABLE Yields ADD COLUMN 'MinCityFlatFreshWater' INTEGER DEFAULT 0;
+ALTER TABLE Yields ADD COLUMN 'MinCityFlatNoFreshWater' INTEGER DEFAULT 0;
+ALTER TABLE Yields ADD COLUMN 'MinCityHillFreshWater' INTEGER DEFAULT 0;
+ALTER TABLE Yields ADD COLUMN 'MinCityHillNoFreshWater' INTEGER DEFAULT 0;
+ALTER TABLE Yields ADD COLUMN 'MinCityMountainFreshWater' INTEGER DEFAULT 0;
+ALTER TABLE Yields ADD COLUMN 'MinCityMountainNoFreshWater' INTEGER DEFAULT 0;
+
+-- Policy Initialize Number of best units in captial. Requries 'IncludesOneShotFreeUnits' Set to true.
+ALTER TABLE Policies ADD COLUMN 'BestNumberLandCombatUnitClass' INTEGER DEFAULT 0;
+ALTER TABLE Policies ADD COLUMN 'BestNumberLandRangedUnitClass' INTEGER DEFAULT 0;
+ALTER TABLE Policies ADD COLUMN 'BestNumberSeaCombatUnitClass' INTEGER DEFAULT 0;
+ALTER TABLE Policies ADD COLUMN 'BestNumberSeaRangedUnitClass' INTEGER DEFAULT 0;
+
+-- Extra Military Supply from Population
+ALTER TABLE Policies ADD COLUMN 'ExtraSupplyPerPopulation' INTEGER DEFAULT 0;
+
+-- Spawn Best Melee Unit on an Improvement during a DOW
+ALTER TABLE Traits ADD COLUMN 'BestUnitSpawnOnImpDOW' BOOLEAN DEFAULT 0;
+ALTER TABLE Traits ADD BestUnitImprovement TEXT DEFAULT NULL REFERENCES Improvements(Type);
+
+-- Spawn best Melee Type Unit on finishing a Build (accounts for Domain of Build)
+ALTER TABLE Builds ADD IsFreeBestDomainUnit BOOLEAN DEFAULT 0;
+
+-- Unit Upgrades for free when reaching it's UnitClass Upgrade Tech
+ALTER TABLE Units ADD FreeUpgrade BOOLEAN DEFAULT 0;
+
+-- Unit gets a new Combat Strength in specific Era, must be set to 'true' or 1, if using Unit_EraCombatStrength, and Unit_EraCombatStrength must be filled in.
+ALTER TABLE Units ADD UnitEraUpgrade BOOLEAN DEFAULT 0;
+
+-- Grants a free building to a city when founded
+ALTER TABLE Policies ADD NewCityFreeBuilding TEXT DEFAULT NULL REFERENCES BuildingClasses(Type);
+
+-- Promotion grants a unit with XP if stacked with a Great General (or great admiral if a boat)
+ALTER TABLE UnitPromotions ADD COLUMN 'StackedGreatGeneralXP' INTEGER DEFAULT 0;
+
+-- Note: The below entries are used, e.g. mounting or dismounting a unit, say a Lancer gets below 50 HP "DamageThreshold", and can "dismount" and fortify as an Infantry type unit.
+
+-- Unit will convert to another UnitType. Must define a "DamageThreshold" and the "ConvertUnit" Type
+ALTER TABLE Units ADD ConvertOnDamage BOOLEAN DEFAULT 0;
+
+-- Unit will convert to another UnitType if "ConvertOnDamage" and "DamageThreshold" are defined.
+ALTER TABLE Units ADD ConvertUnit TEXT DEFAULT NULL REFERENCES Units(Type);
+
+-- Unit will convert to another UnitType. Must define a "ConvertOnDamage" and the "ConvertUnit" Type
+ALTER TABLE Units ADD DamageThreshold INTEGER DEFAULT 0;
+
+-- Unit will convert to the original UnitType when Max Hip Points are restored. Must define "ConvertUnit" Type to the original Unit.
+ALTER TABLE Units ADD ConvertOnFullHP BOOLEAN DEFAULT 0;
+
+-- Does this Civ get a GG/GA Rate Modifier bonus from denunciations and wars?
+ALTER TABLE Traits ADD COLUMN 'GGGARateFromDenunciationsAndWars' INTEGER DEFAULT 0;
+
+-- Does this civ get a free Unit.Type on Conquest? Must be able to train it first....
+ALTER TABLE Traits ADD FreeUnitOnConquest TEXT DEFAULT NULL REFERENCES Units(Type);
+
+-- Can this unit only be trained during War?
+ALTER TABLE Units ADD WarOnly BOOLEAN DEFAULT 0;
+
+-- Can this unit convert an enemy unit into a barbarian? Must set as well DamageThreshold to a value you want enemy to convert.
+ALTER TABLE Units ADD ConvertEnemyUnitToBarbarian BOOLEAN DEFAULT 0;
+
+-- Civ gets an influence boost and Great Admiral Points when sending a Trade Route to a minor Civ.
+ALTER TABLE Traits ADD COLUMN 'TradeRouteMinorInfluenceAP' BOOLEAN DEFAULT 0;
+
+-- Can this building be built next to any body of water?
+ALTER TABLE Buildings ADD AnyWater BOOLEAN DEFAULT 0;
+
+-- Promotion grants additional combat strength if on a pillaged improvement
+ALTER TABLE UnitPromotions ADD COLUMN 'PillageBonusStrength' INTEGER DEFAULT 0;
+
+-- Improvement can create a feature. Best implemented on Tiles that don't have features.
+ALTER TABLE Improvements ADD COLUMN 'CreatesFeature' INTEGER DEFAULT 0;
+
+-- Start a WLTKD when this unit is born or gained. GP's only.
+ALTER TABLE Units ADD WLTKDFromBirth BOOLEAN DEFAULT 0;
+
+-- Civ cities gets a production modifier (from 1%) for every specialist that they have.
+ALTER TABLE Traits ADD COLUMN 'ProdModFromNumSpecialists' BOOLEAN DEFAULT 0;
+
+-- Player during a Golden Age receives a City Attack modifier definable.
+ALTER TABLE Traits ADD COLUMN 'ConquestOfTheWorldCityAttack' INTEGER DEFAULT 0;
+
+-- Internal trade route yields doubled during Golden Ages, starts a Golden Age when conquering a city and extends if already in Golden Age.
+ALTER TABLE Traits ADD COLUMN 'ConquestOfTheWorld' BOOLEAN DEFAULT 0;
+
+-- Start a GoldenAge when this unit is born or gained. GP's only.
+ALTER TABLE Units ADD 'GoldenAgeFromBirth' BOOLEAN DEFAULT 0;
+
+-- Define a defense modifier to a building, like GlobalDefenseModifier (but only local).
+ALTER TABLE Buildings ADD 'BuildingDefenseModifier' INTEGER DEFAULT 0;
+
+-- Define a modifier for all tile/building based tourism in all cities.
+ALTER TABLE Buildings ADD 'GlobalLandmarksTourismPercent' INTEGER DEFAULT 0;
+
+-- Define a modifier for all great work tourism in all cities.
+ALTER TABLE Buildings ADD 'GlobalGreatWorksTourismModifier' INTEGER DEFAULT 0;
+
+-- Promotion grants additional combat strength if on a pillaged improvement
+ALTER TABLE UnitPromotions ADD COLUMN 'ReligiousPressureModifier' INTEGER DEFAULT 0;
+
+-- Trait allows player to have every unit upgraded once tech is reached.
+ALTER TABLE Traits ADD COLUMN 'FreeUpgrade' BOOLEAN DEFAULT 0;
+
+-- Gain a culture boost equal to 4X the culture per turn when this unit is born. GP's only
+ALTER TABLE Units ADD 'CultureBoost' BOOLEAN DEFAULT 0;
+
+-- Unit gets extra attacks and partial health is restored upon killing an enemy unit.
+ALTER TABLE Units ADD 'ExtraAttackHealthOnKill' BOOLEAN DEFAULT 0;
+
+-- Kills Improvement if set to 1 (use this to reveal a resource on the map, when build is finished etc.)
+ALTER TABLE Builds ADD 'KillImprovement' BOOLEAN DEFAULT 0;
+
+-- Trait allows player to have every unit upgraded once tech is reached.
+ALTER TABLE Traits ADD COLUMN 'VotePerXCSFollowingYourReligion' INTEGER DEFAULT 0;
+
+-- Trait allows player a % chance to convert religious units when they enter player's territory.
+ALTER TABLE Traits ADD COLUMN 'ChanceToConvertReligiousUnits' INTEGER DEFAULT 0;
+
+-- When a unit with this promotion is adjacent to a city, city strength value is boosted by X %.
+ALTER TABLE UnitPromotions ADD COLUMN 'AdjacentCityDefenseMod' INTEGER DEFAULT 0;
+
+-- Traveling Citadel.
+ALTER TABLE UnitPromotions ADD COLUMN 'NearbyEnemyDamage' INTEGER DEFAULT 0;
+
+-- Enemy Units gain the "EnemyLands" promotio when in your territory or Friendly City States or Player's that follow the same Ideology. Must define "EnemyLands" promotion type for this to work (see below).
+ALTER TABLE Traits ADD COLUMN 'WarsawPact' BOOLEAN DEFAULT 0;
+
+-- Units gain this promotion when "WarsawPact" Player is set.
+ALTER TABLE UnitPromotions ADD COLUMN 'EnemyLands' BOOLEAN DEFAULT 0;
+
+-- Unit gains this promotion when adjacent when adjacent to a unit and both units have this Prereq Promotion defined as AdjacentSameType = 'PROMOTION_X'
+ALTER TABLE UnitPromotions ADD AdjacentSameType TEXT DEFAULT NULL REFERENCES UnitPromotions(Type);
+
+-- Build adds an instant yield of culture to Player's culture pool.
+ALTER TABLE Builds ADD CultureBoost BOOLEAN DEFAULT 0;
+
+-- When a unit (civilian or combat) with this promotion is stationed in a City, City gains X% modifier towards building military units.
+ALTER TABLE UnitPromotions ADD COLUMN 'MilitaryProductionModifier' INTEGER DEFAULT 0;
+
+-- Unit gets the "HighSeaRaider" Promotion Entry (if defined) when it plunders a Trade Route.
+ALTER TABLE Units ADD HighSeaRaider BOOLEAN DEFAULT 0;
+
+-- Units gains this promotion when its Unit Entry is a HighSeaRaider
+ALTER TABLE UnitPromotions ADD COLUMN 'HighSeaRaider' BOOLEAN DEFAULT 0;
+
+-- Zulu Pikeman Class Upgrade immediately to Impi's upon discovering Impi tech, assuming Impi is not a Pikeman, but a Renaissance Unit.
+ALTER TABLE Traits ADD COLUMN 'FreeZuluPikemanToImpi' BOOLEAN DEFAULT 0;
+
+-- Improvement grants new Ownership if plot is not owned.
+ALTER TABLE Improvements ADD COLUMN 'NewOwner' BOOLEAN DEFAULT 0;
 
 -- CSD
 
@@ -794,3 +1055,34 @@ ALTER TABLE Technologies	ADD		VassalageTradingAllowed			boolean;									-- Enab
 ALTER TABLE Eras			ADD		VassalageEnabled				boolean;									-- Enables Vassalage (era)
 ALTER TABLE Resolutions		ADD		VassalMaintenanceGoldPercent	integer	DEFAULT	0;
 ALTER TABLE Resolutions		ADD		EndAllCurrentVassals			boolean	DEFAULT	0;
+
+-- Whoward Tables
+
+ALTER TABLE Traits
+  ADD GGFromBarbarians INTEGER DEFAULT 0;
+
+INSERT INTO CustomModDbUpdates(Name, Value) VALUES('TRAITS_GG_FROM_BARBARIANS', 1);
+
+
+ALTER TABLE UnitPromotions
+  ADD AuraRangeChange INTEGER DEFAULT 0;
+  
+ALTER TABLE UnitPromotions
+  ADD AuraEffectChange INTEGER DEFAULT 0;
+  
+INSERT OR REPLACE INTO Defines(Name, Value)
+  VALUES('GREAT_GENERAL_MAX_RANGE', 2);
+
+INSERT INTO CustomModDbUpdates(Name, Value) VALUES('PROMOTIONS_AURA_CHANGE', 1);
+
+ALTER TABLE Traits
+  ADD ExtraSupply INTEGER DEFAULT 0;
+
+ALTER TABLE Traits
+  ADD ExtraSupplyPerCity INTEGER DEFAULT 0;
+
+ALTER TABLE Traits
+  ADD ExtraSupplyPerPopulation INTEGER DEFAULT 0;
+
+INSERT INTO CustomModDbUpdates(Name, Value) VALUES('TRAITS_EXTRA_SUPPLY', 1);
+

@@ -64,11 +64,6 @@ public:
 	void ChangeCityConnectionTradeRouteGoldModifier(int iChange);
 	int GetCityConnectionTradeRouteGoldChange() const;
 	void ChangeCityConnectionTradeRouteGoldChange(int iChange);
-#if defined(MOD_EVENTS_CITY_CONNECTIONS)
-	bool HasCityConnectionRouteBetweenCities(CvCity* pFirstCity, CvCity* pSecondCity) const;
-#else
-	bool HasCityConnectionRouteBetweenCities(CvCity* pFirstCity, CvCity* pSecondCity, bool bBestRoute = false) const;
-#endif
 
 	// Gold from international trade routes
 	int GetGoldPerTurnFromTradeRoutes() const;
@@ -129,6 +124,9 @@ public:
 	int GetExpensePerTurnFromVassalTaxesTimes100() const;
 	int GetExpensePerTurnFromVassalTaxes() const;
 	void SetExpensePerTurnFromVassalTaxesTimes100(int iValue);
+#endif
+#if defined(MOD_BALANCE_CORE)
+	int GetContractGoldMaintenance();
 #endif
 
 protected:

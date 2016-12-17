@@ -115,7 +115,7 @@ public:
 	bool IsConnectionInternational (const TradeConnection& kTradeConnection);
 
 	bool IsCityConnectedToPlayer (CvCity* pCity, PlayerTypes eOtherPlayer, bool bOnlyOwnedByCityOwner);
-	bool IsPlayerConnectedToPlayer (PlayerTypes eFirstPlayer, PlayerTypes eSecondPlayer);
+	bool IsPlayerConnectedToPlayer (PlayerTypes eFirstPlayer, PlayerTypes eSecondPlayer, bool bFirstPlayerOnly = false);
 	int CountNumPlayerConnectionsToPlayer (PlayerTypes eFirstPlayer, PlayerTypes eSecondPlayer);
 
 	bool CitiesHaveTradeConnection (CvCity* pFirstCity, CvCity* pSecondCity);
@@ -187,6 +187,7 @@ public:
 
 	bool HavePotentialTradePath(bool bWater, CvCity* pOriginCity, CvCity* pDestCity, SPath* pPathOut=NULL);
 	void UpdateTradePathCache(uint iOriginPlayer);
+	void InvalidateTradePathCache(uint iPlayer);
 
 protected:
 
@@ -249,6 +250,10 @@ public:
 	int GetTradeConnectionCorporationModifierTimes100(const TradeConnection& kTradeConnection, YieldTypes eYield, bool bAsOriginPlayer);
 	int GetTradeConnectionOpenBordersModifierTimes100(const TradeConnection& kTradeConnection, YieldTypes eYield, bool bAsOriginPlayer);
 #endif
+#if defined(HH_MOD_API_TRADEROUTE_MODIFIERS)
+	int GetTradeConnectionPolicyModifierTimes100(const TradeConnection& kTradeConnection, YieldTypes eYield, bool bAsOriginPlayer);
+#endif
+
 	int GetTradeConnectionValueTimes100 (const TradeConnection& kTradeConnection, YieldTypes eYield, bool bAsOriginPlayer);
 	void UpdateTradeConnectionValues (void); // updates the all the values for the trade routes that go to and from this player
 
@@ -301,6 +306,9 @@ public:
 	int GetNumTradeUnitsRemaining (bool bIncludeBeingBuilt);
 
 	int GetNumDifferentTradingPartners (void);
+#if defined(MOD_BALANCE_CORE)
+	int GetNumDifferentMajorCivTradingPartners(void);
+#endif
 
 	void UpdateTradeConnectionWasPlundered();
 	void AddTradeConnectionWasPlundered(const TradeConnection& kTradeConnection);
@@ -335,8 +343,8 @@ public:
 
 	void DoTurn(void);
 
-	void GetAvailableTR(TradeConnectionList& aTradeConnectionList);
-	void GetPrioritizedTradeRoutes(TradeConnectionList& aTradeConnectionList);
+	void GetAvailableTR(TradeConnectionList& aTradeConnectionList, bool bSkipExisting);
+	void GetPrioritizedTradeRoutes(TradeConnectionList& aTradeConnectionList, bool bSkipExisting);
 
 #if defined(MOD_BALANCE_CORE)
 	int	ScoreInternationalTR (const TradeConnection& kTradeConnection, bool bHaveTourism);

@@ -583,6 +583,9 @@ public:
 
 	// Resolution Effect Queries
 	bool IsTradeEmbargoed(PlayerTypes eTrader, PlayerTypes eRecipient);
+#if defined(MOD_API_EXTENSIONS)
+	bool IsPlayerEmbargoed(PlayerTypes ePlayer);
+#endif
 	bool IsLuxuryHappinessBanned(ResourceTypes eLuxury);
 	int GetResearchMod(TechTypes eTech);
 	int GetFeatureYieldChange(FeatureTypes eFeature, YieldTypes eYield);
@@ -604,6 +607,9 @@ public:
 #endif
 #if defined(MOD_BALANCE_CORE)
 	int GetTourismMod();
+	void DoEnactResolutionPublic(CvEnactProposal* pProposal);
+	void DoRepealResolutionPublic(CvRepealProposal* pProposal);
+
 #endif
 
 	// Text composition for UI
@@ -895,7 +901,7 @@ public:
 	void DoProposals(CvLeague* pLeague);
 
 	// Deals for votes
-	VoteCommitmentList GetDesiredVoteCommitments(PlayerTypes eFromPlayer);
+	VoteCommitmentList GetDesiredVoteCommitments(PlayerTypes eFromPlayer, bool bFlippedLogic = false);
 	bool HasVoteCommitment() const;
 	int GetVoteCommitment(PlayerTypes eToPlayer, int iResolutionID, int iVoteChoice, bool bRepeal);
 	bool CanCommitVote(PlayerTypes eToPlayer, CvString* sTooltipSink = NULL);

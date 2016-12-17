@@ -166,6 +166,12 @@ public:
 	CvCity* GetBestGreatWorkCity(CvPlot *pStartPlot, GreatWorkType eGreatWork) const;
 
 #if defined(MOD_CORE_ALTERNATIVE_EXPLORE_SCORE)
+	void SetExplorersNeeded(int iValue);
+	int GetExplorersNeeded() const;
+
+	void SetNavalExplorersNeeded(int iValue);
+	int GetNavalExplorersNeeded() const;
+
 	static int ScoreExplorePlot2(CvPlot* pPlot, CvPlayer* pPlayer, DomainTypes eDomainType, bool bEmbarked);
 	const std::vector<SPlotWithScore>& GetExplorationPlots(DomainTypes domain);
 #else
@@ -183,6 +189,9 @@ public:
 	void CancelSaveForPurchase(PurchaseType ePurchase);
 	bool CanWithdrawMoneyForPurchase(PurchaseType ePurchase, int iAmount, int iPriority = -1);
 	int AmountAvailableForPurchase(PurchaseType ePurchase);
+#if defined(MOD_BALANCE_CORE)
+	int GetPurchaseSaveAmout(PurchaseType ePurchase);
+#endif
 
 	double GetWorkersToCitiesRatio();
 	double GetImprovedToImprovablePlotsRatio();
@@ -233,7 +242,7 @@ public:
 		return m_iVisibleAntiquitySitesNeutral;
 	};
 #endif
-	void UpdatePlots();
+	void UpdateExplorePlots();
 	void SetExplorationPlotsDirty() { m_bExplorationPlotsDirty = true; }
 
 	void LogEconomyMessage(const CvString& strMsg);
@@ -267,7 +276,7 @@ private:
 
 	// Logging functions
 	void LogStrategy(EconomicAIStrategyTypes eStrategy, bool bValue);
-	void LogScrapUnit(UnitHandle pUnit, int iNumWorkers, int iNumCities, int iNumImprovedPlots, int iNumValidPlots);
+	void LogScrapUnit(CvUnit* pUnit, int iNumWorkers, int iNumCities, int iNumImprovedPlots, int iNumValidPlots);
 
 
 	CvPlayer* m_pPlayer;
@@ -282,6 +291,8 @@ private:
 	int m_iLastTurnWorkerDisbanded;
 	int m_iVisibleAntiquitySites;
 #if defined(MOD_BALANCE_CORE)
+	int m_iExplorersNeeded;
+	int m_iNavalExplorersNeeded;
 	int m_iVisibleAntiquitySitesOwn;
 	int m_iVisibleAntiquitySitesNeutral;
 #endif
@@ -326,17 +337,24 @@ namespace EconomicAIHelpers
 int GetWeightThresholdModifier(EconomicAIStrategyTypes eStrategy, CvPlayer* pPlayer);
 
 // Functions that check triggers to see if a strategy should be adopted/continued
+#if defined(MOD_BUGFIX_MINOR_CIV_STRATEGIES)
+bool IsTestStrategy_NeedRecon(EconomicAIStrategyTypes eStrategy, CvPlayer* pPlayer);
+bool IsTestStrategy_NeedReconSea(EconomicAIStrategyTypes eStrategy, CvPlayer* pPlayer);
+bool IsTestStrategy_EarlyExpansion(EconomicAIStrategyTypes eStrategy, CvPlayer* pPlayer);
+bool IsTestStrategy_EnoughExpansion(EconomicAIStrategyTypes eStrategy, CvPlayer* pPlayer);
+#else
 bool IsTestStrategy_NeedRecon(CvPlayer* pPlayer);
-bool IsTestStrategy_EnoughRecon(CvPlayer* pPlayer);
-bool IsTestStrategy_ReallyNeedReconSea(CvPlayer* pPlayer);
 bool IsTestStrategy_NeedReconSea(CvPlayer* pPlayer);
-bool IsTestStrategy_EnoughReconSea(CvPlayer* pPlayer);
 bool IsTestStrategy_EarlyExpansion(CvPlayer* pPlayer);
 #if defined(MOD_BALANCE_CORE)
 bool IsTestStrategy_EnoughExpansion(CvPlayer* pPlayer);
 #else
 bool IsTestStrategy_EnoughExpansion(EconomicAIStrategyTypes eStrategy, CvPlayer* pPlayer);
 #endif
+#endif
+bool IsTestStrategy_EnoughRecon(CvPlayer* pPlayer);
+bool IsTestStrategy_ReallyNeedReconSea(CvPlayer* pPlayer);
+bool IsTestStrategy_EnoughReconSea(CvPlayer* pPlayer);
 bool IsTestStrategy_NeedHappiness(EconomicAIStrategyTypes eStrategy, CvPlayer* pPlayer);
 bool IsTestStrategy_NeedHappinessCritical(EconomicAIStrategyTypes eStrategy, CvPlayer* pPlayer);
 bool IsTestStrategy_CitiesNeedNavalGrowth(EconomicAIStrategyTypes eStrategy, CvPlayer* pPlayer);
@@ -353,8 +371,13 @@ bool IsTestStrategy_LosingMoney(EconomicAIStrategyTypes eStrategy, CvPlayer* pPl
 bool IsTestStrategy_HaltGrowthBuildings(CvPlayer* pPlayer);
 bool IsTestStrategy_TooManyUnits(CvPlayer* pPlayer);
 bool IsTestStrategy_IslandStart(EconomicAIStrategyTypes eStrategy, CvPlayer* pPlayer);
+#if defined(MOD_BUGFIX_MINOR_CIV_STRATEGIES)
+bool IsTestStrategy_ExpandToOtherContinents(EconomicAIStrategyTypes eStrategy, CvPlayer* pPlayer);
+bool IsTestStrategy_ReallyExpandToOtherContinents(EconomicAIStrategyTypes eStrategy, CvPlayer *pPlayer);
+#else
 bool IsTestStrategy_ExpandToOtherContinents(CvPlayer* pPlayer);
 bool IsTestStrategy_ReallyExpandToOtherContinents(CvPlayer *pPlayer);
+#endif
 bool IsTestStrategy_MostlyOnTheCoast(CvPlayer* pPlayer);
 bool IsTestStrategy_NavalMap(CvPlayer* pPlayer);
 bool IsTestStrategy_OffshoreExpansionMap(CvPlayer* pPlayer);
@@ -381,6 +404,9 @@ bool IsTestStrategy_GS_Diplomacy(CvPlayer* pPlayer);
 bool IsTestStrategy_GS_Spaceship(CvPlayer* pPlayer);
 
 bool IsTestStrategy_GS_SpaceshipHomestretch(CvPlayer* pPlayer);
+#if defined(MOD_BUGFIX_MINOR_CIV_STRATEGIES)
+bool CannotMinorCiv(CvPlayer* pPlayer, EconomicAIStrategyTypes strategy);
+#endif
 }
 
 #endif //CIV5_ECONOMIC_AI_H

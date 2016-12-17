@@ -11,6 +11,9 @@
 #define CV_DEAL_CLASSES_H
 
 #include "CvDiplomacyAIEnums.h"
+#if defined(MOD_ACTIVE_DIPLOMACY)
+#include "CvWeightedVector.h"
+#endif
 
 enum TradeableItems
 {
@@ -118,6 +121,9 @@ public:
 	bool m_bConsideringForRenewal; // is currently considering renewing this deal
 	bool m_bCheckedForRenewal; // this deal has been discussed with the player for renewal
 	bool m_bDealCancelled;
+#if defined(MOD_DIPLOMACY_CIV4_FEATURES)
+	bool m_bIsGift;
+#endif
 
 	TradedItemList m_TradedItems;
 
@@ -174,6 +180,11 @@ public:
 
 	bool IsPossibleToTradeItem(PlayerTypes ePlayer, PlayerTypes eToPlayer, TradeableItems eItem, int iData1 = -1, int iData2 = -1, int iData3 = -1, bool bFlag1 = false, bool bCheckOtherPlayerValidity = true, bool bFinalizing = false);
 	int GetNumResource(PlayerTypes ePlayer, ResourceTypes eResource);
+
+#if defined(MOD_BALANCE_CORE)
+	int GetNumCities(PlayerTypes ePlayer);
+	bool IsCityInDeal(PlayerTypes ePlayer, int iCityID);
+#endif
 
 	// Methods to add a CvTradedItem to a deal
 	void AddGoldTrade(PlayerTypes eFrom, int iAmount);
@@ -271,11 +282,14 @@ public:
 	void AddProposedDeal(CvDeal kDeal);
 #if defined(MOD_ACTIVE_DIPLOMACY)
 	bool RemoveProposedDeal(PlayerTypes eFromPlayer, PlayerTypes eToPlayer, CvDeal* pDealOut, bool latest);
-	bool FinalizeDeal(CvDeal kDeal, bool bAccepted);
-	bool FinalizeDeal(PlayerTypes eFromPlayer, PlayerTypes eToPlayer, bool bAccepted, bool latest);
-#else
-	bool FinalizeDeal(PlayerTypes eFromPlayer, PlayerTypes eToPlayer, bool bAccepted);
+	bool FinalizeMPDeal(CvDeal kDeal, bool bAccepted);
+	bool FinalizeMPDealLatest(PlayerTypes eFromPlayer, PlayerTypes eToPlayer, bool bAccepted, bool latest);
+	void FinalizeDealValidAndAccepted(PlayerTypes eFromPlayer, PlayerTypes eToPlayer, CvDeal& kDeal, bool bAccepted, CvWeightedVector<TeamTypes, MAX_CIV_TEAMS, true>& veNowAtPeacePairs);
+	void FinalizeDealNotify(PlayerTypes eFromPlayer, PlayerTypes eToPlayer, CvWeightedVector<TeamTypes, MAX_CIV_TEAMS, true>& veNowAtPeacePairs);
+	CvDeal* GetProposedMPDeal(PlayerTypes eFromPlayer, PlayerTypes eToPlayer, bool latest = false);
+	void DoCancelAllProposedMPDealsWithPlayer(PlayerTypes eCancelPlayer, DiplomacyPlayerType eTargetPlayers);
 #endif
+	bool FinalizeDeal(PlayerTypes eFromPlayer, PlayerTypes eToPlayer, bool bAccepted);
 	void DoTurn();
 
 	void DoUpdateCurrentDealsList();
@@ -284,17 +298,17 @@ public:
 	void SetTempDeal(CvDeal* pDeal);
 
 	PlayerTypes HasMadeProposal(PlayerTypes eFromPlayer);
-#if defined(MOD_ACTIVE_DIPLOMACY)
-	CvDeal* GetProposedDeal(PlayerTypes eFromPlayer, PlayerTypes eToPlayer, bool latest);
-#else
 	bool ProposedDealExists(PlayerTypes eFromPlayer, PlayerTypes eToPlayer);
 	CvDeal* GetProposedDeal(PlayerTypes eFromPlayer, PlayerTypes eToPlayer);
-#endif
-
 	CvDeal* GetCurrentDeal(PlayerTypes ePlayer, uint index);
 	CvDeal* GetHistoricDeal(PlayerTypes ePlayer, uint indx);
 	uint GetNumCurrentDeals(PlayerTypes ePlayer);
 	uint GetNumHistoricDeals(PlayerTypes ePlayer, uint iMaxCount=UINT_MAX);
+
+	CvDeal* GetCurrentDealWithPlayer(PlayerTypes ePlayer, PlayerTypes eOtherPlayer, uint index);
+	CvDeal* GetHistoricDealWithPlayer(PlayerTypes ePlayer, PlayerTypes eOtherPlayer, uint indx);
+	uint GetNumCurrentDealsWithPlayer(PlayerTypes ePlayer, PlayerTypes eOtherPlayer);
+	uint GetNumHistoricDealsWithPlayer(PlayerTypes ePlayer, PlayerTypes eOtherPlayer, uint iMaxCount = UINT_MAX);
 
 	uint CreateDeal();
 	CvDeal* GetDeal(uint index);
@@ -303,11 +317,7 @@ public:
 	void DoCancelDealsBetweenTeams(TeamTypes eTeam1, TeamTypes eTeam2);
 	void DoCancelDealsBetweenPlayers(PlayerTypes eFromPlayer, PlayerTypes eToPlayer);
 	void DoCancelAllDealsWithPlayer(PlayerTypes eCancelPlayer);
-#if defined(MOD_ACTIVE_DIPLOMACY)
-	void DoCancelAllProposedDealsWithPlayer(PlayerTypes eCancelPlayer, DiplomacyPlayerType eTargetPlayers);
-#else
 	void DoCancelAllProposedDealsWithPlayer(PlayerTypes eCancelPlayer);
-#endif
 	void DoEndTradedItem(CvTradedItem* pItem, PlayerTypes eToPlayer, bool bCancelled);
 
 	int GetTradeItemGoldCost(TradeableItems eItem, PlayerTypes ePlayer1, PlayerTypes ePlayer2) const;

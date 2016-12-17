@@ -12,6 +12,7 @@
 #include "CvDiplomacyAI.h"
 #include "CvMinorCivAI.h"
 #if defined(MOD_BALANCE_CORE)
+#include "CvDealAI.h"
 #include "CvMilitaryAI.h"
 #include "CvDiplomacyRequests.h"
 #include "CvCitySpecializationAI.h"
@@ -151,6 +152,9 @@ CvDeal::CvDeal()
 	m_bConsideringForRenewal = false;
 	m_bCheckedForRenewal = false;
 	m_bDealCancelled = false;
+#if defined(MOD_DIPLOMACY_CIV4_FEATURES)
+	m_bIsGift = false;
+#endif
 }
 
 /// Constructor with typical parameters
@@ -162,6 +166,9 @@ CvDeal::CvDeal(PlayerTypes eFromPlayer, PlayerTypes eToPlayer)
 	m_bConsideringForRenewal = false;
 	m_bCheckedForRenewal = false;
 	m_bDealCancelled = false;
+#if defined(MOD_DIPLOMACY_CIV4_FEATURES)
+	m_bIsGift = false;
+#endif
 }
 
 /// Copy Constructor with typical parameters
@@ -179,6 +186,9 @@ CvDeal::CvDeal(const CvDeal& source)
 	m_bConsideringForRenewal = source.m_bConsideringForRenewal;
 	m_bCheckedForRenewal = source.m_bCheckedForRenewal;
 	m_bDealCancelled = source.m_bDealCancelled;
+#if defined(MOD_DIPLOMACY_CIV4_FEATURES)
+	m_bIsGift = source.m_bIsGift;
+#endif
 	m_TradedItems.clear();
 	TradedItemList::const_iterator it;
 	for(it = source.m_TradedItems.begin(); it != source.m_TradedItems.end(); ++it)
@@ -207,6 +217,9 @@ CvDeal& CvDeal::operator=(const CvDeal& source)
 	m_bConsideringForRenewal = source.m_bConsideringForRenewal;
 	m_bCheckedForRenewal = source.m_bCheckedForRenewal;
 	m_bDealCancelled = source.m_bDealCancelled;
+#if defined(MOD_DIPLOMACY_CIV4_FEATURES)
+	m_bIsGift = source.m_bIsGift;
+#endif
 	m_TradedItems.clear();
 	TradedItemList::const_iterator it;
 	for(it = source.m_TradedItems.begin(); it != source.m_TradedItems.end(); ++it)
@@ -228,6 +241,9 @@ void CvDeal::ClearItems()
 	m_bConsideringForRenewal = false;
 	m_bCheckedForRenewal = false;
 	m_bDealCancelled = false;
+#if defined(MOD_DIPLOMACY_CIV4_FEATURES)
+	m_bIsGift = false;
+#endif
 
 	SetPeaceTreatyType(NO_PEACE_TREATY_TYPE);
 	SetSurrenderingPlayer(NO_PLAYER);
@@ -323,11 +339,13 @@ bool CvDeal::IsPossibleToTradeItem(PlayerTypes ePlayer, PlayerTypes eToPlayer, T
 	CvTeam* pFromTeam = &GET_TEAM(eFromTeam);
 	CvTeam* pToTeam = &GET_TEAM(eToTeam);
 
-	CvDeal* pRenewDeal = pFromPlayer->GetDiplomacyAI()->GetDealToRenew();
+#if !defined(MOD_BALANCE_CORE) 
+	CvDeal* pRenewDeal = pFromPlayer->GetDiplomacyAI()->GetDealToRenew(NULL, eToPlayer);
 	if (!pRenewDeal)
 	{
-		pRenewDeal = pToPlayer->GetDiplomacyAI()->GetDealToRenew();
+		pRenewDeal = pToPlayer->GetDiplomacyAI()->GetDealToRenew(NULL, ePlayer);
 	}
+#endif
 #if defined(MOD_BALANCE_CORE)
 	bool bHumanToHuman = false;
 	if(pFromPlayer->isHuman() && pToPlayer->isHuman())
@@ -370,7 +388,7 @@ bool CvDeal::IsPossibleToTradeItem(PlayerTypes ePlayer, PlayerTypes eToPlayer, T
 		if (!this->IsPeaceTreatyTrade(eToPlayer) && !this->IsPeaceTreatyTrade(ePlayer) && this->GetPeaceTreatyType() == NO_PEACE_TREATY_TYPE)
 		{
 			// Can't exchange GPT for lump Gold - we aren't a bank.
-			if(GetGoldPerTurnTrade(ePlayer) > 0 || GetGoldPerTurnTrade(eToPlayer) > 0)
+			if(GetGoldPerTurnTrade(eToPlayer) > 0)
 				return false;
 		}
 		if(!bHumanToHuman)
@@ -397,7 +415,7 @@ bool CvDeal::IsPossibleToTradeItem(PlayerTypes ePlayer, PlayerTypes eToPlayer, T
 		if (!this->IsPeaceTreatyTrade(eToPlayer) && !this->IsPeaceTreatyTrade(ePlayer) && this->GetPeaceTreatyType() == NO_PEACE_TREATY_TYPE)
 		{
 			// Can't exchange GPT for lump Gold - we aren't a bank.
-			if(GetGoldTrade(ePlayer) > 0 || GetGoldTrade(eToPlayer) > 0)
+			if(GetGoldTrade(eToPlayer) > 0)
 				return false;
 		}
 		if(!bHumanToHuman)
@@ -445,9 +463,9 @@ bool CvDeal::IsPossibleToTradeItem(PlayerTypes ePlayer, PlayerTypes eToPlayer, T
 			//int iNumAvailable = GetNumResource(ePlayer, eResource, true);
 
 			int iNumAvailable = pFromPlayer->getNumResourceAvailable(eResource, false);
-			int iNumInRenewDeal = 0;
+#if !defined(MOD_BALANCE_CORE) 
 			int iNumInExistingDeal = 0;
-
+			int iNumInRenewDeal = 0;
 			if (pRenewDeal)
 			{
 				// count any that are in the renew deal
@@ -469,12 +487,27 @@ bool CvDeal::IsPossibleToTradeItem(PlayerTypes ePlayer, PlayerTypes eToPlayer, T
 						iNumInExistingDeal += it->m_iData2;
 					}
 				}
+				if(iNumInRenewDeal > 0)
+				{
+					// Offering up more of a Resource than we have available
+					if(iNumAvailable + iNumInRenewDeal - iNumInExistingDeal < 0)
+						return false;
+				}
+				else
+				{
+					// Offering up more of a Resource than we have available
+					if(iNumAvailable + iNumInRenewDeal - iNumInExistingDeal < iResourceQuantity)
+						return false;
+				}
 			}
-
-			// Offering up more of a Resource than we have available
-			if(iNumAvailable + iNumInRenewDeal - iNumInExistingDeal < iResourceQuantity)
-				return false;
-
+			else
+#endif
+			{
+				// Offering up more of a Resource than we have available
+				if(iNumAvailable < iResourceQuantity)
+					return false;
+			}
+			
 			// Must be a Luxury or a Strategic Resource
 			ResourceUsageTypes eUsage = GC.getResourceInfo(eResource)->getResourceUsage();
 			if(eUsage != RESOURCEUSAGE_LUXURY && eUsage != RESOURCEUSAGE_STRATEGIC)
@@ -482,15 +515,28 @@ bool CvDeal::IsPossibleToTradeItem(PlayerTypes ePlayer, PlayerTypes eToPlayer, T
 
 			if(eUsage == RESOURCEUSAGE_LUXURY)
 			{
-				// Can't trade Luxury if the other player already has one
-				if(pToPlayer->getNumResourceAvailable(eResource) > MAX(iNumInRenewDeal - iNumInExistingDeal, 0))
+#if !defined(MOD_BALANCE_CORE) 
+				if (pRenewDeal)
 				{
-					return false;
+					// Can't trade Luxury if the other player already has one
+					if((pToPlayer->getNumResourceAvailable(eResource) - iNumInRenewDeal) > 0)
+					{
+						return false;
+					}
+				}
+				else
+#endif
+				{
+					// Can't trade Luxury if the other player already has one
+					if(pToPlayer->getNumResourceAvailable(eResource) > 0)
+					{
+						return false;
+					}
 				}
 			}
 
 			// Can't trade them something they're already giving us in the deal
-			if(IsResourceTrade(eToPlayer, eResource))
+			if(!bFinalizing && IsResourceTrade(eToPlayer, eResource))
 				return false;
 
 			// AI can't trade an obsolete resource
@@ -536,7 +582,7 @@ bool CvDeal::IsPossibleToTradeItem(PlayerTypes ePlayer, PlayerTypes eToPlayer, T
 #if defined(MOD_BALANCE_CORE)
 			if (!this->IsPeaceTreatyTrade(eToPlayer) && !this->IsPeaceTreatyTrade(ePlayer) && this->GetPeaceTreatyType() == NO_PEACE_TREATY_TYPE)
 			{
-				if (pFromPlayer->getTeam() != pToPlayer->getTeam() && (!pFromPlayer->GetDiplomacyAI()->IsDoFAccepted(eToPlayer) || !pToPlayer->GetDiplomacyAI()->IsDoFAccepted(ePlayer)))
+				if (pFromTeam != pToTeam && !pToTeam->HasEmbassyAtTeam(eFromTeam))
 					return false;
 			}
 #endif
@@ -613,6 +659,7 @@ bool CvDeal::IsPossibleToTradeItem(PlayerTypes ePlayer, PlayerTypes eToPlayer, T
 			return false;
 		
 		bool bIgnoreExistingOP = true;
+#if !defined(MOD_BALANCE_CORE)
 		if (pRenewDeal)
 		{
 			// count any that are in the renew deal
@@ -631,6 +678,7 @@ bool CvDeal::IsPossibleToTradeItem(PlayerTypes ePlayer, PlayerTypes eToPlayer, T
 				bIgnoreExistingOP = false;
 			}
 		}
+#endif
 
 		// Already has OP
 		if(pFromTeam->IsAllowsOpenBordersToTeam(eToTeam) && bIgnoreExistingOP)
@@ -823,15 +871,14 @@ bool CvDeal::IsPossibleToTradeItem(PlayerTypes ePlayer, PlayerTypes eToPlayer, T
 		if(eThirdTeam == NO_TEAM)
 			return false;
 
-		//Can't already be offering this.
-		if (!bFinalizing && IsThirdPartyPeaceTrade( ePlayer, eThirdTeam))
-			return false;
-#endif
-#if defined(MOD_BALANCE_CORE)
 		//If not at war, need embassy.
 		if (!this->IsPeaceTreatyTrade(eToPlayer) && !this->IsPeaceTreatyTrade(ePlayer) && this->GetPeaceTreatyType() == NO_PEACE_TREATY_TYPE)
 		{
 			if (!GET_TEAM(eToTeam).HasEmbassyAtTeam(eFromTeam))
+				return false;
+		
+			//Can't already be offering this.
+			if (!bFinalizing && IsThirdPartyPeaceTrade( ePlayer, eThirdTeam))
 				return false;
 		}
 
@@ -862,6 +909,14 @@ bool CvDeal::IsPossibleToTradeItem(PlayerTypes ePlayer, PlayerTypes eToPlayer, T
 
 		// Player that would go to peace is already at peace with the 3rd Team
 		if(!pFromTeam->isAtWar(eThirdTeam))
+			return false;
+
+		//Either side can't make peace yet?
+		if(!pFromTeam->canChangeWarPeace(eThirdTeam))
+			return false;
+
+		//Either side can't make peace yet?
+		if(!GET_TEAM(eThirdTeam).canChangeWarPeace(eFromTeam))
 			return false;
 
 #if defined(MOD_BALANCE_CORE)
@@ -907,34 +962,30 @@ bool CvDeal::IsPossibleToTradeItem(PlayerTypes ePlayer, PlayerTypes eToPlayer, T
 
 				// Major civ
 				else
-				{
-					//Can't make peace yet?
-					if(pFromTeam->GetNumTurnsLockedIntoWar(pOtherPlayer->getTeam()) > 0)
-						return false;
-
-					//Can't make peace yet?
-					if(GET_TEAM(pOtherPlayer->getTeam()).GetNumTurnsLockedIntoWar(pFromPlayer->getTeam()) > 0)
-						return false;
-
-					//Either side can't make peace yet?
-					if(!pFromPlayer->GetDiplomacyAI()->IsWantsPeaceWithPlayer(pOtherPlayer->GetID()))
-						return false;
-
-					//Either side can't make peace yet?
-					if(!pOtherPlayer->GetDiplomacyAI()->IsWantsPeaceWithPlayer(pFromPlayer->GetID()))
-						return false;
-
-					int iTurns = 30;
-					if(GET_TEAM(pOtherPlayer->getTeam()).GetNumTurnsAtWar(pFromPlayer->getTeam()) <= iTurns)
-						return false;
-				
+				{				
 					//Only matters if not a peace deal (i.e. we're not making negotiations)
 					if (!this->IsPeaceTreatyTrade(eToPlayer) && !this->IsPeaceTreatyTrade(ePlayer) && this->GetPeaceTreatyType() == NO_PEACE_TREATY_TYPE)
 					{
+						if(pFromPlayer->GetDiplomacyAI()->GetPlayerNumTurnsAtWar(eLoopPlayer) < GD_INT_GET(WAR_MAJOR_MINIMUM_TURNS))
+						{
+							return false;
+						}
+						if(pOtherPlayer->GetDiplomacyAI()->GetPlayerNumTurnsAtWar(ePlayer) < GD_INT_GET(WAR_MAJOR_MINIMUM_TURNS))
+						{
+							return false;
+						}
+
+						//Either side can't make peace yet because of city capture?
+						if(pOtherPlayer->GetDiplomacyAI()->GetPlayerNumTurnsSinceCityCapture(ePlayer) <= 1)
+							return false;
+
+						if(pFromPlayer->GetDiplomacyAI()->GetPlayerNumTurnsSinceCityCapture(eLoopPlayer) <= 1)
+							return false;
+
 						//Can't force third party peace with a loser. Has to be a sizeable difference
 						int iFromWarScore = pFromPlayer->GetDiplomacyAI()->GetWarScore(pOtherPlayer->GetID());
 
-						if(iFromWarScore <= 0)
+						if(iFromWarScore < 75)
 							return false;
 					}
 				}
@@ -992,7 +1043,7 @@ bool CvDeal::IsPossibleToTradeItem(PlayerTypes ePlayer, PlayerTypes eToPlayer, T
 			return false;
 
 		//Need embassy.
-		if (!GET_TEAM(eFromTeam).HasEmbassyAtTeam(eToTeam))
+		if (!GET_TEAM(eToTeam).HasEmbassyAtTeam(eFromTeam))
 			return false;
 
 		//Not allowed in peace deals.
@@ -1400,13 +1451,14 @@ int CvDeal::GetNumResource(PlayerTypes ePlayer, ResourceTypes eResource)
 	int iNumInRenewDeal = 0;
 	int iNumInExistingDeal = 0;
 
-	CvDeal* pRenewDeal = GET_PLAYER(ePlayer).GetDiplomacyAI()->GetDealToRenew();
-	if (!pRenewDeal)
+	PlayerTypes eOtherPlayer = GetOtherPlayer(ePlayer);
+	CvDeal* pRenewDeal = NULL;
+	if (eOtherPlayer != NO_PLAYER)
 	{
-		PlayerTypes eOtherPlayer = GetOtherPlayer(ePlayer);
-		if (eOtherPlayer != NO_PLAYER)
+		pRenewDeal = GET_PLAYER(ePlayer).GetDiplomacyAI()->GetDealToRenew(NULL, eOtherPlayer);
+		if (!pRenewDeal)
 		{
-			pRenewDeal = GET_PLAYER(eOtherPlayer).GetDiplomacyAI()->GetDealToRenew();
+			pRenewDeal = GET_PLAYER(eOtherPlayer).GetDiplomacyAI()->GetDealToRenew(NULL, ePlayer);
 		}
 	}
 
@@ -1435,7 +1487,49 @@ int CvDeal::GetNumResource(PlayerTypes ePlayer, ResourceTypes eResource)
 	return iNumAvailable + iNumInRenewDeal - iNumInExistingDeal;
 }
 
+#if defined(MOD_BALANCE_CORE)
+int CvDeal::GetNumCities(PlayerTypes ePlayer)
+{
+	if(ePlayer == NO_PLAYER)
+		return 0;
 
+	int iNumCities = 0;
+	TradedItemList::iterator it;
+	// remove any that are in this deal
+	for(it = m_TradedItems.begin(); it != m_TradedItems.end(); ++it)
+	{
+		if(it->m_eItemType == TRADE_ITEM_CITIES && it->m_eFromPlayer == ePlayer)
+		{
+			iNumCities ++;
+		}
+	}
+	return iNumCities;
+}
+bool CvDeal::IsCityInDeal(PlayerTypes ePlayer, int iCityID)
+{
+	if (ePlayer == NO_PLAYER)
+		return 0;
+
+	TradedItemList::iterator it;
+	// remove any that are in this deal
+	for (it = m_TradedItems.begin(); it != m_TradedItems.end(); ++it)
+	{
+		if (it->m_eItemType == TRADE_ITEM_CITIES && it->m_eFromPlayer == ePlayer)
+		{
+			CvCity* pCity = GET_PLAYER(ePlayer).getCity(iCityID);
+			if (pCity != NULL)
+			{
+				if (it->m_iData1 == pCity->getX() &&
+					it->m_iData2 == pCity->getY())
+				{
+					return true;
+				}
+			}
+		}
+	}
+	return false;
+}
+#endif
 /// What kind of Peace Treaty (if any) is this Deal?
 PeaceTreatyTypes CvDeal::GetPeaceTreatyType() const
 {
@@ -2238,7 +2332,6 @@ CvDeal::DealRenewStatus CvDeal::GetItemTradeableState(TradeableItems eTradeItem)
 
 bool CvDeal::IsPotentiallyRenewable()
 {
-
 	TradedItemList::iterator it;
 	bool bHasValidTradeItem = false;
 	for(it = m_TradedItems.begin(); it != m_TradedItems.end(); ++it)
@@ -2468,6 +2561,9 @@ FDataStream& OldLoad(FDataStream& loadFrom, CvDeal& writeTo)
 	loadFrom >> writeTo.m_iStartTurn;
 	loadFrom >> writeTo.m_bConsideringForRenewal;
 	loadFrom >> writeTo.m_bDealCancelled;
+#if defined(MOD_DIPLOMACY_CIV4_FEATURES)
+	loadFrom >> writeTo.m_bIsGift;
+#endif
 	loadFrom >> writeTo.m_ePeaceTreatyType;
 	loadFrom >> writeTo.m_eSurrenderingPlayer;
 	loadFrom >> writeTo.m_eDemandingPlayer;
@@ -2507,6 +2603,9 @@ FDataStream& operator>>(FDataStream& loadFrom, CvDeal& writeTo)
 		writeTo.m_bCheckedForRenewal = false;
 	}
 	loadFrom >> writeTo.m_bDealCancelled;
+#if defined(MOD_DIPLOMACY_CIV4_FEATURES)
+	loadFrom >> writeTo.m_bIsGift;
+#endif
 	loadFrom >> writeTo.m_ePeaceTreatyType;
 	loadFrom >> writeTo.m_eSurrenderingPlayer;
 	loadFrom >> writeTo.m_eDemandingPlayer;
@@ -2544,6 +2643,9 @@ FDataStream& operator<<(FDataStream& saveTo, const CvDeal& readFrom)
 	saveTo << readFrom.m_bConsideringForRenewal;
 	saveTo << readFrom.m_bCheckedForRenewal;
 	saveTo << readFrom.m_bDealCancelled;
+#if defined(MOD_DIPLOMACY_CIV4_FEATURES)
+	saveTo << readFrom.m_bIsGift;
+#endif
 	saveTo << readFrom.m_ePeaceTreatyType;
 	saveTo << readFrom.m_eSurrenderingPlayer;
 	saveTo << readFrom.m_eDemandingPlayer;
@@ -2597,6 +2699,7 @@ void CvDeal::AddVassalageTrade(PlayerTypes eFrom)
 		CvAssertMsg(false, "DEAL: Trying to add an invalid Vassalage item to a deal");
 	}
 }
+
 /// Insert Vassalage Trade
 void CvDeal::AddRevokeVassalageTrade(PlayerTypes eFrom)
 {
@@ -2658,6 +2761,7 @@ bool CvDeal::IsVassalageTrade(PlayerTypes eFrom)
 	}
 	return 0;
 }
+
 bool CvDeal::IsRevokeVassalageTrade(PlayerTypes eFrom)
 {
 	TradedItemList::iterator it;
@@ -2723,24 +2827,25 @@ void CvGameDeals::Init()
 void CvGameDeals::AddProposedDeal(CvDeal kDeal)
 {
 #if defined(MOD_ACTIVE_DIPLOMACY)
-	PlayerTypes eFrom = kDeal.GetFromPlayer();
-	PlayerTypes eTo = kDeal.GetToPlayer();
-
-	if (CvPreGame::isHuman(eFrom) && CvPreGame::isHuman(eTo))
+	if(GC.getGame().isReallyNetworkMultiPlayer() && MOD_ACTIVE_DIPLOMACY)
 	{
-		// only one deal from Human to Human
-		CvDeal kRemovedDeal;
-		while (RemoveProposedDeal(eFrom, eTo, &kRemovedDeal, true))
-		{//deal from eCancelPlayer
-			FinalizeDeal(kRemovedDeal, false);
-		}
-		while (RemoveProposedDeal(eTo, eFrom, &kRemovedDeal, true))
-		{//deal to eCancelPlayer
-			FinalizeDeal(kRemovedDeal, false);
+		PlayerTypes eFrom = kDeal.GetFromPlayer();
+		PlayerTypes eTo = kDeal.GetToPlayer();
+		if (CvPreGame::isHuman(eFrom) && CvPreGame::isHuman(eTo))
+		{
+			// only one deal from Human to Human
+			CvDeal kRemovedDeal;
+			while (RemoveProposedDeal(eFrom, eTo, &kRemovedDeal, true))
+			{//deal from eCancelPlayer
+				FinalizeMPDeal(kRemovedDeal, false);
+			}
+			while (RemoveProposedDeal(eTo, eFrom, &kRemovedDeal, true))
+			{//deal to eCancelPlayer
+				FinalizeMPDeal(kRemovedDeal, false);
+			}
 		}
 	}
 #endif
-
 	// Store Deal away
 	m_ProposedDeals.push_back(kDeal);
 
@@ -2756,7 +2861,7 @@ void CvGameDeals::AddProposedDeal(CvDeal kDeal)
 /// Removes a deal from the proposed deals list (returns FALSE if deal not found)
 bool CvGameDeals::RemoveProposedDeal(PlayerTypes eFromPlayer, PlayerTypes eToPlayer, CvDeal* pDealOut, bool latest)
 {
-	CvDeal* pDeal = GetProposedDeal(eFromPlayer, eToPlayer, latest);
+	CvDeal* pDeal = GetProposedMPDeal(eFromPlayer, eToPlayer, latest);
 
 	if (!pDeal)
 		return false;
@@ -2770,6 +2875,7 @@ bool CvGameDeals::RemoveProposedDeal(PlayerTypes eFromPlayer, PlayerTypes eToPla
 
 	return true;
 }
+
 bool CvDeal::AreAllTradeItemsValid()
 {
 	TradedItemList::iterator iter;
@@ -2787,7 +2893,7 @@ bool CvDeal::AreAllTradeItemsValid()
 }
 
 /// Moves a deal from the proposed list to the active one (returns FALSE if deal is not valid)
-bool CvGameDeals::FinalizeDeal(PlayerTypes eFromPlayer, PlayerTypes eToPlayer, bool bAccepted, bool latest)
+bool CvGameDeals::FinalizeMPDealLatest(PlayerTypes eFromPlayer, PlayerTypes eToPlayer, bool bAccepted, bool latest)
 {
 	CvDeal kDeal;
 	if (!RemoveProposedDeal(eFromPlayer, eToPlayer, &kDeal, latest))
@@ -2795,10 +2901,11 @@ bool CvGameDeals::FinalizeDeal(PlayerTypes eFromPlayer, PlayerTypes eToPlayer, b
 		LogDealFailed(NULL, false, !bAccepted, false);
 		return false;
 	}
-	return FinalizeDeal(kDeal, bAccepted);
+	return FinalizeMPDeal(kDeal, bAccepted);
 }
+
 /// Moves a deal from the proposed list to the active one (returns FALSE if deal not valid)
-bool CvGameDeals::FinalizeDeal(CvDeal kDeal, bool bAccepted)
+bool CvGameDeals::FinalizeMPDeal(CvDeal kDeal, bool bAccepted)
 {
 	PlayerTypes eFromPlayer = kDeal.m_eFromPlayer;
 	PlayerTypes eToPlayer = kDeal.m_eToPlayer;
@@ -2806,7 +2913,714 @@ bool CvGameDeals::FinalizeDeal(CvDeal kDeal, bool bAccepted)
 	bool bValid = kDeal.AreAllTradeItemsValid();
 	CvWeightedVector<TeamTypes, MAX_CIV_TEAMS, true> veNowAtPeacePairs; // hacked CvWeighedVector to keep track of third party minors that this deal makes at peace
 	{
+		if(!bValid || !bAccepted)
+		{
+			LogDealFailed(&kDeal, false, !bAccepted, true);
+		}
+
+		if(bValid && bAccepted)
+		{
+			FinalizeDealValidAndAccepted(eFromPlayer, eToPlayer, kDeal, bAccepted, veNowAtPeacePairs);
+			PlayerTypes eLoopPlayer;
+			for (int iPlayerLoop = 0; iPlayerLoop < MAX_MAJOR_CIVS; iPlayerLoop++)
+			{
+				eLoopPlayer = (PlayerTypes)iPlayerLoop;
+				if (eLoopPlayer != NO_PLAYER)
+				{
+					GET_PLAYER(eLoopPlayer).GetDiplomacyRequests()->CheckRemainingNotifications();
+				}
+			}
+		}
+	}
+	
+	FinalizeDealNotify(eFromPlayer, eToPlayer, veNowAtPeacePairs);
+
+	return bFoundIt && bValid;
+}
+
+void CvGameDeals::FinalizeDealValidAndAccepted(PlayerTypes eFromPlayer, PlayerTypes eToPlayer, CvDeal& kDeal, bool bAccepted, CvWeightedVector<TeamTypes, MAX_CIV_TEAMS, true>& veNowAtPeacePairs)
+{
+	// Determine total duration of the Deal
+	int iLatestItemLastTurn = 0;
+	int iLongestDuration = 0;
+	//int iTemp;
+
+	TradedItemList::iterator it;
+	for(it = kDeal.m_TradedItems.begin(); it != kDeal.m_TradedItems.end(); ++it)
+	{
+		CvAssertMsg(it->m_eFromPlayer == kDeal.m_eFromPlayer || it->m_eFromPlayer == kDeal.m_eToPlayer, "DEAL: Adding deal that has an item for a player that's not actually in this deal!  Please send Jon this with your last 5 autosaves and what changelist # you're playing.");
+
+		// Calculate duration
+		if(it->m_iDuration > 0)
+		{
+			it->m_iFinalTurn = it->m_iDuration + GC.getGame().getGameTurn();
+			if(it->m_iDuration > iLongestDuration)
+			{
+				iLongestDuration = it->m_iDuration;
+				iLatestItemLastTurn = it->m_iFinalTurn;
+			}
+		}
+	}
+
+	kDeal.m_iDuration = iLongestDuration;
+	kDeal.m_iFinalTurn = iLatestItemLastTurn;
+	kDeal.m_iStartTurn = GC.getGame().getGameTurn();
+
+	// Add to current deals
+	CvAssertMsg(kDeal.m_TradedItems.size() > 0, "New deal has no tradeable items!");
+	m_CurrentDeals.push_back(kDeal);
+	kDeal.m_iStartTurn = GC.getGame().getGameTurn();
+
+	bool bSentResearchAgreementNotification = false;
+
+	int iCost;
+
+	// What effects does this Deal have right now?
+	PlayerTypes eAcceptedFromPlayer;
+	PlayerTypes eAcceptedToPlayer;
+	TeamTypes eFromTeam;
+	TeamTypes eToTeam;
+#if defined(MOD_BALANCE_CORE)
+	bool bDone = false;
+	//Set surrendering player in human v. human war. Based on who puts what where.
+	if(GET_PLAYER(eFromPlayer).isHuman() && GET_PLAYER(eToPlayer).isHuman())
+	{
+		if(kDeal.IsPeaceTreatyTrade(eFromPlayer) || kDeal.IsPeaceTreatyTrade(eToPlayer))
+		{
+			for(it = kDeal.m_TradedItems.begin(); it != kDeal.m_TradedItems.end(); ++it)
+			{
+				// if the deal is renewed do not start it up
+				if(it->m_bToRenewed)
+				{
+					continue;
+				}
+
+				eAcceptedFromPlayer = it->m_eFromPlayer;
+				eAcceptedToPlayer = kDeal.GetOtherPlayer(eAcceptedFromPlayer);
+				eFromTeam = GET_PLAYER(eAcceptedFromPlayer).getTeam();
+				eToTeam = GET_PLAYER(eAcceptedToPlayer).getTeam();
+
+				CvAssertMsg(eAcceptedFromPlayer == kDeal.m_eFromPlayer || eAcceptedFromPlayer == kDeal.m_eToPlayer, "DEAL: Adding deal that has an item for a player that's not actually in this deal!  Please send Jon this with your last 5 autosaves and what changelist # you're playing.");
+					
+				// Gold
+				if(it->m_eItemType == TRADE_ITEM_GOLD)
+				{
+					kDeal.SetSurrenderingPlayer(it->m_eFromPlayer);
+					break;
+				}
+				// Gold Per Turn
+				else if(it->m_eItemType == TRADE_ITEM_GOLD_PER_TURN)
+				{
+					kDeal.SetSurrenderingPlayer(it->m_eFromPlayer);
+					break;
+				}
+				// Resource
+				else if(it->m_eItemType == TRADE_ITEM_RESOURCES)
+				{
+					kDeal.SetSurrenderingPlayer(it->m_eFromPlayer);
+					break;
+				}
+				// City
+				else if(it->m_eItemType == TRADE_ITEM_CITIES)
+				{
+					kDeal.SetSurrenderingPlayer(it->m_eFromPlayer);
+					break;
+				}
+				else if(it->m_eItemType == TRADE_ITEM_ALLOW_EMBASSY)
+				{
+					kDeal.SetSurrenderingPlayer(it->m_eFromPlayer);
+					break;	
+				}
+				// Vote Commitment
+				else if(it->m_eItemType == TRADE_ITEM_VOTE_COMMITMENT)
+				{
+					kDeal.SetSurrenderingPlayer(it->m_eFromPlayer);
+					break;
+				}
+				// Open Borders
+				else if(it->m_eItemType == TRADE_ITEM_OPEN_BORDERS)
+				{
+					kDeal.SetSurrenderingPlayer(it->m_eFromPlayer);
+					break;
+				}
+				// Research Agreement
+				else if(it->m_eItemType == TRADE_ITEM_RESEARCH_AGREEMENT)
+				{
+					kDeal.SetSurrenderingPlayer(it->m_eFromPlayer);
+					break;
+				}
+#if defined(MOD_DIPLOMACY_CIV4_FEATURES)
+				// Maps
+				else if (MOD_DIPLOMACY_CIV4_FEATURES && it->m_eItemType == TRADE_ITEM_MAPS)
+				{
+					kDeal.SetSurrenderingPlayer(it->m_eFromPlayer);
+					break;
+				}
+				// Techs
+				else if(MOD_DIPLOMACY_CIV4_FEATURES && it->m_eItemType == TRADE_ITEM_TECHS)
+				{
+					kDeal.SetSurrenderingPlayer(it->m_eFromPlayer);
+					break;
+				}
+				// Vassalage
+				else if(MOD_DIPLOMACY_CIV4_FEATURES && it->m_eItemType == TRADE_ITEM_VASSALAGE)
+				{
+					kDeal.SetSurrenderingPlayer(it->m_eFromPlayer);
+					break;
+				}
+				// Revoke Vassalage
+				else if(MOD_DIPLOMACY_CIV4_FEATURES && it->m_eItemType == TRADE_ITEM_VASSALAGE_REVOKE)
+				{
+					kDeal.SetSurrenderingPlayer(it->m_eFromPlayer);
+					break;
+				}						
+			}
+		}
+	}
+#endif
+#endif
+
+	for(it = kDeal.m_TradedItems.begin(); it != kDeal.m_TradedItems.end(); ++it)
+	{
+		// if the deal is renewed do not start it up
+		if(it->m_bToRenewed)
+		{
+			LogDealFailed(&kDeal, true, !bAccepted, false);	
+			continue;
+		}
+
+		eAcceptedFromPlayer = it->m_eFromPlayer;
+		eAcceptedToPlayer = kDeal.GetOtherPlayer(eAcceptedFromPlayer);
+		eFromTeam = GET_PLAYER(eAcceptedFromPlayer).getTeam();
+		eToTeam = GET_PLAYER(eAcceptedToPlayer).getTeam();
+
+		CvAssertMsg(eAcceptedFromPlayer == kDeal.m_eFromPlayer || eAcceptedFromPlayer == kDeal.m_eToPlayer, "DEAL: Adding deal that has an item for a player that's not actually in this deal!  Please send Jon this with your last 5 autosaves and what changelist # you're playing.");
+
+		// Deduct Gold cost (if applicable)
+		iCost = GetTradeItemGoldCost(it->m_eItemType, eAcceptedFromPlayer, eAcceptedToPlayer);
+		GET_PLAYER(eAcceptedFromPlayer).GetTreasury()->ChangeGold(-iCost);
+
+		// Gold
+		if(it->m_eItemType == TRADE_ITEM_GOLD)
+		{
+			int iGoldAmount = it->m_iData1;
+			GET_PLAYER(eAcceptedFromPlayer).GetTreasury()->ChangeGold(-iGoldAmount);
+			GET_PLAYER(eAcceptedToPlayer).GetTreasury()->ChangeGold(iGoldAmount);
+		}
+		// Gold Per Turn
+		else if(it->m_eItemType == TRADE_ITEM_GOLD_PER_TURN)
+		{
+			int iGoldPerTurn = it->m_iData1;
+			GET_PLAYER(eAcceptedFromPlayer).GetTreasury()->ChangeGoldPerTurnFromDiplomacy(-iGoldPerTurn);
+			GET_PLAYER(eAcceptedToPlayer).GetTreasury()->ChangeGoldPerTurnFromDiplomacy(iGoldPerTurn);
+		}
+		// Resource
+		else if(it->m_eItemType == TRADE_ITEM_RESOURCES)
+		{
+			ResourceTypes eResource = (ResourceTypes) it->m_iData1;
+			int iResourceQuantity = it->m_iData2;
+			GET_PLAYER(eAcceptedFromPlayer).changeResourceExport(eResource, iResourceQuantity);
+			GET_PLAYER(eAcceptedToPlayer).changeResourceImport(eResource, iResourceQuantity);
+
+#if !defined(NO_ACHIEVEMENTS)
+			//Resource Trading Achievements
+			if(!GC.getGame().isGameMultiPlayer())
+			{
+				if(GET_PLAYER(eAcceptedFromPlayer).isHuman())
+				{
+					gDLL->IncrementSteamStatAndUnlock(ESTEAMSTAT_RESOURCESTRADED, 100, ACHIEVEMENT_100RESOURCES);
+
+					if(GC.getResourceInfo(eResource)->getResourceUsage() == RESOURCEUSAGE_LUXURY)
+					{
+						//OutputDebugString("\nStep0");
+						if(((CvString)GET_PLAYER(eAcceptedFromPlayer).getLeaderTypeKey() == "LEADER_HARUN_AL_RASHID"))
+						{
+							//OutputDebugString("\nStep1");
+							int iJ;
+							for(iJ = 0; iJ < GC.getNumBuildingInfos(); iJ++)
+							{
+								CvBuildingEntry* pkBuildingEntry = GC.getBuildingInfo((BuildingTypes)iJ);
+								if(pkBuildingEntry)
+								{
+									if((CvString)pkBuildingEntry->GetType() == "BUILDING_BAZAAR")
+									{
+										//OutputDebugString("\nStep2");
+										if(GET_PLAYER(eAcceptedFromPlayer).getBuildingClassCount((BuildingClassTypes)pkBuildingEntry->GetBuildingClassType()) >= 1)
+										{
+											gDLL->UnlockAchievement(ACHIEVEMENT_SPECIAL_TRADER);
+										}
+
+									}
+								}
+							}
+						}
+					}
+				}
+			}
+#endif
+		}
+		// City
+		else if(it->m_eItemType == TRADE_ITEM_CITIES)
+		{
+			CvCity* pCity = GC.getMap().plot(it->m_iData1, it->m_iData2)->getPlotCity();
+			if(pCity != NULL)
+#if defined(MOD_BALANCE_CORE)
+			{
+				//I've traded for? I don't want to give away again.
+				pCity->SetTraded(eAcceptedToPlayer, true);
+#endif
+				GET_PLAYER(eAcceptedToPlayer).acquireCity(pCity, false, true);
+#if defined(MOD_BALANCE_CORE)
+			}
+#endif
+		}
+		else if(it->m_eItemType == TRADE_ITEM_ALLOW_EMBASSY)
+		{
+			GET_TEAM(eToTeam).SetHasEmbassyAtTeam(eFromTeam, true);
+		}
+		else if(it->m_eItemType == TRADE_ITEM_DECLARATION_OF_FRIENDSHIP)
+		{
+			// Declaration of friendship always goes both ways.  We will most likely have two entries in the deal for this
+			// but just in case, set both anyway.
+			GET_PLAYER(eAcceptedFromPlayer).GetDiplomacyAI()->SetDoFAccepted(eAcceptedToPlayer, true);
+			GET_PLAYER(eAcceptedFromPlayer).GetDiplomacyAI()->SetDoFCounter(eAcceptedToPlayer, 0);
+			GET_PLAYER(eAcceptedToPlayer).GetDiplomacyAI()->SetDoFAccepted(eAcceptedFromPlayer, true);
+			GET_PLAYER(eAcceptedToPlayer).GetDiplomacyAI()->SetDoFCounter(eAcceptedFromPlayer, 0);
+		}
+		// Vote Commitment
+		else if(it->m_eItemType == TRADE_ITEM_VOTE_COMMITMENT)
+		{
+			GET_PLAYER(eAcceptedFromPlayer).GetLeagueAI()->AddVoteCommitment(eAcceptedToPlayer, it->m_iData1, it->m_iData2, it->m_iData3, it->m_bFlag1);
+		}
+		// Open Borders
+		else if(it->m_eItemType == TRADE_ITEM_OPEN_BORDERS)
+		{
+			GET_TEAM(eFromTeam).SetAllowsOpenBordersToTeam(eToTeam, true);
+		}
+		// Defensive Pact
+		else if(it->m_eItemType == TRADE_ITEM_DEFENSIVE_PACT)
+		{
+			GET_TEAM(eFromTeam).SetHasDefensivePact(eToTeam, true);
+		}
+		// Research Agreement
+		else if(it->m_eItemType == TRADE_ITEM_RESEARCH_AGREEMENT)
+		{
+			GET_TEAM(eFromTeam).SetHasResearchAgreement(eToTeam, true);
+			GET_PLAYER(eAcceptedFromPlayer).GetTreasury()->LogExpenditure(GET_PLAYER(eAcceptedToPlayer).getCivilizationShortDescription(), iCost, 9);
+
+			if(!bSentResearchAgreementNotification)
+			{
+				bSentResearchAgreementNotification = true;
+				GC.getGame().DoResearchAgreementNotification(eFromTeam, eToTeam);
+			}
+		}
+		// Trade Agreement
+		else if(it->m_eItemType == TRADE_ITEM_TRADE_AGREEMENT)
+		{
+			GET_TEAM(eFromTeam).SetHasTradeAgreement(eToTeam, true);
+		}
+		// Third Party Peace
+		else if(it->m_eItemType == TRADE_ITEM_THIRD_PARTY_PEACE)
+		{
+			TeamTypes eTargetTeam = (TeamTypes) it->m_iData1;
+			bool bTargetTeamIsMinor = GET_TEAM(eTargetTeam).isMinorCiv();
+#if defined(MOD_EVENTS_WAR_AND_PEACE)
+					GET_TEAM(eFromTeam).makePeace(eTargetTeam, /*bBumpUnits*/ true, /*bSuppressNotification*/ bTargetTeamIsMinor, eFromPlayer);
 #else
+					GET_TEAM(eFromTeam).makePeace(eTargetTeam, /*bBumpUnits*/ true, /*bSuppressNotification*/ bTargetTeamIsMinor);
+#endif
+			GET_TEAM(eFromTeam).setForcePeace(eTargetTeam, true);
+			GET_TEAM(eTargetTeam).setForcePeace(eFromTeam, true);
+
+			if(bTargetTeamIsMinor)
+			{
+				veNowAtPeacePairs.push_back(eTargetTeam, eFromTeam); //eFromTeam is second so we can take advantage of CvWeightedVector's sort by weights
+			}
+#if defined(MOD_BALANCE_CORE)
+			PlayerTypes eLoopPlayer;
+			for(int iPlayerLoop = 0; iPlayerLoop < MAX_MAJOR_CIVS; iPlayerLoop++)
+			{
+				eLoopPlayer = (PlayerTypes) iPlayerLoop;
+				if(eLoopPlayer != NO_PLAYER && GET_PLAYER(eLoopPlayer).getTeam() == eTargetTeam)
+				{
+					//If human was target, let human know.
+					if(GET_PLAYER(eLoopPlayer).isHuman())
+					{
+						CvNotifications* pNotifications = GET_PLAYER(eLoopPlayer).GetNotifications();
+						if(pNotifications)
+						{
+							Localization::String strText = Localization::Lookup("TXT_KEY_NOTIFICATION_DIPLOMACY_THIRD_PARTY_BROKER_PEACE_NAME");
+							strText << GET_PLAYER(eAcceptedToPlayer).getCivilizationShortDescriptionKey();
+							strText << GET_PLAYER(eAcceptedFromPlayer).getCivilizationShortDescriptionKey();
+							Localization::String strSummary = Localization::Lookup("TXT_KEY_NOTIFICATION_DIPLOMACY_THIRD_PARTY_BROKER_PEACE_NAME_S");
+							strSummary << GET_PLAYER(eAcceptedToPlayer).getCivilizationShortDescriptionKey();
+							pNotifications->Add(NOTIFICATION_DIPLOMACY_DECLARATION, strText.toUTF8(), strSummary.toUTF8(), -1, -1, -1);
+						}
+					}
+					//If AI, improve opinion of broker a bit.
+					else if(!GET_PLAYER(eLoopPlayer).isMinorCiv())
+					{
+						GET_PLAYER(eLoopPlayer).GetDiplomacyAI()->ChangeRecentAssistValue(eAcceptedToPlayer, -400);
+					}
+				}
+			}
+#endif
+		}
+		// Third Party War
+		else if(it->m_eItemType == TRADE_ITEM_THIRD_PARTY_WAR)
+		{
+			TeamTypes eTargetTeam = (TeamTypes) it->m_iData1;
+#if defined(MOD_EVENTS_WAR_AND_PEACE)
+					GET_TEAM(eFromTeam).declareWar(eTargetTeam, false, eFromPlayer);
+#else
+					GET_TEAM(eFromTeam).declareWar(eTargetTeam);
+#endif
+
+			int iLockedTurns = /*15*/ GC.getCOOP_WAR_LOCKED_LENGTH();
+			GET_TEAM(eFromTeam).ChangeNumTurnsLockedIntoWar(eTargetTeam, iLockedTurns);
+#if defined(MOD_BALANCE_CORE)
+			GET_PLAYER(eAcceptedFromPlayer).GetCitySpecializationAI()->SetSpecializationsDirty(SPECIALIZATION_UPDATE_NOW_AT_WAR);
+					
+			if(!CvPreGame::isNetworkMultiplayerGame() && GC.getGame().getActiveTeam() == eTargetTeam)
+			{
+				const char* strText = GET_PLAYER(eAcceptedFromPlayer).GetDiplomacyAI()->GetDiploStringForMessage(DIPLO_MESSAGE_DOW_ROOT, GET_TEAM(eTargetTeam).getLeaderID());
+				gDLL->GameplayDiplomacyAILeaderMessage(eAcceptedFromPlayer, DIPLO_UI_STATE_AI_DECLARED_WAR, strText, LEADERHEAD_ANIM_DECLARE_WAR);
+			}
+
+			PlayerTypes eLoopPlayer;
+			for(int iPlayerLoop = 0; iPlayerLoop < MAX_MAJOR_CIVS; iPlayerLoop++)
+			{
+				eLoopPlayer = (PlayerTypes) iPlayerLoop;
+				if(eLoopPlayer != NO_PLAYER && GET_PLAYER(eLoopPlayer).getTeam() == eTargetTeam)
+				{
+					//AI go to war now.
+					if(!GET_PLAYER(eAcceptedFromPlayer).isHuman())
+					{
+						GET_PLAYER(eAcceptedFromPlayer).GetMilitaryAI()->RequestBasicAttack(eLoopPlayer, 2);
+						GET_PLAYER(eAcceptedFromPlayer).GetMilitaryAI()->RequestPureNavalAttack(eLoopPlayer, 2);
+					}
+
+					//If human attacked, send notification with info.
+					if(GET_PLAYER(eLoopPlayer).isHuman() && GET_PLAYER(eLoopPlayer).GetEspionage())
+					{
+						if(GET_PLAYER(eLoopPlayer).GetEspionage()->IsAnySurveillanceEstablished(eAcceptedToPlayer) || GET_PLAYER(eLoopPlayer).GetEspionage()->IsAnySurveillanceEstablished(eAcceptedFromPlayer))
+						{
+							CvNotifications* pNotifications = GET_PLAYER(eLoopPlayer).GetNotifications();
+							if(pNotifications)
+							{
+								Localization::String strText = Localization::Lookup("TXT_KEY_NOTIFICATION_DIPLOMACY_THIRD_PARTY_BROKER_NAME");
+								strText << GET_PLAYER(eAcceptedToPlayer).getCivilizationShortDescriptionKey();
+								strText << GET_PLAYER(eAcceptedFromPlayer).getCivilizationShortDescriptionKey();
+								Localization::String strSummary = Localization::Lookup("TXT_KEY_NOTIFICATION_DIPLOMACY_THIRD_PARTY_BROKER_NAME_S");
+								strSummary << GET_PLAYER(eAcceptedToPlayer).getCivilizationShortDescriptionKey();
+								pNotifications->Add(NOTIFICATION_DIPLOMACY_DECLARATION, strText.toUTF8(), strSummary.toUTF8(), -1, -1, -1);
+							}
+						}
+					}
+					//If AI, bump down their opinion of the broker a bit.
+					else if(!GET_PLAYER(eLoopPlayer).isMinorCiv() && GET_PLAYER(eLoopPlayer).GetEspionage())
+					{
+						if(GET_PLAYER(eLoopPlayer).GetEspionage()->IsAnySurveillanceEstablished(eAcceptedToPlayer) || GET_PLAYER(eLoopPlayer).GetEspionage()->IsAnySurveillanceEstablished(eAcceptedFromPlayer))
+						{
+							GET_PLAYER(eLoopPlayer).GetDiplomacyAI()->ChangeRecentAssistValue(eAcceptedToPlayer, 600);
+						}
+					}
+				}
+			}
+#endif
+		}
+#if defined(MOD_DIPLOMACY_CIV4_FEATURES)
+				// Maps
+				else if (MOD_DIPLOMACY_CIV4_FEATURES && it->m_eItemType == TRADE_ITEM_MAPS)
+				{
+					GET_TEAM(eToTeam).AcquireMap(eFromTeam);
+				}
+				// Techs
+				else if(MOD_DIPLOMACY_CIV4_FEATURES && it->m_eItemType == TRADE_ITEM_TECHS)
+				{
+					TechTypes eTech = (TechTypes) it->m_iData1;
+
+					GET_TEAM(eToTeam).setHasTech(eTech, true, NO_PLAYER, true, false);
+					
+					// If No Tech Brokering is enabled then don't let the player trade this tech
+					if(GC.getGame().isOption(GAMEOPTION_NO_TECH_BROKERING))
+					{
+						GET_TEAM(eToTeam).SetTradeTech(eTech, false);
+					}
+				}
+				// Vassalage
+				else if(MOD_DIPLOMACY_CIV4_FEATURES && it->m_eItemType == TRADE_ITEM_VASSALAGE)
+				{
+					bool bCapitulation = kDeal.IsPeaceTreatyTrade(eFromPlayer) || kDeal.IsPeaceTreatyTrade(eToPlayer);
+					GET_TEAM(eFromTeam).DoBecomeVassal(eToTeam, !bCapitulation);
+				}
+				// Revoke Vassalage
+				else if(MOD_DIPLOMACY_CIV4_FEATURES && it->m_eItemType == TRADE_ITEM_VASSALAGE_REVOKE)
+				{
+					PlayerTypes eLoopPlayer;
+					TeamTypes eLoopTeam;
+					for(int iPlayerLoop = 0; iPlayerLoop < MAX_MAJOR_CIVS; iPlayerLoop++)
+					{
+						eLoopPlayer = (PlayerTypes) iPlayerLoop;
+
+						if(eLoopPlayer != NO_PLAYER && GET_PLAYER(eLoopPlayer).isAlive())
+						{
+							eLoopTeam = GET_PLAYER(eLoopPlayer).getTeam();
+							if(eLoopTeam != NO_TEAM)
+							{
+								GET_TEAM(eFromTeam).DoEndVassal(eLoopTeam, true, true);
+							}
+						}
+					}
+				}
+#endif
+		// **** Peace Treaty **** this should always be the last item processed!!!
+		else if(it->m_eItemType == TRADE_ITEM_PEACE_TREATY)
+		{
+#if defined(MOD_EVENTS_WAR_AND_PEACE)
+					GET_TEAM(eFromTeam).makePeace(eToTeam, true, false, eFromPlayer);
+#else
+					GET_TEAM(eFromTeam).makePeace(eToTeam);
+#endif
+			GET_TEAM(eFromTeam).setForcePeace(eToTeam, true);
+#if defined(MOD_BALANCE_CORE)
+			if(MOD_BALANCE_CORE)
+			{
+				if((kDeal.GetSurrenderingPlayer() == eAcceptedFromPlayer) && !bDone)
+				{
+					int iTurns = GET_PLAYER(eAcceptedToPlayer).GetPlayerTraits()->GetGoldenAgeFromVictory();
+					if(iTurns > 0)
+					{
+						if(iTurns < GC.getGame().goldenAgeLength())
+						{
+							iTurns = GC.getGame().goldenAgeLength();
+						}
+						// Player modifier
+						int iLengthModifier = GET_PLAYER(eAcceptedToPlayer).getGoldenAgeModifier();
+
+						// Trait modifier
+						iLengthModifier += GET_PLAYER(eAcceptedToPlayer).GetPlayerTraits()->GetGoldenAgeDurationModifier();
+
+#if defined(MOD_BALANCE_CORE_RESOURCE_MONOPOLIES)
+						// Do we get increased Golden Ages from a resource monopoly?
+						if(MOD_BALANCE_CORE_RESOURCE_MONOPOLIES)
+						{
+							for (int iResourceLoop = 0; iResourceLoop < GC.getNumResourceInfos(); iResourceLoop++)
+							{
+								ResourceTypes eResourceLoop = (ResourceTypes) iResourceLoop;
+								if(eResourceLoop != NO_RESOURCE)
+								{
+									CvResourceInfo* pInfo = GC.getResourceInfo(eResourceLoop);
+									if (pInfo && pInfo->isMonopoly())
+									{
+										if(GET_PLAYER(eAcceptedToPlayer).HasGlobalMonopoly(eResourceLoop) && pInfo->getMonopolyGALength() > 0)
+										{
+											int iTemp = pInfo->getMonopolyGALength();
+											iTemp += GET_PLAYER(eAcceptedToPlayer).GetMonopolyModPercent();
+											iLengthModifier += iTemp;
+										}
+									}
+								}
+							}
+						}
+#endif
+						if(iLengthModifier != 0)
+						{
+							iTurns = iTurns * (100 + iLengthModifier) / 100;
+						}
+						int iValue = GET_PLAYER(eAcceptedToPlayer).GetGoldenAgeProgressMeter();
+						GET_PLAYER(eAcceptedToPlayer).changeGoldenAgeTurns(iTurns, iValue);
+					}
+
+					int iTourism = GET_PLAYER(eAcceptedToPlayer).GetEventTourism();
+					GET_PLAYER(eAcceptedToPlayer).ChangeNumHistoricEvents(1);
+					// Culture boost based on previous turns
+					int iPreviousTurnsToCount = 10;
+					// Calculate boost
+					iTourism *= GET_PLAYER(eAcceptedToPlayer).GetCultureYieldFromPreviousTurns(GC.getGame().getGameTurn(), iPreviousTurnsToCount);
+					iTourism /= 100;
+					if(iTourism > 0)
+					{
+						GET_PLAYER(eAcceptedToPlayer).GetCulture()->AddTourismAllKnownCivs(iTourism);
+						if(eAcceptedToPlayer == GC.getGame().getActivePlayer())
+						{
+							CvCity* pCity = GET_PLAYER(eAcceptedToPlayer).getCapitalCity();
+							if(pCity != NULL)
+							{
+								char text[256] = {0};
+								float fDelay = 0.5f;
+								sprintf_s(text, "[COLOR_WHITE]+%d[ENDCOLOR][ICON_TOURISM]", iTourism);
+								DLLUI->AddPopupText(pCity->getX(), pCity->getY(), text, fDelay);
+								CvNotifications* pNotification = GET_PLAYER(eAcceptedToPlayer).GetNotifications();
+								if(pNotification)
+								{
+									CvString strMessage;
+									CvString strSummary;
+									strMessage = GetLocalizedText("TXT_KEY_TOURISM_EVENT_WAR", iTourism);
+									strSummary = GetLocalizedText("TXT_KEY_TOURISM_EVENT_SUMMARY");
+									pNotification->Add(NOTIFICATION_CULTURE_VICTORY_SOMEONE_INFLUENTIAL, strMessage, strSummary, pCity->getX(), pCity->getY(), eAcceptedToPlayer);
+								}
+							}
+						}
+					}
+					bDone = true;
+				}
+				else if((kDeal.GetSurrenderingPlayer() == eAcceptedToPlayer) && !bDone)
+				{
+					int iTurns = GET_PLAYER(eAcceptedFromPlayer).GetPlayerTraits()->GetGoldenAgeFromVictory();
+					if(iTurns > 0)
+					{
+						if(iTurns < GC.getGame().goldenAgeLength())
+						{
+							iTurns = GC.getGame().goldenAgeLength();
+						}
+						// Player modifier
+						int iLengthModifier = GET_PLAYER(eAcceptedFromPlayer).getGoldenAgeModifier();
+
+						// Trait modifier
+						iLengthModifier += GET_PLAYER(eAcceptedFromPlayer).GetPlayerTraits()->GetGoldenAgeDurationModifier();
+
+#if defined(MOD_BALANCE_CORE_RESOURCE_MONOPOLIES)
+						// Do we get increased Golden Ages from a resource monopoly?
+						if(MOD_BALANCE_CORE_RESOURCE_MONOPOLIES)
+						{
+							for (int iResourceLoop = 0; iResourceLoop < GC.getNumResourceInfos(); iResourceLoop++)
+							{
+								ResourceTypes eResourceLoop = (ResourceTypes) iResourceLoop;
+								if(eResourceLoop != NO_RESOURCE)
+								{
+									CvResourceInfo* pInfo = GC.getResourceInfo(eResourceLoop);
+									if (pInfo && pInfo->isMonopoly())
+									{
+										if(GET_PLAYER(eAcceptedFromPlayer).HasGlobalMonopoly(eResourceLoop) && pInfo->getMonopolyGALength() > 0)
+										{
+											int iTemp = pInfo->getMonopolyGALength();
+											iTemp += GET_PLAYER(eAcceptedFromPlayer).GetMonopolyModPercent();
+											iLengthModifier += iTemp;
+										}
+									}
+								}
+							}
+						}
+#endif
+						if(iLengthModifier != 0)
+						{
+							iTurns = iTurns * (100 + iLengthModifier) / 100;
+						}
+								
+						int iValue = GET_PLAYER(eAcceptedFromPlayer).GetGoldenAgeProgressMeter();
+						GET_PLAYER(eAcceptedFromPlayer).changeGoldenAgeTurns(iTurns, iValue);
+					}
+
+					int iTourism = GET_PLAYER(eAcceptedFromPlayer).GetEventTourism();
+					GET_PLAYER(eAcceptedFromPlayer).ChangeNumHistoricEvents(1);
+					// Culture boost based on previous turns
+					int iPreviousTurnsToCount = 10;
+					// Calculate boost
+					iTourism *= GET_PLAYER(eAcceptedFromPlayer).GetCultureYieldFromPreviousTurns(GC.getGame().getGameTurn(), iPreviousTurnsToCount);
+					iTourism /= 100;
+					if(iTourism > 0)
+					{
+						GET_PLAYER(eAcceptedFromPlayer).GetCulture()->AddTourismAllKnownCivs(iTourism);
+						if(eAcceptedFromPlayer == GC.getGame().getActivePlayer())
+						{
+							CvCity* pCity = GET_PLAYER(eAcceptedFromPlayer).getCapitalCity();
+							if(pCity != NULL)
+							{
+								char text[256] = {0};
+								float fDelay = 0.5f;
+								sprintf_s(text, "[COLOR_WHITE]+%d[ENDCOLOR][ICON_TOURISM]", iTourism);
+								DLLUI->AddPopupText(pCity->getX(), pCity->getY(), text, fDelay);
+								CvNotifications* pNotification = GET_PLAYER(eAcceptedFromPlayer).GetNotifications();
+								if(pNotification)
+								{
+									CvString strMessage;
+									CvString strSummary;
+									strMessage = GetLocalizedText("TXT_KEY_TOURISM_EVENT_WAR", iTourism);
+									strSummary = GetLocalizedText("TXT_KEY_TOURISM_EVENT_SUMMARY");
+									pNotification->Add(NOTIFICATION_CULTURE_VICTORY_SOMEONE_INFLUENTIAL, strMessage, strSummary, pCity->getX(), pCity->getY(), eAcceptedFromPlayer);
+								}
+							}
+						}
+					}
+					bDone = true;
+				}
+			}
+#endif
+		}
+		//////////////////////////////////////////////////////////////////////
+		// **** DO NOT PUT ANYTHING AFTER THIS LINE ****
+		//////////////////////////////////////////////////////////////////////
+	}
+
+	LogDealComplete(&kDeal);
+}
+
+void CvGameDeals::FinalizeDealNotify(PlayerTypes eFromPlayer, PlayerTypes eToPlayer, CvWeightedVector<TeamTypes, MAX_CIV_TEAMS, true>& veNowAtPeacePairs)
+{
+	// Update UI if we were involved in the deal
+	PlayerTypes eActivePlayer = GC.getGame().getActivePlayer();
+	if(eFromPlayer == eActivePlayer || eToPlayer == eActivePlayer)
+	{
+		GC.GetEngineUserInterface()->setDirty(GameData_DIRTY_BIT, true);
+	}
+
+	// Send out a condensed notification if peace was made with third party minor civs in this deal
+	if(veNowAtPeacePairs.size() > 0)
+	{
+		// Loop through all teams
+		for(int iFromTeamIndex = 0; iFromTeamIndex < MAX_CIV_TEAMS; iFromTeamIndex++)
+		{
+			TeamTypes eFromTeam = (TeamTypes) iFromTeamIndex;
+			TeamTypes eToTeam = NO_TEAM;
+			bool bFromTeamMadePeace = false;
+
+			Localization::String strTemp = Localization::Lookup("TXT_KEY_MISC_MADE_PEACE_WITH_MINOR_ALLIES");
+			Localization::String strSummary = Localization::Lookup("TXT_KEY_MISC_MADE_PEACE_WITH_MINOR_ALLIES_SUMMARY");
+			strTemp << GET_TEAM(eFromTeam).getName().GetCString();
+			strSummary << GET_TEAM(eFromTeam).getName().GetCString();
+			CvString strMessage = strTemp.toUTF8();
+
+			// Did this team make peace with someone in this deal?
+			for(int iPairIndex = 0; iPairIndex < veNowAtPeacePairs.size(); iPairIndex++)
+			{
+				if(veNowAtPeacePairs.GetWeight(iPairIndex) == (int) eFromTeam)
+				{
+					eToTeam = veNowAtPeacePairs.GetElement(iPairIndex);
+					strTemp = Localization::Lookup(GET_TEAM(eToTeam).getName().GetCString());
+					strMessage = strMessage + "[NEWLINE]" + strTemp.toUTF8();
+					bFromTeamMadePeace = true;
+				}
+			}
+
+			// Send out notifications if there was a change
+			if(bFromTeamMadePeace)
+			{
+				// Send out the notifications to other players
+				for(int iNotifPlayerLoop = 0; iNotifPlayerLoop < MAX_MAJOR_CIVS; iNotifPlayerLoop++)
+				{
+					PlayerTypes eNotifPlayer = (PlayerTypes) iNotifPlayerLoop;
+
+					if(!GET_PLAYER(eNotifPlayer).isAlive())
+						continue;
+
+					if(GET_PLAYER(eNotifPlayer).getTeam() == eFromTeam)
+						continue;
+
+					if(GET_TEAM(GET_PLAYER(eNotifPlayer).getTeam()).isHasMet(eFromTeam))  //antonjs: consider: what if eNotifPlayer hasn't met one or more of the minors that eFromTeam made peace with?
+					{
+						if(GET_PLAYER(eNotifPlayer).GetNotifications())
+						{
+							GET_PLAYER(eNotifPlayer).GetNotifications()->Add(NOTIFICATION_PEACE, strMessage, strSummary.toUTF8(), -1, -1, GET_TEAM(eFromTeam).getLeaderID(), eToTeam);
+						}
+					}
+				}
+			}
+		}
+	}
+}
+#endif
+
 /// Moves a deal from the proposed list to the active one (returns FALSE if deal not found)
 bool CvGameDeals::FinalizeDeal(PlayerTypes eFromPlayer, PlayerTypes eToPlayer, bool bAccepted)
 {
@@ -2828,15 +3642,8 @@ bool CvGameDeals::FinalizeDeal(PlayerTypes eFromPlayer, PlayerTypes eToPlayer, b
 			bFoundIt = true;
 		}
 	}
-#if defined(MOD_BALANCE_CORE)
-	if(!bFoundIt)
-	{
-		LogDealFailed(NULL, false, !bAccepted, false);
-	}
-	if(bFoundIt && bAccepted)
-#else
+
 	if(bFoundIt)
-#endif
 	{
 
 		TradedItemList::iterator iter;
@@ -2851,15 +3658,10 @@ bool CvGameDeals::FinalizeDeal(PlayerTypes eFromPlayer, PlayerTypes eToPlayer, b
 			{
 				// mark that the deal is no longer valid. We will still delete the deal but not commit its actions
 				bValid = false;
-#if defined(MOD_BALANCE_CORE)
-				if(!bValid)
-				{
-					LogDealFailed(&kDeal, false, !bAccepted, true);
-				}
-#endif
 				break;
 			}
 		}
+
 
 		// **** START HACK ****
 		// EFB: temporary delete method; recopy vector without this element
@@ -2881,13 +3683,6 @@ bool CvGameDeals::FinalizeDeal(PlayerTypes eFromPlayer, PlayerTypes eToPlayer, b
 			}
 		}
 		// **** END HACK ****
-#endif // MOD_ACTIVE_DIPLOMACY
-#if defined(MOD_BALANCE_CORE)
-		if(!bValid || !bAccepted)
-		{
-			LogDealFailed(&kDeal, false, !bAccepted, true);
-		}
-#endif
 
 		if(bValid && bAccepted)
 		{
@@ -3035,9 +3830,6 @@ bool CvGameDeals::FinalizeDeal(PlayerTypes eFromPlayer, PlayerTypes eToPlayer, b
 				// if the deal is renewed do not start it up
 				if(it->m_bToRenewed)
 				{
-#if defined(MOD_BALANCE_CORE)
-					LogDealFailed(&kDeal, true, !bAccepted, false);
-#endif
 					continue;
 				}
 
@@ -3340,161 +4132,12 @@ bool CvGameDeals::FinalizeDeal(PlayerTypes eFromPlayer, PlayerTypes eToPlayer, b
 					{
 						if((kDeal.GetSurrenderingPlayer() == eAcceptedFromPlayer) && !bDone)
 						{
-							int iTurns = GET_PLAYER(eAcceptedToPlayer).GetPlayerTraits()->GetGoldenAgeFromVictory();
-							if(iTurns > 0)
-							{
-								if(iTurns < GC.getGame().goldenAgeLength())
-								{
-									iTurns = GC.getGame().goldenAgeLength();
-								}
-								// Player modifier
-								int iLengthModifier = GET_PLAYER(eAcceptedToPlayer).getGoldenAgeModifier();
-
-								// Trait modifier
-								iLengthModifier += GET_PLAYER(eAcceptedToPlayer).GetPlayerTraits()->GetGoldenAgeDurationModifier();
-
-#if defined(MOD_BALANCE_CORE_RESOURCE_MONOPOLIES)
-								// Do we get increased Golden Ages from a resource monopoly?
-								if(MOD_BALANCE_CORE_RESOURCE_MONOPOLIES)
-								{
-									for (int iResourceLoop = 0; iResourceLoop < GC.getNumResourceInfos(); iResourceLoop++)
-									{
-										ResourceTypes eResourceLoop = (ResourceTypes) iResourceLoop;
-										if(eResourceLoop != NO_RESOURCE)
-										{
-											CvResourceInfo* pInfo = GC.getResourceInfo(eResourceLoop);
-											if (pInfo && pInfo->isMonopoly())
-											{
-												if(GET_PLAYER(eAcceptedToPlayer).HasGlobalMonopoly(eResourceLoop) && pInfo->getMonopolyGALength() > 0)
-												{
-													int iTemp = pInfo->getMonopolyGALength();
-													iTemp += GET_PLAYER(eAcceptedToPlayer).GetMonopolyModPercent();
-													iLengthModifier += iTemp;
-												}
-											}
-										}
-									}
-								}
-#endif
-								if(iLengthModifier != 0)
-								{
-									iTurns = iTurns * (100 + iLengthModifier) / 100;
-								}
-								int iValue = GET_PLAYER(eAcceptedToPlayer).GetGoldenAgeProgressMeter();
-								GET_PLAYER(eAcceptedToPlayer).changeGoldenAgeTurns(iTurns, iValue);
-							}
-
-							int iTourism = GET_PLAYER(eAcceptedToPlayer).GetEventTourism();
-							GET_PLAYER(eAcceptedToPlayer).ChangeNumHistoricEvents(1);
-							// Culture boost based on previous turns
-							int iPreviousTurnsToCount = 10;
-							// Calculate boost
-							iTourism *= GET_PLAYER(eAcceptedToPlayer).GetCultureYieldFromPreviousTurns(GC.getGame().getGameTurn(), iPreviousTurnsToCount);
-							iTourism /= 100;
-							if(iTourism > 0)
-							{
-								GET_PLAYER(eAcceptedToPlayer).GetCulture()->AddTourismAllKnownCivs(iTourism);
-								if(eAcceptedToPlayer == GC.getGame().getActivePlayer())
-								{
-									CvCity* pCity = GET_PLAYER(eAcceptedToPlayer).getCapitalCity();
-									if(pCity != NULL)
-									{
-										char text[256] = {0};
-										float fDelay = 0.5f;
-										sprintf_s(text, "[COLOR_WHITE]+%d[ENDCOLOR][ICON_TOURISM]", iTourism);
-										DLLUI->AddPopupText(pCity->getX(), pCity->getY(), text, fDelay);
-										CvNotifications* pNotification = GET_PLAYER(eAcceptedToPlayer).GetNotifications();
-										if(pNotification)
-										{
-											CvString strMessage;
-											CvString strSummary;
-											strMessage = GetLocalizedText("TXT_KEY_TOURISM_EVENT_WAR", iTourism);
-											strSummary = GetLocalizedText("TXT_KEY_TOURISM_EVENT_SUMMARY");
-											pNotification->Add(NOTIFICATION_CULTURE_VICTORY_SOMEONE_INFLUENTIAL, strMessage, strSummary, pCity->getX(), pCity->getY(), eAcceptedToPlayer);
-										}
-									}
-								}
-							}
+							GET_PLAYER(eAcceptedToPlayer).DoWarVictoryBonuses();
 							bDone = true;
 						}
 						else if((kDeal.GetSurrenderingPlayer() == eAcceptedToPlayer) && !bDone)
 						{
-							int iTurns = GET_PLAYER(eAcceptedFromPlayer).GetPlayerTraits()->GetGoldenAgeFromVictory();
-							if(iTurns > 0)
-							{
-								if(iTurns < GC.getGame().goldenAgeLength())
-								{
-									iTurns = GC.getGame().goldenAgeLength();
-								}
-								// Player modifier
-								int iLengthModifier = GET_PLAYER(eAcceptedFromPlayer).getGoldenAgeModifier();
-
-								// Trait modifier
-								iLengthModifier += GET_PLAYER(eAcceptedFromPlayer).GetPlayerTraits()->GetGoldenAgeDurationModifier();
-
-#if defined(MOD_BALANCE_CORE_RESOURCE_MONOPOLIES)
-								// Do we get increased Golden Ages from a resource monopoly?
-								if(MOD_BALANCE_CORE_RESOURCE_MONOPOLIES)
-								{
-									for (int iResourceLoop = 0; iResourceLoop < GC.getNumResourceInfos(); iResourceLoop++)
-									{
-										ResourceTypes eResourceLoop = (ResourceTypes) iResourceLoop;
-										if(eResourceLoop != NO_RESOURCE)
-										{
-											CvResourceInfo* pInfo = GC.getResourceInfo(eResourceLoop);
-											if (pInfo && pInfo->isMonopoly())
-											{
-												if(GET_PLAYER(eAcceptedFromPlayer).HasGlobalMonopoly(eResourceLoop) && pInfo->getMonopolyGALength() > 0)
-												{
-													int iTemp = pInfo->getMonopolyGALength();
-													iTemp += GET_PLAYER(eAcceptedFromPlayer).GetMonopolyModPercent();
-													iLengthModifier += iTemp;
-												}
-											}
-										}
-									}
-								}
-#endif
-								if(iLengthModifier != 0)
-								{
-									iTurns = iTurns * (100 + iLengthModifier) / 100;
-								}
-								
-								int iValue = GET_PLAYER(eAcceptedFromPlayer).GetGoldenAgeProgressMeter();
-								GET_PLAYER(eAcceptedFromPlayer).changeGoldenAgeTurns(iTurns, iValue);
-							}
-
-							int iTourism = GET_PLAYER(eAcceptedFromPlayer).GetEventTourism();
-							GET_PLAYER(eAcceptedFromPlayer).ChangeNumHistoricEvents(1);
-							// Culture boost based on previous turns
-							int iPreviousTurnsToCount = 10;
-							// Calculate boost
-							iTourism *= GET_PLAYER(eAcceptedFromPlayer).GetCultureYieldFromPreviousTurns(GC.getGame().getGameTurn(), iPreviousTurnsToCount);
-							iTourism /= 100;
-							if(iTourism > 0)
-							{
-								GET_PLAYER(eAcceptedFromPlayer).GetCulture()->AddTourismAllKnownCivs(iTourism);
-								if(eAcceptedFromPlayer == GC.getGame().getActivePlayer())
-								{
-									CvCity* pCity = GET_PLAYER(eAcceptedFromPlayer).getCapitalCity();
-									if(pCity != NULL)
-									{
-										char text[256] = {0};
-										float fDelay = 0.5f;
-										sprintf_s(text, "[COLOR_WHITE]+%d[ENDCOLOR][ICON_TOURISM]", iTourism);
-										DLLUI->AddPopupText(pCity->getX(), pCity->getY(), text, fDelay);
-										CvNotifications* pNotification = GET_PLAYER(eAcceptedFromPlayer).GetNotifications();
-										if(pNotification)
-										{
-											CvString strMessage;
-											CvString strSummary;
-											strMessage = GetLocalizedText("TXT_KEY_TOURISM_EVENT_WAR", iTourism);
-											strSummary = GetLocalizedText("TXT_KEY_TOURISM_EVENT_SUMMARY");
-											pNotification->Add(NOTIFICATION_CULTURE_VICTORY_SOMEONE_INFLUENTIAL, strMessage, strSummary, pCity->getX(), pCity->getY(), eAcceptedFromPlayer);
-										}
-									}
-								}
-							}
+							GET_PLAYER(eAcceptedFromPlayer).DoWarVictoryBonuses();
 							bDone = true;
 						}
 					}
@@ -3569,10 +4212,6 @@ bool CvGameDeals::FinalizeDeal(PlayerTypes eFromPlayer, PlayerTypes eToPlayer, b
 			}
 		}
 	}
-#if defined(MOD_ACTIVE_DIPLOMACY)
-	GET_PLAYER(eFromPlayer).GetDiplomacyRequests()->CheckValidity();
-	GET_PLAYER(eFromPlayer).GetDiplomacyRequests()->CheckValidity();
-#endif
 
 	return bFoundIt && bValid;
 }
@@ -3704,9 +4343,28 @@ void CvGameDeals::DoTurn()
 	}
 }
 
-
 PlayerTypes CvGameDeals::HasMadeProposal(PlayerTypes ePlayer)
 {
+#if defined(MOD_ACTIVE_DIPLOMACY)
+	if(GC.getGame().isReallyNetworkMultiPlayer() && MOD_ACTIVE_DIPLOMACY)
+	{
+		for (DealList::const_iterator it = m_ProposedDeals.begin(); it != m_ProposedDeals.end(); ++it)
+		{
+		if (it->GetFromPlayer() == ePlayer)
+			return it->GetToPlayer();		
+		}
+	}
+	else
+	{
+		if(m_ProposedDeals.size() > 0)
+		{
+			DealList::iterator iter;
+			for(iter = m_ProposedDeals.begin(); iter != m_ProposedDeals.end(); ++iter)
+				if(iter->m_eFromPlayer == ePlayer)
+					return iter->m_eToPlayer;
+		}
+	}
+#else
 	if(m_ProposedDeals.size() > 0)
 	{
 		DealList::iterator iter;
@@ -3714,25 +4372,10 @@ PlayerTypes CvGameDeals::HasMadeProposal(PlayerTypes ePlayer)
 			if(iter->m_eFromPlayer == ePlayer)
 				return iter->m_eToPlayer;
 	}
-
+#endif
 	return NO_PLAYER;
 }
 
-#if defined(MOD_ACTIVE_DIPLOMACY)
-CvDeal* CvGameDeals::GetProposedDeal(PlayerTypes eFromPlayer, PlayerTypes eToPlayer, bool latest)
-{
-	int start = latest ? m_ProposedDeals.size() - 1 : 0;
-	int end = latest ? -1 : m_ProposedDeals.size();
-	int inc = latest ? -1 : 1;
-	for (int i = start; i != end; i += inc) {
-		CvDeal* pDeal = &m_ProposedDeals[i];
-		if (pDeal->GetFromPlayer() == eFromPlayer && pDeal->GetToPlayer() == eToPlayer)
-			return pDeal;
-	}
-
-	return NULL;
-}
-#else
 bool CvGameDeals::ProposedDealExists(PlayerTypes eFromPlayer, PlayerTypes eToPlayer)
 {
 	if(m_ProposedDeals.size() > 0)
@@ -3748,6 +4391,23 @@ bool CvGameDeals::ProposedDealExists(PlayerTypes eFromPlayer, PlayerTypes eToPla
 	return false;
 }
 
+#if defined(MOD_ACTIVE_DIPLOMACY)
+CvDeal* CvGameDeals::GetProposedMPDeal(PlayerTypes eFromPlayer, PlayerTypes eToPlayer, bool latest)
+{
+	int start = latest ? m_ProposedDeals.size() - 1 : 0;
+	int end = latest ? -1 : m_ProposedDeals.size();
+	int inc = latest ? -1 : 1;
+	for (int i = start; i != end; i += inc)
+	{
+		CvDeal* pDeal = &m_ProposedDeals[i];
+		if (pDeal->GetFromPlayer() == eFromPlayer && pDeal->GetToPlayer() == eToPlayer)
+			return pDeal;
+		else if (pDeal->GetFromPlayer() == eToPlayer && pDeal->GetToPlayer() == eFromPlayer)
+			return pDeal;
+	}
+	return NULL;
+}
+#endif
 CvDeal* CvGameDeals::GetProposedDeal(PlayerTypes eFromPlayer, PlayerTypes eToPlayer)
 {
 	if(m_ProposedDeals.size() > 0)
@@ -3757,11 +4417,8 @@ CvDeal* CvGameDeals::GetProposedDeal(PlayerTypes eFromPlayer, PlayerTypes eToPla
 			if(iter->m_eFromPlayer == eFromPlayer && iter->m_eToPlayer == eToPlayer)
 				return &(*iter);
 	}
-
 	return NULL;
 }
-#endif
-
 
 /// If a deal has actually ended, move it from the current list to the historic list
 void CvGameDeals::DoUpdateCurrentDealsList()
@@ -3781,6 +4438,10 @@ void CvGameDeals::DoUpdateCurrentDealsList()
 	m_CurrentDeals.clear();
 	for(it = tempDeals.begin(); it != tempDeals.end(); ++it)
 	{
+#if defined(MOD_BALANCE_CORE)
+		if(it->m_iFinalTurn < 0)
+			continue;
+#endif
 		if(it->m_iFinalTurn <= GC.getGame().getGameTurn())
 		{
 			m_HistoricalDeals.push_back(*it);
@@ -3923,38 +4584,39 @@ void CvGameDeals::DoCancelAllDealsWithPlayer(PlayerTypes eCancelPlayer)
 		}
 	}
 }
-#if defined(MOD_ACTIVE_DIPLOMACY)
-void CvGameDeals::DoCancelAllProposedDealsWithPlayer(PlayerTypes eCancelPlayer, DiplomacyPlayerType eTargetPlayers)
-{
-	PlayerTypes eLoopPlayer;
-	for(int iPlayerLoop = 0; iPlayerLoop < MAX_MAJOR_CIVS; iPlayerLoop++)
-	{
-		eLoopPlayer = (PlayerTypes) iPlayerLoop;
-		CvPlayer& kLoopPlayer = GET_PLAYER(eLoopPlayer);
-		if (   (eTargetPlayers == DIPLO_AI_PLAYERS && !kLoopPlayer.isHuman())
-			|| (eTargetPlayers == DIPLO_ALL_PLAYERS)
-			|| (eLoopPlayer == static_cast<PlayerTypes>(eTargetPlayers)))
-		{
-			CvDeal kDeal;
-			while (RemoveProposedDeal(eCancelPlayer, eLoopPlayer, &kDeal, true))
-			{//deal from eCancelPlayer
-				FinalizeDeal(kDeal, false);
-			}
-			while (RemoveProposedDeal(eLoopPlayer, eCancelPlayer, &kDeal, true))
-			{//deal to eCancelPlayer
-				FinalizeDeal(kDeal, false);
-			}
-		}
-	}
-}
-#else
-void CvGameDeals::DoCancelAllProposedDealsWithPlayer(PlayerTypes eCancelPlayer)
 
+#if defined(MOD_ACTIVE_DIPLOMACY)
+// JdH => added eTargetPlayers parameter to be able to control proposed deal removal
+void CvGameDeals::DoCancelAllProposedMPDealsWithPlayer(PlayerTypes eCancelPlayer, DiplomacyPlayerType eTargetPlayers)
 {//Cancel all proposed deals involving eCancelPlayer.
 	PlayerTypes eLoopPlayer;
 	for(int iPlayerLoop = 0; iPlayerLoop < MAX_MAJOR_CIVS; iPlayerLoop++)
 	{
 		eLoopPlayer = (PlayerTypes) iPlayerLoop;
+		CvPlayer& kLoopPlayer = GET_PLAYER(eLoopPlayer);
+		if ((eTargetPlayers == DIPLO_AI_PLAYERS && !kLoopPlayer.isHuman()) || (eTargetPlayers == DIPLO_ALL_PLAYERS) || (eLoopPlayer == static_cast<PlayerTypes>(eTargetPlayers)))
+		{
+			CvDeal kDeal;
+			while (RemoveProposedDeal(eCancelPlayer, eLoopPlayer, &kDeal, true))
+			{//deal from eCancelPlayer
+				FinalizeMPDeal(kDeal, false);
+			}
+			while (RemoveProposedDeal(eLoopPlayer, eCancelPlayer, &kDeal, true))
+			{//deal to eCancelPlayer
+				FinalizeMPDeal(kDeal, false);
+			}
+		}
+	}
+}
+#endif
+
+void CvGameDeals::DoCancelAllProposedDealsWithPlayer(PlayerTypes eCancelPlayer)
+{//Cancel all proposed deals involving eCancelPlayer.
+	PlayerTypes eLoopPlayer;
+	for(int iPlayerLoop = 0; iPlayerLoop < MAX_MAJOR_CIVS; iPlayerLoop++)
+	{
+		eLoopPlayer = (PlayerTypes) iPlayerLoop;
+
 		if(GetProposedDeal(eCancelPlayer, eLoopPlayer))
 		{//deal from eCancelPlayer
 			FinalizeDeal(eCancelPlayer, eLoopPlayer, false);
@@ -3965,7 +4627,7 @@ void CvGameDeals::DoCancelAllProposedDealsWithPlayer(PlayerTypes eCancelPlayer)
 		}
 	}
 }
-#endif
+
 /// End a TradedItem (if it's an ongoing item)
 void CvGameDeals::DoEndTradedItem(CvTradedItem* pItem, PlayerTypes eToPlayer, bool bCancelled)
 {
@@ -4352,8 +5014,17 @@ void CvGameDeals::LogDealComplete(CvDeal* pDeal)
 
 		CvString strOutBuf;
 		CvString strBaseString;
-
-		CvString playerName = GET_PLAYER(pDeal->GetFromPlayer()).getCivilizationShortDescription();
+		CvString playerName;
+#if defined(MOD_ACTIVE_DIPLOMACY)
+		if(GC.getGame().isReallyNetworkMultiPlayer() && MOD_ACTIVE_DIPLOMACY)
+		{
+			CvString playerName = GET_PLAYER(pDeal->GetFromPlayer()).getCivilizationShortDescription();
+		}
+		int iEvenValueImOffering;
+		int iEvenValueTheyreOffering;
+		int iTotalValueFrom = GET_PLAYER(pDeal->GetFromPlayer()).GetDealAI()->GetDealValue(pDeal, iEvenValueImOffering, iEvenValueTheyreOffering, /*bUseEvenValue*/ false, true);
+		int iTotalValueTo = GET_PLAYER(pDeal->GetToPlayer()).GetDealAI()->GetDealValue(pDeal, iEvenValueImOffering, iEvenValueTheyreOffering, /*bUseEvenValue*/ false, true);
+#endif
 		CvString otherPlayerName;
 
 		CvString strTemp;
@@ -4361,11 +5032,11 @@ void CvGameDeals::LogDealComplete(CvDeal* pDeal)
 		// Open the log file
 		if(GC.getPlayerAndCityAILogSplit())
 		{
-			strLogName = "DiplomacyAI_Messages_Log_" + playerName + ".csv";
+			strLogName = "DiplomacyAI_TradeAgreements_Log_" + playerName + ".csv";
 		}
 		else
 		{
-			strLogName = "DiplomacyAI_Messages_Log.csv";
+			strLogName = "DiplomacyAI_TradeAgreements_Log.csv";
 		}
 
 		FILogFile* pLog;
@@ -4553,6 +5224,11 @@ void CvGameDeals::LogDealComplete(CvDeal* pDeal)
 			OutputDebugString("\n");
 #endif
 		}
+
+		strTemp.Format("DEAL COMPLETE: Deal Value Sender: %d ; Deal Value Recipient: %d", iTotalValueFrom, iTotalValueTo);
+		strOutBuf = strTemp;
+
+		pLog->Msg(strOutBuf);
 	}
 }
 #if defined(MOD_BALANCE_CORE)
@@ -4573,11 +5249,11 @@ void CvGameDeals::LogDealFailed(CvDeal* pDeal, bool bNoRenew, bool bNotAccepted,
 		// Open the log file
 		if(GC.getPlayerAndCityAILogSplit())
 		{
-			strLogName = "DiplomacyAI_Messages_Log_" + playerName + ".csv";
+			strLogName = "DiplomacyAI_TradeAgreements_Log_" + playerName + ".csv";
 		}
 		else
 		{
-			strLogName = "DiplomacyAI_Messages_Log.csv";
+			strLogName = "DiplomacyAI_TradeAgremeents_Log.csv";
 		}
 
 		FILogFile* pLog;
@@ -4821,17 +5497,51 @@ CvDeal* CvGameDeals::GetCurrentDeal(PlayerTypes ePlayer, uint index)
 // ------------------------------------------------------------------------
 CvDeal* CvGameDeals::GetHistoricDeal(PlayerTypes ePlayer, uint index)
 {
-	//iterate backwards, usually the latest deals are most interesting
-	uint iCount = 0;
-	for (uint iIdx=m_HistoricalDeals.size()-1; iIdx>=0; iIdx--)
+#if defined(MOD_ACTIVE_DIPLOMACY)
+	if(GC.getGame().isReallyNetworkMultiPlayer() && MOD_ACTIVE_DIPLOMACY)
 	{
-		DealList::value_type& deal = m_HistoricalDeals[iIdx];
-		if((deal.m_eToPlayer == ePlayer || deal.m_eFromPlayer == ePlayer) && (iCount++ == index))
+		//iterate backwards, usually the latest deals are most interesting
+		uint iCount = 0;
+		for (int i = m_HistoricalDeals.size() - 1; i >= 0; --i)
 		{
-			return &deal;
+			CvDeal& kDeal = m_HistoricalDeals[i];
+			if((kDeal.m_eToPlayer == ePlayer || kDeal.m_eFromPlayer == ePlayer) && (iCount++ == index))
+			{
+				return &kDeal;
+			}
 		}
 	}
+	else
+	{
+		DealList::iterator iter;
+		DealList::iterator end = m_HistoricalDeals.end();
 
+		uint iCount = 0;
+		for(iter = m_HistoricalDeals.begin(); iter != end; ++iter)
+		{
+			if((iter->m_eToPlayer == ePlayer ||
+		        iter->m_eFromPlayer == ePlayer) &&
+		        (iCount++ == index))
+			{
+				return &(*iter);
+			}
+		}
+	}
+#else
+	DealList::iterator iter;
+	DealList::iterator end = m_HistoricalDeals.end();
+
+	uint iCount = 0;
+	for(iter = m_HistoricalDeals.begin(); iter != end; ++iter)
+	{
+		if((iter->m_eToPlayer == ePlayer ||
+		        iter->m_eFromPlayer == ePlayer) &&
+		        (iCount++ == index))
+		{
+			return &(*iter);
+		}
+	}
+#endif
 	return NULL;
 }
 
@@ -4879,6 +5589,128 @@ uint CvGameDeals::GetNumHistoricDeals(PlayerTypes ePlayer, uint iMaxCount)
 
 	return iCount;
 }
+
+// ------------------------------------------------------------------------
+// ------------------------------------------------------------------------
+CvDeal* CvGameDeals::GetCurrentDealWithPlayer(PlayerTypes ePlayer, PlayerTypes eOtherPlayer, uint index)
+{
+	DealList::iterator iter;
+	DealList::iterator end = m_CurrentDeals.end();
+
+	uint iCount = 0;
+	for (iter = m_CurrentDeals.begin(); iter != end; ++iter)
+	{
+		if ((iter->m_eToPlayer == ePlayer || iter->m_eFromPlayer == ePlayer) && 
+			(iter->m_eToPlayer == eOtherPlayer || iter->m_eFromPlayer == eOtherPlayer) &&
+			(iCount++ == index))
+		{
+			return &(*iter);
+		}
+	}
+
+	return NULL;
+}
+
+
+// ------------------------------------------------------------------------
+// ------------------------------------------------------------------------
+CvDeal* CvGameDeals::GetHistoricDealWithPlayer(PlayerTypes ePlayer, PlayerTypes eOtherPlayer, uint index)
+{
+#if defined(MOD_ACTIVE_DIPLOMACY)
+	if (GC.getGame().isReallyNetworkMultiPlayer() && MOD_ACTIVE_DIPLOMACY)
+	{
+		//iterate backwards, usually the latest deals are most interesting
+		uint iCount = 0;
+		for (int i = m_HistoricalDeals.size() - 1; i >= 0; --i)
+		{
+			CvDeal& kDeal = m_HistoricalDeals[i];
+			if ((kDeal.m_eToPlayer == ePlayer || kDeal.m_eFromPlayer == ePlayer) &&
+				(kDeal.m_eToPlayer == eOtherPlayer || kDeal.m_eFromPlayer == eOtherPlayer) &&
+				(iCount++ == index))
+			{
+				return &kDeal;
+			}
+		}
+	}
+	else
+	{
+		DealList::iterator iter;
+		DealList::iterator end = m_HistoricalDeals.end();
+
+		uint iCount = 0;
+		for (iter = m_HistoricalDeals.begin(); iter != end; ++iter)
+		{
+			if ((iter->m_eToPlayer == ePlayer || iter->m_eFromPlayer == ePlayer) &&
+				(iter->m_eToPlayer == eOtherPlayer || iter->m_eFromPlayer == eOtherPlayer) &&
+				(iCount++ == index))
+			{
+				return &(*iter);
+			}
+		}
+	}
+#else
+	DealList::iterator iter;
+	DealList::iterator end = m_HistoricalDeals.end();
+
+	uint iCount = 0;
+	for (iter = m_HistoricalDeals.begin(); iter != end; ++iter)
+	{
+		if ((iter->m_eToPlayer == ePlayer ||
+			iter->m_eFromPlayer == ePlayer) &&
+			(iCount++ == index))
+		{
+			return &(*iter);
+		}
+	}
+#endif
+	return NULL;
+}
+
+
+// ------------------------------------------------------------------------
+// ------------------------------------------------------------------------
+uint CvGameDeals::GetNumCurrentDealsWithPlayer(PlayerTypes ePlayer, PlayerTypes eOtherPlayer)
+{
+	DealList::iterator iter;
+	DealList::iterator end = m_CurrentDeals.end();
+
+	uint iCount = 0;
+	for (iter = m_CurrentDeals.begin(); iter != end; ++iter)
+	{
+		if ((iter->m_eToPlayer == ePlayer || iter->m_eFromPlayer == ePlayer) &&
+			(iter->m_eToPlayer == eOtherPlayer || iter->m_eFromPlayer == eOtherPlayer))
+		{
+			++iCount;
+		}
+	}
+
+	return iCount;
+}
+
+
+// ------------------------------------------------------------------------
+// ------------------------------------------------------------------------
+uint CvGameDeals::GetNumHistoricDealsWithPlayer(PlayerTypes ePlayer, PlayerTypes eOtherPlayer, uint iMaxCount)
+
+{
+	DealList::iterator iter;
+	DealList::iterator end = m_HistoricalDeals.end();
+
+	uint iCount = 0;
+	for (iter = m_HistoricalDeals.begin(); iter != end; ++iter)
+	{
+		if ((iter->m_eToPlayer == ePlayer || iter->m_eFromPlayer == ePlayer) &&
+			(iter->m_eToPlayer == eOtherPlayer || iter->m_eFromPlayer == eOtherPlayer))
+		{
+			++iCount;
+			if (iCount == iMaxCount)
+				break;
+		}
+	}
+
+	return iCount;
+}
+
 //------------------------------------------------------------------------------
 uint CvGameDeals::CreateDeal()
 {
@@ -4923,24 +5755,40 @@ FDataStream& OldLoad(FDataStream& loadFrom, CvGameDeals& writeTo)
 	int iEntriesToRead;
 	CvDeal tempItem;
 
-	writeTo.m_ProposedDeals.clear();
-	loadFrom >> iEntriesToRead;
 #if defined(MOD_ACTIVE_DIPLOMACY)
-	for (int iI = 0; iI < iEntriesToRead; iI++)
+	if(GC.getGame().isReallyNetworkMultiPlayer() && MOD_ACTIVE_DIPLOMACY)
 	{
-		loadFrom >> tempItem;
-		if (CvPreGame::isHuman(tempItem.GetFromPlayer()) && CvPreGame::isHuman(tempItem.GetToPlayer())) 
+		// JdH => savegame compatible load
+		loadFrom >> iEntriesToRead;
+		for (int iI = 0; iI < iEntriesToRead; iI++)
 		{
-			// only load human to humand deals until other problems are fixed
+			loadFrom >> tempItem;
+			if (CvPreGame::isHuman(tempItem.GetFromPlayer()) && CvPreGame::isHuman(tempItem.GetToPlayer())) 
+			{
+				// only load human to humand deals until other problems are fixed
+				writeTo.m_ProposedDeals.push_back(tempItem);
+			}
+		}
+	}
+	else
+	{
+		writeTo.m_ProposedDeals.clear();
+		loadFrom >> iEntriesToRead;
+		for(int iI = 0; iI < iEntriesToRead; iI++)
+		{
+			loadFrom = OldLoad(loadFrom, tempItem);
 			writeTo.m_ProposedDeals.push_back(tempItem);
 		}
 	}
 #else
+	writeTo.m_ProposedDeals.clear();
+	loadFrom >> iEntriesToRead;
 	for(int iI = 0; iI < iEntriesToRead; iI++)
 	{
 		loadFrom = OldLoad(loadFrom, tempItem);
 		writeTo.m_ProposedDeals.push_back(tempItem);
 	}
+
 #endif
 
 	writeTo.m_CurrentDeals.clear();
@@ -4972,26 +5820,40 @@ FDataStream& operator>>(FDataStream& loadFrom, CvGameDeals& writeTo)
 	loadFrom >> uiVersion;
 	MOD_SERIALIZE_INIT_READ(loadFrom);
 
-	writeTo.m_ProposedDeals.clear();
-	loadFrom >> iEntriesToRead;
 #if defined(MOD_ACTIVE_DIPLOMACY)
-	for (int iI = 0; iI < iEntriesToRead; iI++)
+	if(GC.getGame().isReallyNetworkMultiPlayer() && MOD_ACTIVE_DIPLOMACY)
 	{
-		loadFrom >> tempItem;
-		if (CvPreGame::isHuman(tempItem.GetFromPlayer()) && CvPreGame::isHuman(tempItem.GetToPlayer())) 
+		// JdH => savegame compatible load
+		loadFrom >> iEntriesToRead;
+		for (int iI = 0; iI < iEntriesToRead; iI++)
 		{
-			// only load human to humand deals until other problems are fixed
+			loadFrom >> tempItem;
+			if (CvPreGame::isHuman(tempItem.GetFromPlayer()) && CvPreGame::isHuman(tempItem.GetToPlayer()))
+			{
+				// only load human to humand deals until other problems are fixed
+				writeTo.m_ProposedDeals.push_back(tempItem);
+			}
+		}
+	}
+	else
+	{
+		writeTo.m_ProposedDeals.clear();
+		loadFrom >> iEntriesToRead;
+		for(int iI = 0; iI < iEntriesToRead; iI++)
+		{
+			loadFrom >> tempItem;
 			writeTo.m_ProposedDeals.push_back(tempItem);
 		}
 	}
 #else
+	writeTo.m_ProposedDeals.clear();
+	loadFrom >> iEntriesToRead;
 	for(int iI = 0; iI < iEntriesToRead; iI++)
 	{
 		loadFrom >> tempItem;
 		writeTo.m_ProposedDeals.push_back(tempItem);
 	}
 #endif
-
 	writeTo.m_CurrentDeals.clear();
 	loadFrom >> iEntriesToRead;
 	for(int iI = 0; iI < iEntriesToRead; iI++)
@@ -5020,19 +5882,31 @@ FDataStream& operator<<(FDataStream& saveTo, const CvGameDeals& readFrom)
 	MOD_SERIALIZE_INIT_WRITE(saveTo);
 
 #if defined(MOD_ACTIVE_DIPLOMACY)
-	DealList saveList;
-	for (it = readFrom.m_ProposedDeals.begin(); it != readFrom.m_ProposedDeals.end(); ++it)
+	if(GC.getGame().isReallyNetworkMultiPlayer() && MOD_ACTIVE_DIPLOMACY)
 	{
-		if (CvPreGame::isHuman(it->GetFromPlayer()) && CvPreGame::isHuman(it->GetToPlayer()))
+		// JdH => savegame compatible save
+		DealList saveList;
+		for (it = readFrom.m_ProposedDeals.begin(); it != readFrom.m_ProposedDeals.end(); ++it)
 		{
-			// only save human to human deals until we save notifications & requests too
-			saveList.push_back(*it);
+			if (CvPreGame::isHuman(it->GetFromPlayer()) && CvPreGame::isHuman(it->GetToPlayer()))
+			{
+				// only save human to human deals until we save notifications & requests too
+				saveList.push_back(*it);
+			}
+		}
+		saveTo << saveList.size();
+		for (it = saveList.begin(); it != saveList.end(); ++it) 
+		{
+			saveTo << *it;
 		}
 	}
-	saveTo << saveList.size();
-	for (it = saveList.begin(); it != saveList.end(); ++it) 
+	else
 	{
-		saveTo << *it;
+		saveTo << readFrom.m_ProposedDeals.size();
+		for(it = readFrom.m_ProposedDeals.begin(); it != readFrom.m_ProposedDeals.end(); ++it)
+		{
+			saveTo << *it;
+		}
 	}
 #else
 	saveTo << readFrom.m_ProposedDeals.size();

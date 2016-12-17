@@ -87,6 +87,9 @@ public:
 	int GetWonderProductionModifier() const;
 	int GetPlunderModifier() const;
 	int GetImprovementMaintenanceModifier() const;
+#if defined(MOD_CIV6_WORKER)
+	int GetRouteBuilderCostModifier() const;
+#endif
 	int GetGoldenAgeDurationModifier() const;
 	int GetGoldenAgeMoveChange() const;
 	int GetGoldenAgeCombatModifier() const;
@@ -117,6 +120,8 @@ public:
 	bool IsMountainPass() const;
 	bool IsUniqueBeliefsOnly() const;
 	bool IsNoNaturalReligionSpread() const;
+	bool IsNoOpenTrade() const;
+	bool IsGoldenAgeOnWar() const;
 	int  GetGrowthBoon() const;
 	int GetAllianceCSDefense() const;
 	int GetAllianceCSStrength() const;
@@ -129,6 +134,20 @@ public:
 	int GetGAUnhappinesNeedMod() const;
 	int GetStartingSpies() const;
 	int GetStartingSpyRank() const;
+	int GetQuestYieldModifier() const;
+	int GetWonderProductionModifierToBuilding() const;
+	int GetPolicyGEorGM() const;
+	int GetGoldenAgeGarrisonedCityRangeStrikeModifier() const;
+	bool IsBestUnitSpawnOnImprovementDOW() const;
+	ImprovementTypes GetBestSpawnUnitImprovement() const;
+	int GetGGGARateFromDenunciationsAndWars() const;
+	bool IsTradeRouteMinorInfluenceAdmiralPoints() const;
+	bool IsProductionModFromNumSpecialists() const;
+	int GetConquestOfTheWorldCityAttack() const;
+	bool IsConquestOfTheWorld() const;
+	bool IsFreeUpgrade() const;
+	bool IsWarsawPact() const;
+	bool IsFreeZuluPikemanToImpi() const;
 #endif
 #if defined(MOD_BALANCE_CORE_BUILDING_INVESTMENTS)
 	int GetInvestmentModifier() const;
@@ -179,6 +198,7 @@ public:
 	BuildingTypes GetFreeBuilding() const;
 #if defined(MOD_BALANCE_CORE)
 	BuildingTypes GetFreeCapitalBuilding() const;
+	UnitTypes GetFreeUnitOnConquest() const;
 #endif
 	BuildingTypes GetFreeBuildingOnConquest() const;
 #if defined(MOD_BALANCE_CORE_AFRAID_ANNEX)
@@ -203,6 +223,9 @@ public:
 	bool IsCrossesMountainsAfterGreatGeneral() const;
 #if defined(MOD_TRAITS_CROSSES_ICE)
 	bool IsCrossesIce() const;
+#endif
+#if defined(MOD_TRAITS_GG_FROM_BARBARIANS)
+	bool IsGGFromBarbarians() const;
 #endif
 	bool IsMayaCalendarBonuses() const;
 	bool IsNoAnnexing() const;
@@ -248,6 +271,9 @@ public:
 	int GetMovesChangeUnitClass(const int unitClassID) const;
 	int GetGAPToYield(int i) const;
 	int GetMountainRangeYield(int i) const;
+	int GetNumPledgeDomainProductionModifier(DomainTypes eDomain) const;
+	int GetFreeUnitClassesDOW(UnitClassTypes eUnitClass) const;
+	int GetYieldFromTileEarnTerrainType(TerrainTypes eIndex1, YieldTypes eIndex2) const;
 #endif
 	int GetMaintenanceModifierUnitCombat(const int unitCombatID) const;
 	int GetImprovementYieldChanges(ImprovementTypes eIndex1, YieldTypes eIndex2) const;
@@ -262,11 +288,14 @@ public:
 	int GetYieldFromExport(int i) const;
 	int GetYieldFromImport(int i) const;
 	int GetYieldFromTilePurchase(int i) const;
+	int GetYieldFromTileEarn(int i) const;
 	int GetYieldFromCSAlly(int i) const;
 	int GetYieldFromCSFriend(int i) const;
 	int GetYieldFromSettle(int i) const;
 	int GetYieldFromConquest(int i) const;
 	int GetVotePerXCSAlliance() const;
+	int GetVotePerXCSFollowingYourReligion() const;
+	int GetChanceToConvertReligiousUnits() const;
 	int GetGoldenAgeFromVictory() const;
 	bool IsFreeGreatWorkOnConquest() const;
 	bool IsPopulationBoostReligion() const;
@@ -296,6 +325,8 @@ public:
 	int GetGreatPersonExpendedYield(GreatPersonTypes eIndex1, YieldTypes eIndex2) const;
 	int GetGreatPersonBornYield(GreatPersonTypes eIndex1, YieldTypes eIndex2) const;
 	int GetGoldenAgeGreatPersonRateModifier(GreatPersonTypes eIndex1) const;
+	int GetPerPuppetGreatPersonRateModifier(GreatPersonTypes eIndex1) const;
+	int GetGreatPersonGWAM(GreatPersonTypes eIndex1) const;
 	int GetCityYieldFromUnimprovedFeature(FeatureTypes eIndex1, YieldTypes eIndex2) const;
 #endif
 	int GetUnimprovedFeatureYieldChanges(FeatureTypes eIndex1, YieldTypes eIndex2) const;
@@ -353,6 +384,9 @@ protected:
 	int m_iWonderProductionModifier;
 	int m_iPlunderModifier;
 	int m_iImprovementMaintenanceModifier;
+#if defined(MOD_CIV6_WORKER)
+	int m_iRouteBuilderCostModifier;
+#endif
 	int m_iGoldenAgeDurationModifier;
 	int m_iGoldenAgeMoveChange;
 	int m_iGoldenAgeCombatModifier;
@@ -395,9 +429,24 @@ protected:
 	int m_iAllianceCSStrength;
 	int m_iTourismGABonus;
 	bool m_bNoNaturalReligionSpread;
+	bool m_bNoOpenTrade;
+	bool m_bGoldenAgeOnWar;
 	int m_iTourismToGAP;
 	int m_iEventTourismBoost;
 	int m_iEventGP;
+	int m_iWonderProductionModifierToBuilding;
+	int m_iPolicyGEorGM;
+	int m_iGAGarrisonCityRangeStrikeModifier;
+	bool m_bBestUnitSpawnOnImpDOW;
+	ImprovementTypes m_iBestUnitImprovement;
+	int m_iGGGARateFromDenunciationsAndWars;
+	bool m_bTradeRouteMinorInfluenceAP;
+	bool m_bProdModFromNumSpecialists;
+	int m_iConquestOfTheWorldCityAttack;
+	bool m_bConquestOfTheWorld;
+	bool m_bFreeUpgrade;
+	bool m_bWarsawPact;
+	bool m_bFreeZuluPikemanToImpi;
 #endif
 #if defined(MOD_BALANCE_CORE_BUILDING_INVESTMENTS)
 	int m_iInvestmentModifier;
@@ -440,6 +489,7 @@ protected:
 	int m_iGAUnhappinesNeedMod;
 	int m_iStartingSpies;
 	int m_iStartingSpyRank;
+	int m_iQuestYieldModifier;
 #endif
 
 	TechTypes m_eFreeUnitPrereqTech;
@@ -449,6 +499,7 @@ protected:
 	BuildingTypes m_eFreeCapitalBuilding;
 	TechTypes m_eFreeBuildingPrereqTech;
 	TechTypes m_eCapitalFreeBuildingPrereqTech;
+	UnitTypes m_eFreeUnitOnConquest;
 #endif
 	BuildingTypes m_eFreeBuildingOnConquest;
 #if defined(MOD_BALANCE_CORE_AFRAID_ANNEX)
@@ -473,6 +524,9 @@ protected:
 	bool m_bCrossesMountainsAfterGreatGeneral;
 #if defined(MOD_TRAITS_CROSSES_ICE)
 	bool m_bCrossesIce;
+#endif
+#if defined(MOD_TRAITS_GG_FROM_BARBARIANS)
+	bool m_bGGFromBarbarians;
 #endif
 	bool m_bMayaCalendarBonuses;
 	bool m_bNoAnnexing;
@@ -509,6 +563,7 @@ protected:
 	int* m_paiGAPToYield;
 	int* m_paiMountainRangeYield;
 	int* m_piMovesChangeUnitClasses;
+	int** m_ppiYieldFromTileEarnTerrainType;
 #endif
 	int* m_piMaintenanceModifierUnitCombats;
 	int** m_ppiImprovementYieldChanges;
@@ -523,15 +578,20 @@ protected:
 	int* m_piYieldFromExport;
 	int* m_piYieldFromImport;
 	int* m_piYieldFromTilePurchase;
+	int* m_piYieldFromTileEarn;
 	int* m_piYieldFromCSAlly;
 	int* m_piYieldFromCSFriend;
 	int* m_piYieldFromSettle;
 	int* m_piYieldFromConquest;
 	int m_iVotePerXCSAlliance;
+	int m_iVotePerXCSFollowingFollowingYourReligion;
+	int m_iChanceToConvertReligiousUnits;
 	int m_iGoldenAgeFromVictory;
 	bool m_bFreeGreatWorkOnConquest;
 	bool m_bPopulationBoostReligion;
 	bool m_bCombatBoostNearNaturalWonder;
+	int* m_piNumPledgesDomainProdMod;
+	int* m_piFreeUnitClassesDOW;
 #endif
 #if defined(MOD_API_UNIFIED_YIELDS)
 	int** m_ppiBuildingClassYieldChanges;
@@ -555,8 +615,10 @@ protected:
 	int** m_ppiSpecialistYieldChanges;
 #if defined(MOD_API_UNIFIED_YIELDS)
 	int** m_ppiGreatPersonExpendedYield;
-	int ** m_ppiGreatPersonBornYield;
+	int** m_ppiGreatPersonBornYield;
 	int* m_piGoldenAgeGreatPersonRateModifier;
+	int* m_piPerPuppetGreatPersonRateModifier;
+	int* m_piGreatPersonGWAM;
 	int** m_ppiCityYieldFromUnimprovedFeature;
 #endif
 	int** m_ppiUnimprovedFeatureYieldChanges;
@@ -752,6 +814,12 @@ public:
 	{
 		return m_iImprovementMaintenanceModifier;
 	};
+#if defined(MOD_CIV6_WORKER)
+	int GetRouteBuilderCostModifier() const
+	{
+		return m_iRouteBuilderCostModifier;
+	};
+#endif
 	int GetGoldenAgeDurationModifier() const
 	{
 		return m_iGoldenAgeDurationModifier;
@@ -867,6 +935,14 @@ public:
 	{
 		return m_bNoNaturalReligionSpread;
 	};
+	bool IsNoOpenTrade() const
+	{
+		return m_bNoOpenTrade;
+	};
+	bool IsGoldenAgeOnWar() const
+	{
+		return m_bGoldenAgeOnWar;
+	};
 	int GetGrowthBoon() const
 	{
 		return m_iGrowthBoon;
@@ -914,6 +990,66 @@ public:
 	int GetStartingSpyRank() const
 	{
 		return m_iStartingSpyRank;
+	};
+	int GetQuestYieldModifier() const
+	{
+		return m_iQuestYieldModifier;
+	};
+	int GetWonderProductionModifierToBuilding() const
+	{
+		return m_iWonderProductionModifierToBuilding;
+	};
+	int GetPolicyGEorGM() const
+	{
+		return m_iPolicyGEorGM;
+	};
+	int GetGoldenAgeGarrisonedCityRangeStrikeModifier() const
+	{
+		return m_iGAGarrisonCityRangeStrikeModifier;
+	};
+	bool IsBestUnitSpawnOnImprovementDOW() const
+	{
+		return m_bBestUnitSpawnOnImpDOW;
+	};
+	ImprovementTypes GetBestSpawnUnitImprovement()
+	{
+		return m_iBestUnitImprovement;
+	};
+	void SetBestSpawnUnitImprovement(ImprovementTypes eType)
+	{
+		m_iBestUnitImprovement = eType;
+	};
+	int GetGGGARateFromDenunciationsAndWars() const
+	{
+		return m_iGGGARateFromDenunciationsAndWars;
+	};
+	bool IsTradeRouteMinorInfluenceAdmiralPoints() const
+	{
+		return m_bTradeRouteMinorInfluenceAP;
+	};
+	bool IsProductionModFromNumSpecialists() const
+	{
+		return m_bProdModFromNumSpecialists;
+	};
+	int GetConquestOfTheWorldCityAttack() const
+	{
+		return m_iConquestOfTheWorldCityAttack;
+	};
+	bool IsConquestOfTheWorld() const
+	{
+		return m_bConquestOfTheWorld;
+	};
+	bool IsFreeUpgrade() const
+	{
+		return m_bFreeUpgrade;
+	};
+	bool IsFreeZuluPikemanToImpi() const
+	{
+		return m_bFreeZuluPikemanToImpi;
+	};
+	bool IsWarsawPact() const
+	{
+		return m_bWarsawPact;
 	};
 #endif
 #if defined(MOD_BALANCE_CORE_BUILDING_INVESTMENTS)
@@ -1109,6 +1245,12 @@ public:
 		return m_bCrossesIce;
 	};
 #endif
+#if defined(MOD_TRAITS_GG_FROM_BARBARIANS)
+	bool IsGGFromBarbarians() const
+	{
+		return m_bGGFromBarbarians;
+	};
+#endif
 	bool IsMayaCalendarBonuses() const
 	{
 		return m_bMayaCalendarBonuses;
@@ -1209,9 +1351,33 @@ public:
 	{
 		return ((uint)eResource < m_aiResourceQuantityModifier.size())?m_aiResourceQuantityModifier[(int)eResource]:0;
 	};
+#if defined(MOD_BALANCE_CORE)
+	int GetPerPuppetGreatPersonRateModifier(GreatPersonTypes eGreatPerson) const
+	{
+		return ((uint)eGreatPerson < m_aiPerPuppetGreatPersonRateModifier.size()) ? m_aiPerPuppetGreatPersonRateModifier[(int)eGreatPerson] : 0;
+	};
+	int GetGreatPersonGWAM(GreatPersonTypes eGreatPerson) const
+	{
+		return ((uint)eGreatPerson < m_aiGreatPersonGWAM.size()) ? m_aiGreatPersonGWAM[(int)eGreatPerson] : 0;
+	};
+	int GetGoldenAgeGreatPersonRateModifier(GreatPersonTypes eGreatPerson) const
+	{
+		return ((uint)eGreatPerson < m_aiGoldenAgeGreatPersonRateModifier.size()) ? m_aiGoldenAgeGreatPersonRateModifier[(int)eGreatPerson] : 0;
+	};
+
+	int GetNumPledgeDomainProductionModifier(DomainTypes eDomain) const
+	{
+		return ((uint)eDomain < m_aiNumPledgesDomainProdMod.size()) ? m_aiNumPledgesDomainProdMod[(int)eDomain] : 0;
+	};
+	int GetFreeUnitClassesDOW(UnitClassTypes eUnitClass) const
+	{
+		return ((uint)eUnitClass < m_aiFreeUnitClassesDOW.size()) ? m_aiFreeUnitClassesDOW[(int)eUnitClass] : 0;
+	}
+#endif
 	int GetMovesChangeUnitCombat(const int unitCombatID) const;
 #if defined(MOD_BALANCE_CORE)
 	int GetMovesChangeUnitClass(const int unitClassID) const;
+	int GetYieldChangeFromTileEarnTerrainType(TerrainTypes eTerrain, YieldTypes eYield) const;
 #endif
 	int GetMaintenanceModifierUnitCombat(const int unitCombatID) const;
 	int GetImprovementYieldChange(ImprovementTypes eImprovement, YieldTypes eYield) const;
@@ -1247,6 +1413,10 @@ public:
 	{
 		return m_iYieldFromTilePurchase[(int)eYield];
 	};
+	int GetYieldFromTileEarn(YieldTypes eYield) const
+	{
+		return m_iYieldFromTileEarn[(int)eYield];
+	};
 	int GetYieldFromCSAlly(YieldTypes eYield) const
 	{
 		return m_iYieldFromCSAlly[(int)eYield];
@@ -1266,31 +1436,39 @@ public:
 	int GetVotePerXCSAlliance() const
 	{
 		return m_iVotePerXCSAlliance;
-	}
+	};
+	int GetVotePerXCSFollowingYourReligion() const
+	{
+		return m_iVotePerXCSFollowingFollowingYourReligion;
+	};
+	int GetChanceToConvertReligiousUnits() const
+	{
+		return m_iChanceToConvertReligiousUnits;
+	};
 	int GetGoldenAgeFromVictory() const
 	{
 		return m_iGoldenAgeFromVictory;
-	}
+	};
 	bool IsFreeGreatWorkOnConquest() const
 	{
 		return m_bFreeGreatWorkOnConquest;
-	}
+	};
 	bool IsPopulationBoostReligion() const
 	{
 		return m_bPopulationBoostReligion;
-	}
+	};
 	bool IsCombatBoostNearNaturalWonder() const
 	{
 		return m_bCombatBoostNearNaturalWonder;
-	}
+	};
 	int GetGAPToYield(YieldTypes eYield) const
 	{
 		return m_iGAPToYield[(int)eYield];
-	}
+	};
 	int GetMountainRangeYield(YieldTypes eYield) const
 	{
 		return m_iMountainRangeYield[(int)eYield];
-	}
+	};
 #endif
 #if defined(MOD_API_UNIFIED_YIELDS)
 	int GetBuildingClassYieldChange(BuildingClassTypes eBuildingClass, YieldTypes eYield) const;
@@ -1346,7 +1524,7 @@ public:
 #if defined(MOD_API_UNIFIED_YIELDS)
 	int GetGreatPersonExpendedYield(GreatPersonTypes eGreatPerson, YieldTypes eYield) const;
 	int GetGreatPersonBornYield(GreatPersonTypes eGreatPerson, YieldTypes eYield) const;
-	int GetGoldenAgeGreatPersonRateModifier(GreatPersonTypes eGreatPerson) const;
+	
 	int GetCityYieldFromUnimprovedFeature(FeatureTypes eFeature, YieldTypes eYield) const;
 #endif
 	int GetUnimprovedFeatureYieldChange(FeatureTypes eFeature, YieldTypes eYield) const;
@@ -1372,10 +1550,13 @@ public:
 #if defined(MOD_BALANCE_CORE)
 	TechTypes GetFreeBuildingPrereqTech() const;
 	TechTypes GetCapitalFreeBuildingPrereqTech() const;
+	int GetWonderProductionToBuildingDiscount(BuildingTypes eBuilding);
+	void SpawnBestUnitsOnImprovementDOW(CvCity *pCity);
 #endif
 	BuildingTypes GetFreeBuilding() const;
 #if defined(MOD_BALANCE_CORE)
 	BuildingTypes GetFreeCapitalBuilding() const;
+	UnitTypes GetFreeUnitOnConquest() const;
 #endif
 	BuildingTypes GetFreeBuildingOnConquest() const;
 	void SetDefeatedBarbarianCampGuardType(UnitTypes eType)
@@ -1426,10 +1607,10 @@ public:
 private:
 #if defined(MOD_EVENTS_UNIT_CAPTURE)
 	bool ConvertBarbarianCamp(CvUnit* pByUnit, CvPlot* pPlot);
-	bool ConvertBarbarianNavalUnit(CvUnit* pByUnit, UnitHandle pUnit);
+	bool ConvertBarbarianNavalUnit(CvUnit* pByUnit, CvUnit* pUnit);
 #else
 	bool ConvertBarbarianCamp(CvPlot* pPlot);
-	bool ConvertBarbarianNavalUnit(UnitHandle pUnit);
+	bool ConvertBarbarianNavalUnit(CvUnit* pUnit);
 #endif
 
 	CvTraitXMLEntries* m_pTraits;
@@ -1470,6 +1651,9 @@ private:
 	int m_iWonderProductionModifier;
 	int m_iPlunderModifier;
 	int m_iImprovementMaintenanceModifier;
+#if defined(MOD_CIV6_WORKER)
+	int m_iRouteBuilderCostModifier;
+#endif
 	int m_iGoldenAgeDurationModifier;
 	int m_iGoldenAgeMoveChange;
 	int m_iGoldenAgeCombatModifier;
@@ -1499,6 +1683,8 @@ private:
 	bool m_bMountainPass;
 	bool m_bUniqueBeliefsOnly;
 	bool m_bNoNaturalReligionSpread;
+	bool m_bNoOpenTrade;
+	bool m_bGoldenAgeOnWar;
 	int m_iTourismToGAP;
 	int m_iEventTourismBoost;
 	int m_iGrowthBoon;
@@ -1511,6 +1697,20 @@ private:
 	int m_iGAUnhappinesNeedMod;
 	int m_iStartingSpies;
 	int m_iStartingSpyRank;
+	int m_iQuestYieldModifier;
+	int m_iWonderProductionModifierToBuilding;
+	int m_iPolicyGEorGM;
+	int m_iGAGarrisonCityRangeStrikeModifier;
+	bool m_bBestUnitSpawnOnImpDOW;
+	ImprovementTypes m_iBestUnitImprovement;
+	int m_iGGGARateFromDenunciationsAndWars;
+	bool m_bTradeRouteMinorInfluenceAP;
+	bool m_bProdModFromNumSpecialists;
+	int m_iConquestOfTheWorldCityAttack;
+	bool m_bConquestOfTheWorld;
+	bool m_bFreeUpgrade;
+	bool m_bWarsawPact;
+	bool m_bFreeZuluPikemanToImpi;
 #endif
 #if defined(MOD_BALANCE_CORE_BUILDING_INVESTMENTS)
 	int m_iInvestmentModifier;
@@ -1572,6 +1772,9 @@ private:
 #if defined(MOD_TRAITS_CROSSES_ICE)
 	bool m_bCrossesIce;
 #endif
+#if defined(MOD_TRAITS_GG_FROM_BARBARIANS)
+	bool m_bGGFromBarbarians;
+#endif
 	bool m_bMayaCalendarBonuses;
 	bool m_bNoAnnexing;
 	bool m_bTechFromCityConquer;
@@ -1597,6 +1800,7 @@ private:
 	BuildingTypes m_eFreeBuilding;
 #if defined(MOD_BALANCE_CORE)
 	BuildingTypes m_eFreeCapitalBuilding;
+	UnitTypes m_eFreeUnitOnConquest;
 #endif
 	BuildingTypes m_eFreeBuildingOnConquest;
 #if defined(MOD_BALANCE_CORE_AFRAID_ANNEX)
@@ -1629,6 +1833,7 @@ private:
 	std::vector<int> m_paiMaintenanceModifierUnitCombat;
 #if defined(MOD_BALANCE_CORE)
 	std::vector<int> m_paiMovesChangeUnitClass;
+	std::vector< Firaxis::Array<int, NUM_YIELD_TYPES > > m_ppiYieldFromTileEarnTerrainType;
 #endif
 
 	std::vector< Firaxis::Array<int, NUM_YIELD_TYPES > > m_ppaaiImprovementYieldChange;
@@ -1643,11 +1848,14 @@ private:
 	int m_iYieldFromExport[NUM_YIELD_TYPES];
 	int m_iYieldFromImport[NUM_YIELD_TYPES];
 	int m_iYieldFromTilePurchase[NUM_YIELD_TYPES];
+	int m_iYieldFromTileEarn[NUM_YIELD_TYPES];
 	int m_iYieldFromCSAlly[NUM_YIELD_TYPES];
 	int m_iYieldFromCSFriend[NUM_YIELD_TYPES];
 	int m_iYieldFromSettle[NUM_YIELD_TYPES];
 	int m_iYieldFromConquest[NUM_YIELD_TYPES];
 	int m_iVotePerXCSAlliance;
+	int m_iVotePerXCSFollowingFollowingYourReligion;
+	int m_iChanceToConvertReligiousUnits;
 	int m_iGoldenAgeFromVictory;
 	bool m_bFreeGreatWorkOnConquest;
 	bool m_bPopulationBoostReligion;
@@ -1680,7 +1888,11 @@ private:
 #if defined(MOD_API_UNIFIED_YIELDS)
 	std::vector< Firaxis::Array<int, NUM_YIELD_TYPES > > m_ppiGreatPersonExpendedYield;
 	std::vector< Firaxis::Array<int, NUM_YIELD_TYPES > > m_ppiGreatPersonBornYield;
-	std::vector<int> m_piGoldenAgeGreatPersonRateModifier;
+	std::vector<int> m_aiNumPledgesDomainProdMod;
+	std::vector<int> m_aiFreeUnitClassesDOW;
+	std::vector<int> m_aiGoldenAgeGreatPersonRateModifier;
+	std::vector<int> m_aiPerPuppetGreatPersonRateModifier;
+	std::vector<int> m_aiGreatPersonGWAM;
 	std::vector< Firaxis::Array<int, NUM_YIELD_TYPES > > m_ppiCityYieldFromUnimprovedFeature;
 #endif
 	std::vector< Firaxis::Array<int, NUM_YIELD_TYPES > > m_ppaaiUnimprovedFeatureYieldChange;

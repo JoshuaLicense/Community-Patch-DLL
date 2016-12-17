@@ -30,6 +30,10 @@
 #include "../CvReplayMessage.h"
 #include "../cvStopWatch.h"
 
+#if defined(MOD_BATTLE_ROYALE)
+#include "../CvLoggerCSV.h"
+#endif
+
 #define Method(func) RegisterMethod(L, l##func, #func);
 
 //------------------------------------------------------------------------------
@@ -317,7 +321,6 @@ void CvLuaGame::RegisterMembers(lua_State* L)
 	Method(GetBuildingYieldChange);
 	Method(GetBuildingYieldModifier);
 #if defined(MOD_BALANCE_CORE)
-	Method(GetBuildingCorporateYieldChange);
 	Method(GetBuildingCorporateGPChange);
 	Method(GetPovertyHappinessChangeBuilding);
 	Method(GetDefenseHappinessChangeBuilding);
@@ -331,7 +334,9 @@ void CvLuaGame::RegisterMembers(lua_State* L)
 	Method(GetMinorityHappinessChangeBuildingGlobal);
 	Method(GetPromiseDuration);
 	Method(GetCorporationFounder);
+	Method(GetCorporationHeadquarters);
 	Method(GetNumCorporationsFounded);
+	Method(GetNumAvailableCorporations);
 #if defined(MOD_BALANCE_CORE_RESOURCE_MONOPOLIES)
 	Method(GetGreatestPlayerResourceMonopoly);
 #endif
@@ -398,6 +403,10 @@ void CvLuaGame::RegisterMembers(lua_State* L)
 	Method(GetNumLeaguesEverFounded);
 	Method(GetLeague);
 	Method(GetActiveLeague);
+#if defined(MOD_BALANCE_CORE)
+	Method(DoEnactResolution);
+	Method(DoRepealResolution);
+#endif
 
 #if defined(MOD_API_LUA_EXTENSIONS)
 	Method(IsAchievementUnlocked);
@@ -483,6 +492,32 @@ void CvLuaGame::RegisterMembers(lua_State* L)
 	Method(AnyoneHasTech);
 	Method(AnyoneHasUnit);
 	Method(AnyoneHasUnitClass);
+#endif
+
+#if defined(MOD_BALANCE_CORE)
+	Method(FoundCorporation);
+	Method(CanFoundCorporation);
+	Method(IsCorporationFounded);
+
+	//Contracts
+	Method(DoUpdateContracts);
+	Method(GetNumActiveContracts);
+	Method(GetNumInactiveContracts);
+	Method(GetNumAvailableContracts);
+	Method(GetNumUnavailableContracts);
+	Method(GetActiveContract);
+	Method(GetInactiveContract);
+	Method(IsContractActive);
+	Method(IsContractAvailable);
+	Method(SetContractUnits);
+	Method(GetContractUnits);
+	Method(GetInactiveContractUnitList);
+	Method(GetActiveContractUnitList);
+#endif
+
+#if defined(MOD_BATTLE_ROYALE)
+	Method(DeleteCSV);
+	Method(WriteCSV);
 #endif
 }
 //------------------------------------------------------------------------------
@@ -1090,7 +1125,15 @@ int CvLuaGame::lIsNoNukes(lua_State* L)
 //void changeNoNukesCount(int iChange);
 int CvLuaGame::lChangeNoNukesCount(lua_State* L)
 {
+#if defined(MOD_BUGFIX_LUA_API)
+	int iNumNukes;
+	if (lua_gettop(L) == 1)
+		iNumNukes = lua_tointeger(L, 1); // The correct Game.ChangeNoNukesCount() usage
+	else
+		iNumNukes = lua_tointeger(L, 2); // The incorrect (but as used by the game core .lua files) Game:ChangeNoNukesCount() usage
+#else
 	int iNumNukes = lua_tointeger(L, 2);
+#endif
 	GC.getGame().changeNoNukesCount(iNumNukes);
 	return 1;
 }
@@ -1104,7 +1147,15 @@ int CvLuaGame::lGetNukesExploded(lua_State* L)
 //void changeNukesExploded(int iChange);
 int CvLuaGame::lChangeNukesExploded(lua_State* L)
 {
+#if defined(MOD_BUGFIX_LUA_API)
+	int iNumNukes;
+	if (lua_gettop(L) == 1)
+		iNumNukes = lua_tointeger(L, 1); // The correct Game.ChangeNukesExploded() usage
+	else
+		iNumNukes = lua_tointeger(L, 2); // The incorrect (but as used by the game core .lua files) Game:ChangeNukesExploded() usage
+#else
 	int iNumNukes = lua_tointeger(L, 2);
+#endif
 	GC.getGame().changeNukesExploded(iNumNukes);
 	return 1;
 }
@@ -1620,11 +1671,7 @@ int CvLuaGame::lRand(lua_State* L)
 {
 	const int max_num = luaL_checkinteger(L, 1);
 	const char* strLog = luaL_checkstring(L, 2);
-#if defined(MOD_BUGFIX_RANDOM)
 	const int rand_val = GetInstance()->getJonRandNum(max_num, strLog);
-#else
-	const int rand_val = GetInstance()->getJonRand().get(max_num, strLog);
-#endif
 
 	lua_pushinteger(L, rand_val);
 	return 1;
@@ -2338,24 +2385,6 @@ int CvLuaGame::lGetMinorityHappinessChangeBuildingGlobal(lua_State* L)
 /// CORPORATIONS
 //////
 //------------------------------------------------------------------------------
-int CvLuaGame::lGetBuildingCorporateYieldChange(lua_State* L)
-{
-	const BuildingTypes eBuilding = (BuildingTypes) luaL_checkint(L, 1);
-	const YieldTypes eYield = (YieldTypes) luaL_checkint(L, 2);
-
-	CvBuildingEntry* pkBuildingInfo = GC.getBuildingInfo(eBuilding);
-	CvYieldInfo* pkYieldInfo = GC.getYieldInfo(eYield);
-
-	int iYieldChange = 0;
-	if(pkBuildingInfo && pkYieldInfo)
-	{
-		iYieldChange = pkBuildingInfo->GetCorporationYieldChange(eYield);
-	}
-
-	lua_pushinteger(L, iYieldChange);
-	return 1;
-}
-//------------------------------------------------------------------------------
 int CvLuaGame::lGetBuildingCorporateGPChange(lua_State* L)
 {
 	const BuildingTypes eBuilding = (BuildingTypes) luaL_checkint(L, 1);
@@ -2365,7 +2394,7 @@ int CvLuaGame::lGetBuildingCorporateGPChange(lua_State* L)
 	int iYieldChange = 0;
 	if(pkBuildingInfo)
 	{
-		iYieldChange = pkBuildingInfo->GetCorporationGPChange();
+		iYieldChange = pkBuildingInfo->GetGPRateModifierPerXFranchises();
 	}
 
 	lua_pushinteger(L, iYieldChange);
@@ -2380,15 +2409,41 @@ int CvLuaGame::lGetPromiseDuration(lua_State* L)
 
 int CvLuaGame::lGetCorporationFounder(lua_State* L)
 {
-	const int iCorporationID = luaL_checkint(L, 1);
-	int iReturn = (int) GC.getGame().GetCorporationFounder(iCorporationID);
+	const CorporationTypes eCorporation = (CorporationTypes) luaL_checkint(L, 1);
+	int iReturn = (int) GC.getGame().GetCorporationFounder(eCorporation);
 	lua_pushinteger(L, iReturn);
+	return 1;
+}
+
+int CvLuaGame::lGetCorporationHeadquarters(lua_State* L)
+{
+	const CorporationTypes eCorporation = (CorporationTypes)luaL_checkint(L, 1);
+	
+	CvCity* pkCity = NULL;
+	CvCorporation* pCorporation = GC.getGame().GetGameCorporations()->GetCorporation(eCorporation);
+	if (pCorporation)
+	{
+		CvPlot* pHQPlot = GC.getMap().plot(pCorporation->m_iHeadquartersCityX, pCorporation->m_iHeadquartersCityY);
+		if (pHQPlot)
+		{
+			pkCity = pHQPlot->getPlotCity();
+		}
+	}
+
+	CvLuaCity::Push(L, pkCity);
 	return 1;
 }
 
 int CvLuaGame::lGetNumCorporationsFounded(lua_State* L)
 {
 	int iReturn = GC.getGame().GetNumCorporationsFounded();
+	lua_pushinteger(L, iReturn);
+	return 1;
+}
+
+int CvLuaGame::lGetNumAvailableCorporations(lua_State* L)
+{
+	int iReturn = GC.getGame().GetGameCorporations()->GetNumAvailableCorporations();
 	lua_pushinteger(L, iReturn);
 	return 1;
 }
@@ -3007,6 +3062,39 @@ int CvLuaGame::lGetActiveLeague(lua_State* L)
 	}
 	return 1;
 }
+#if defined(MOD_BALANCE_CORE)
+int CvLuaGame::lDoEnactResolution(lua_State* L)
+{
+	CvLeague* pLeague = GC.getGame().GetGameLeagues()->GetActiveLeague();
+	if (pLeague != NULL)
+	{
+		const ResolutionTypes iResolutionType = static_cast<ResolutionTypes>(luaL_checkint(L, 1));
+		const int iChoice = luaL_checkint(L, 2);
+		PlayerTypes ePlayer = (PlayerTypes)lua_tointeger(L, 3);
+		CvEnactProposal fakeProposal(GC.getGame().GetGameLeagues()->GenerateResolutionUniqueID(), iResolutionType, pLeague->GetID(), ePlayer, iChoice);
+		
+		pLeague->DoEnactResolutionPublic(&fakeProposal);
+	}
+	return 1;
+}
+int CvLuaGame::lDoRepealResolution(lua_State* L)
+{
+	CvLeague* pLeague = GC.getGame().GetGameLeagues()->GetActiveLeague();
+	if (pLeague != NULL)
+	{
+		const ResolutionTypes iResolutionType = static_cast<ResolutionTypes>(luaL_checkint(L, 1));
+		PlayerTypes ePlayer = (PlayerTypes)lua_tointeger(L, 2);
+		CvActiveResolution* pResolution = pLeague->GetActiveResolution(iResolutionType);
+		if (pResolution)
+		{
+			CvRepealProposal fakeProposal(pResolution, ePlayer);
+
+			pLeague->DoRepealResolutionPublic(&fakeProposal);
+		}
+	}
+	return 1;
+}
+#endif
 //------------------------------------------------------------------------------
 int CvLuaGame::lIsProcessingMessages(lua_State* L)
 {
@@ -3690,6 +3778,230 @@ int CvLuaGame::lAnyoneHasUnitClass(lua_State* L)
 {
 	const UnitClassTypes iUnitClassType = static_cast<UnitClassTypes>(luaL_checkint(L, 1));
 	lua_pushboolean(L, GC.getGame().AnyoneHasUnitClass(iUnitClassType));
+	return 1;
+}
+#endif
+
+#if defined(MOD_BALANCE_CORE)
+int CvLuaGame::lFoundCorporation(lua_State* L)
+{
+	const PlayerTypes ePlayer = static_cast<PlayerTypes>(luaL_checkint(L, 1));
+	const CorporationTypes eCorporation = static_cast<CorporationTypes>(luaL_checkint(L, 2));
+	CvCity* pkCity = CvLuaCity::GetInstance(L, 3);
+	GC.getGame().GetGameCorporations()->FoundCorporation(ePlayer, eCorporation, pkCity);
+	return 1;
+}
+
+int CvLuaGame::lCanFoundCorporation(lua_State* L)
+{
+	const PlayerTypes ePlayer = static_cast<PlayerTypes>(luaL_checkint(L, 1));
+	const CorporationTypes eCorporation = static_cast<CorporationTypes>(luaL_checkint(L, 2));
+	bool bResult = GC.getGame().GetGameCorporations()->CanFoundCorporation(ePlayer, eCorporation);
+	lua_pushboolean(L, bResult);
+	return 1;
+}
+
+int CvLuaGame::lIsCorporationFounded(lua_State* L)
+{
+	const CorporationTypes eCorporation = static_cast<CorporationTypes>(luaL_checkint(L, 1));
+	bool bResult = GC.getGame().GetGameCorporations()->IsCorporationFounded(eCorporation);
+	lua_pushboolean(L, bResult);
+	return 1;
+}
+
+int CvLuaGame::lDoUpdateContracts(lua_State* L)
+{
+	GC.getGame().GetGameContracts()->DoUpdateContracts();
+	return 0;
+}
+//------------------------------------------------------------------------------
+int CvLuaGame::lGetNumActiveContracts(lua_State* L)
+{
+	lua_pushinteger(L, GC.getGame().GetGameContracts()->GetNumActiveContracts());
+	return 1;
+}
+//------------------------------------------------------------------------------
+int CvLuaGame::lGetNumInactiveContracts(lua_State* L)
+{
+	lua_pushinteger(L, GC.getGame().GetGameContracts()->GetNumInactiveContracts());
+	return 1;
+}
+//------------------------------------------------------------------------------
+int CvLuaGame::lGetNumAvailableContracts(lua_State* L)
+{
+	lua_pushinteger(L, GC.getGame().GetGameContracts()->GetNumAvailableContracts());
+	return 1;
+}
+//------------------------------------------------------------------------------
+int CvLuaGame::lGetNumUnavailableContracts(lua_State* L)
+{
+	lua_pushinteger(L, GC.getGame().GetGameContracts()->GetNumUnavailableContracts());
+	return 1;
+}
+//------------------------------------------------------------------------------
+int CvLuaGame::lIsContractActive(lua_State* L)
+{
+	const ContractTypes eContract = (ContractTypes)lua_tointeger(L, 1);
+	const bool bResult = GC.getGame().GetGameContracts()->IsContractActive(eContract);
+	lua_pushboolean(L, bResult);
+	return 1;
+}
+//------------------------------------------------------------------------------
+int CvLuaGame::lIsContractAvailable(lua_State* L)
+{
+	const ContractTypes eContract = (ContractTypes)lua_tointeger(L, 1);
+	const bool bResult = GC.getGame().GetGameContracts()->IsContractAvailable(eContract);
+	lua_pushboolean(L, bResult);
+	return 1;
+}
+//------------------------------------------------------------------------------
+int CvLuaGame::lGetActiveContract(lua_State* L)
+{
+	const ContractTypes eContract = (ContractTypes)lua_tointeger(L, 1);
+
+	const CvContract* pContract = GC.getGame().GetGameContracts()->GetActiveContract(eContract);
+
+	lua_pushinteger(L, (int)pContract->m_eContract);
+	return 1;
+}
+//------------------------------------------------------------------------------
+int CvLuaGame::lGetInactiveContract(lua_State* L)
+{
+	ContractTypes eContract = (ContractTypes)lua_tointeger(L, 1);
+	const CvContract* pContract = GC.getGame().GetGameContracts()->GetInactiveContract(eContract);
+
+	lua_pushinteger(L, (int)pContract->m_eContract);
+	return 1;
+}
+int CvLuaGame::lSetContractUnits(lua_State* L)
+{
+	ContractTypes eContract = (ContractTypes)lua_tointeger(L, 1);
+	UnitTypes eUnit = (UnitTypes)lua_tointeger(L, 2);
+	int iValue = lua_tointeger(L, 3);
+	GC.getGame().SetContractUnits(eContract, eUnit, iValue);
+	return 0;
+}
+int CvLuaGame::lGetContractUnits(lua_State* L)
+{
+	ContractTypes eContract = (ContractTypes)lua_tointeger(L, 1);
+	UnitTypes eUnit = (UnitTypes)lua_tointeger(L, 2);
+	int iResult = GC.getGame().GetContractUnits(eContract, eUnit);
+	lua_pushinteger(L, iResult);
+	return 1;
+}
+//------------------------------------------------------------------------------
+int CvLuaGame::lGetInactiveContractUnitList(lua_State* L)
+{
+	lua_createtable(L, 0, 0);
+	int contractunits_idx = 1;
+	
+	for(int i = 0; i < GC.getNumContractInfos(); i++)
+	{
+		ContractTypes eContract = (ContractTypes)i;
+		const CvContract* pContract = GC.getGame().GetGameContracts()->GetInactiveContract(eContract);
+		if(pContract)
+		{
+			for(int j = 0; j < GC.getNumUnitInfos(); j++)
+			{
+				UnitTypes eUnit = (UnitTypes)j;
+			
+				if(eUnit == NO_UNIT)
+					continue;
+
+				CvUnitEntry* pkUnitInfo = GC.getUnitInfo(eUnit);
+				if(!pkUnitInfo)
+					continue;
+			
+				int iNumContractUnits = GC.getGame().GetContractUnits(eContract, eUnit);
+
+				if(iNumContractUnits <= 0)
+					continue;
+
+				lua_createtable(L, 0, 0);
+				const int t = lua_gettop(L);
+
+				lua_pushinteger(L, eContract);
+				lua_setfield(L, t, "Contract");
+
+				lua_pushinteger(L, eUnit);
+				lua_setfield(L, t, "Unit");
+
+				lua_pushinteger(L, iNumContractUnits);
+				lua_setfield(L, t, "NumUnits");
+
+				lua_rawseti(L, -2, contractunits_idx++);
+			}
+		}	
+	}
+	return 1;
+}
+
+//------------------------------------------------------------------------------
+int CvLuaGame::lGetActiveContractUnitList(lua_State* L)
+{
+
+	lua_createtable(L, 0, 0);
+	int contractunits_idx = 1;
+
+	for(int i = 0; i < GC.getNumContractInfos(); i++)
+	{
+		ContractTypes eContract = (ContractTypes)i;
+		const CvContract* pContract = GC.getGame().GetGameContracts()->GetActiveContract(eContract);
+		if(pContract)
+		{
+			for(int j = 0; j < GC.getNumUnitInfos(); j++)
+			{
+				UnitTypes eUnit = (UnitTypes)j;
+			
+				if(eUnit == NO_UNIT)
+					continue;
+
+				CvUnitEntry* pkUnitInfo = GC.getUnitInfo(eUnit);
+				if(!pkUnitInfo)
+					continue;
+			
+				int iNumContractUnits = GC.getGame().GetContractUnits(eContract, eUnit);
+
+				if(iNumContractUnits <= 0)
+					continue;
+
+				lua_createtable(L, 0, 0);
+				const int t = lua_gettop(L);
+
+				lua_pushinteger(L, eContract);
+				lua_setfield(L, t, "Contract");
+
+				lua_pushinteger(L, eUnit);
+				lua_setfield(L, t, "Unit");
+
+				lua_pushinteger(L, iNumContractUnits);
+				lua_setfield(L, t, "NumUnits");
+
+				lua_rawseti(L, -2, contractunits_idx++);
+			}
+		}	
+	}
+	return 1;
+}
+#endif
+
+#if defined(MOD_BATTLE_ROYALE)
+int CvLuaGame::lDeleteCSV(lua_State * L)
+{
+	const char* szCSVFilename = lua_tostring(L, 2);
+
+	CvLoggerCSV::DeleteCSV(szCSVFilename);
+
+	return 1;
+}
+
+int CvLuaGame::lWriteCSV(lua_State * L)
+{
+	const char* szCSVFilename = lua_tostring(L, 2);
+	const char* szCSVLine = lua_tostring(L, 3);
+
+	CvLoggerCSV::WriteCSVLog(szCSVFilename, szCSVLine);
+
 	return 1;
 }
 #endif

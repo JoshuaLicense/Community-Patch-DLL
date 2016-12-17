@@ -269,7 +269,8 @@ public:
 	std::vector<BeliefTypes> GetAvailableReformationBeliefs();
 #endif
 
-	int GetAdjacentCityReligiousPressure (ReligionTypes eReligion, CvCity *pFromCity, CvCity *pToCity, int& iNumTradeRoutesInfluencing, bool bPretendTradeConnection);
+	int GetAdjacentCityReligiousPressure (ReligionTypes eReligion, CvCity *pFromCity, CvCity *pToCity, 
+		int& iNumTradeRoutesInfluencing, bool bActualValue, bool bPretendTradeConnection);
 
 	// Great Prophet/Person information functions
 	int GetFaithGreatProphetNumber(int iNum) const;
@@ -374,7 +375,7 @@ public:
 #endif
 #if defined(MOD_BALANCE_CORE)
 	void SetPlayerReligion(ReligionTypes eReligion);
-	ReligionTypes GetCurrentReligion() const;
+	ReligionTypes GetCurrentReligion(bool bIncludePantheon = true) const;
 #endif
 #if defined(MOD_RELIGION_RECURRING_PURCHASE_NOTIFIY)
 	bool CanAffordNextPurchase();
@@ -459,6 +460,7 @@ public:
 	ReligionTypes GetSecondaryReligion();
 	BeliefTypes GetSecondaryReligionPantheonBelief();
 	int GetFollowersOtherReligions(ReligionTypes eReligion);
+#if !defined(MOD_BALANCE_CORE)
 	bool HasPaidAdoptionBonus() const
 	{
 		return m_bHasPaidAdoptionBonus;
@@ -467,6 +469,7 @@ public:
 	{
 		m_bHasPaidAdoptionBonus = bNewValue;
 	};
+#endif
 	int GetReligiousPressureModifier() const
 	{
 		return m_iReligiousPressureModifier;
@@ -529,7 +532,9 @@ private:
 	void LogFollowersChange(CvReligiousFollowChangeReason eReason);
 
 	CvCity* m_pCity;
+#if !defined(MOD_BALANCE_CORE)
 	bool m_bHasPaidAdoptionBonus;
+#endif
 	int m_iReligiousPressureModifier;
 
 #if defined(MOD_BALANCE_CORE)
@@ -625,9 +630,9 @@ public:
 	BeliefTypes ChooseReformationBelief();
 #endif
 
-	CvCity* ChooseMissionaryTargetCity(UnitHandle pUnit, int* piTurns = NULL);
-	CvCity* ChooseInquisitorTargetCity(UnitHandle pUnit, int* piTurns = NULL);
-	CvCity *ChooseProphetConversionCity(bool bOnlyBetterThanEnhancingReligion, UnitHandle pUnit = NULL, int* piTurns = NULL) const;
+	CvCity* ChooseMissionaryTargetCity(CvUnit* pUnit, int* piTurns = NULL);
+	CvCity* ChooseInquisitorTargetCity(CvUnit* pUnit, int* piTurns = NULL);
+	CvCity *ChooseProphetConversionCity(bool bOnlyBetterThanEnhancingReligion, CvUnit* pUnit = NULL, int* piTurns = NULL) const;
 
 	CvPlayer* GetPlayer();
 	ReligionTypes GetReligionToSpread() const;
@@ -637,10 +642,10 @@ private:
 	void DoFaithPurchasesInCities(CvCity* pCity);
 #endif
 	void DoFaithPurchases();
-	void BuyMissionary(ReligionTypes eReligion);
-	void BuyInquisitor(ReligionTypes eReligion);
-	void BuyGreatPerson(UnitTypes eUnit);
-	void BuyFaithBuilding(ReligionTypes eReligion, BuildingClassTypes eBuildingClass);
+	bool BuyMissionary(ReligionTypes eReligion);
+	bool BuyInquisitor(ReligionTypes eReligion);
+	bool BuyGreatPerson(UnitTypes eUnit);
+	bool BuyFaithBuilding(CvCity* pCity, BuildingTypes eBuilding);
 #if defined(MOD_BALANCE_CORE_BELIEFS)
 	bool BuyAnyAvailableNonFaithUnit();
 #endif
@@ -652,8 +657,8 @@ private:
 	int ScoreBeliefAtCity(CvBeliefEntry* pEntry, CvCity* pCity);
 	int ScoreBeliefForPlayer(CvBeliefEntry* pEntry);
 
-	int ScoreCityForMissionary(CvCity* pCity, UnitHandle pUnit);
-	int ScoreCityForInquisitor(CvCity* pCity, UnitHandle pUnit);
+	int ScoreCityForMissionary(CvCity* pCity, CvUnit* pUnit);
+	int ScoreCityForInquisitor(CvCity* pCity, CvUnit* pUnit);
 
 	bool ShouldBecomeNewMajority(CvCity* pCity, ReligionTypes eReligion, int iNewPressure) const;
 	bool AreAllOurCitiesConverted(ReligionTypes eReligion, bool bIncludePuppets) const;

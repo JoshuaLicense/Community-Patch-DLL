@@ -73,6 +73,10 @@ CvPromotionEntry::CvPromotionEntry():
 	m_iExtraAttacks(0),
 	m_bGreatGeneral(false),
 	m_bGreatAdmiral(false),
+#if defined(MOD_PROMOTIONS_AURA_CHANGE)
+	m_iAuraRangeChange(0),
+	m_iAuraEffectChange(0),
+#endif
 	m_iGreatGeneralModifier(0),
 	m_bGreatGeneralReceivesMovement(false),
 	m_iGreatGeneralCombatModifier(0),
@@ -116,6 +120,7 @@ CvPromotionEntry::CvPromotionEntry():
 	m_bIsLostOnMove(false),
 	m_bCityStateOnly(false),
 	m_bBarbarianOnly(false),
+	m_bStrongerDamaged(false),
 	m_iNegatesPromotion(NO_PROMOTION),
 	m_iForcedDamageValue(0),
 	m_iChangeDamageValue(0),
@@ -149,6 +154,13 @@ CvPromotionEntry::CvPromotionEntry():
 	m_iNearbyImprovementBonusRange(0),
 	m_eCombatBonusImprovement(NO_IMPROVEMENT),
 #endif
+#if defined(MOD_BALANCE_CORE)
+	m_iNearbyUnitClassBonus(0),
+	m_iNearbyUnitClassBonusRange(0),
+	m_iCombatBonusFromNearbyUnitClass(NO_UNITCLASS),
+	m_iWonderProductionModifier(0),
+	m_bMountainsDoubleMove(false),
+#endif
 #if defined(MOD_PROMOTIONS_CROSS_MOUNTAINS)
 	m_bCanCrossMountains(false),
 #endif
@@ -157,6 +169,9 @@ CvPromotionEntry::CvPromotionEntry():
 #endif
 #if defined(MOD_PROMOTIONS_CROSS_ICE)
 	m_bCanCrossIce(false),
+#endif
+#if defined(MOD_PROMOTIONS_GG_FROM_BARBARIANS)
+	m_bGGFromBarbarians(false),
 #endif
 	m_bRoughTerrainEndsTurn(false),
 	m_bHoveringUnit(false),
@@ -189,6 +204,28 @@ CvPromotionEntry::CvPromotionEntry():
 	m_bHasPostCombatPromotions(false),
 	m_bPostCombatPromotionsExclusive(false),
 	m_bSapper(false),
+#if defined(MOD_BALANCE_CORE)
+	m_bIsNearbyCityPromotion(false),
+	m_bIsNearbyFriendlyCityPromotion(false),
+	m_bIsNearbyEnemyCityPromotion(false),
+	m_bIsNearbyPromotion(false),
+	m_bIsFriendlyLands(false),
+	m_bEnemyLands(false),
+	m_iNearbyRange(0),
+	m_eAddedFromNearbyPromotion(NO_PROMOTION),
+	m_eRequiredUnit(NO_UNIT),
+	m_eConvertDomainUnit(NO_UNIT),
+	m_eConvertDomain(NO_DOMAIN),
+	m_iStackedGreatGeneralExperience(0),
+	m_iPillageBonusStrength(0),
+	m_iReligiousPressureModifier(0),
+	m_iAdjacentCityDefesneMod(0),
+	m_iNearbyEnemyDamage(0),
+	m_eAdjacentSameType(NO_PROMOTION),
+	m_iMilitaryProductionModifier(0),
+	m_piYieldModifier(NULL),
+	m_bHighSeaRaider(false),
+#endif
 	m_bCanHeavyCharge(false),
 	m_piTerrainAttackPercent(NULL),
 	m_piTerrainDefensePercent(NULL),
@@ -200,6 +237,7 @@ CvPromotionEntry::CvPromotionEntry():
 #if defined(MOD_API_UNIFIED_YIELDS)
 	m_piYieldFromKills(NULL),
 	m_piYieldFromBarbarianKills(NULL),
+	m_piGarrisonYield(NULL),
 #endif
 	m_piUnitCombatModifierPercent(NULL),
 	m_piUnitClassModifierPercent(NULL),
@@ -238,10 +276,12 @@ CvPromotionEntry::~CvPromotionEntry(void)
 	SAFE_DELETE_ARRAY(m_piFeatureDefensePercent);
 #if defined(MOD_BALANCE_CORE)
 	SAFE_DELETE_ARRAY(m_piYieldFromScouting);
+	SAFE_DELETE_ARRAY(m_piYieldModifier);
 #endif
 #if defined(MOD_API_UNIFIED_YIELDS)
 	SAFE_DELETE_ARRAY(m_piYieldFromKills);
 	SAFE_DELETE_ARRAY(m_piYieldFromBarbarianKills);
+	SAFE_DELETE_ARRAY(m_piGarrisonYield);
 #endif
 	SAFE_DELETE_ARRAY(m_piUnitCombatModifierPercent);
 	SAFE_DELETE_ARRAY(m_piUnitClassModifierPercent);
@@ -285,6 +325,7 @@ bool CvPromotionEntry::CacheResults(Database::Results& kResults, CvDatabaseUtili
 	m_bIsLostOnMove = kResults.GetBool("IsLostOnMove");
 	m_bCityStateOnly = kResults.GetBool("CityStateOnly");
 	m_bBarbarianOnly = kResults.GetBool("BarbarianOnly");
+	m_bStrongerDamaged = kResults.GetBool("StrongerDamaged");
 	const char* szNegatesPromotion = kResults.GetText("NegatesPromotion");
 	m_iNegatesPromotion = GC.getInfoTypeForString(szNegatesPromotion, true);
 	m_iForcedDamageValue = kResults.GetInt("ForcedDamageValue");
@@ -324,8 +365,17 @@ bool CvPromotionEntry::CacheResults(Database::Results& kResults, CvDatabaseUtili
 		}
 	}
 #endif
+#if defined(MOD_BALANCE_CORE)
+	const char* szCombatBonusFromNearbyUnitClass = kResults.GetText("CombatBonusFromNearbyUnitClass");
+	m_iCombatBonusFromNearbyUnitClass = (UnitClassTypes)GC.getInfoTypeForString(szCombatBonusFromNearbyUnitClass, true);
+	m_iNearbyUnitClassBonusRange = kResults.GetInt("NearbyUnitClassBonusRange");
+	m_iNearbyUnitClassBonus = kResults.GetInt("NearbyUnitClassBonus");
+	m_iWonderProductionModifier = kResults.GetInt("WonderProductionModifier");
+	m_bMountainsDoubleMove = kResults.GetBool("MountainsDoubleMove");
+#endif
 #if defined(MOD_PROMOTIONS_CROSS_MOUNTAINS)
-	if (MOD_PROMOTIONS_CROSS_MOUNTAINS) {
+	if (MOD_PROMOTIONS_CROSS_MOUNTAINS)
+	{
 		m_bCanCrossMountains = kResults.GetBool("CanCrossMountains");
 	}
 #endif
@@ -337,6 +387,11 @@ bool CvPromotionEntry::CacheResults(Database::Results& kResults, CvDatabaseUtili
 #if defined(MOD_PROMOTIONS_CROSS_ICE)
 	if (MOD_PROMOTIONS_CROSS_ICE) {
 		m_bCanCrossIce = kResults.GetBool("CanCrossIce");
+	}
+#endif
+#if defined(MOD_PROMOTIONS_GG_FROM_BARBARIANS)
+	if (MOD_PROMOTIONS_GG_FROM_BARBARIANS) {
+		m_bGGFromBarbarians = kResults.GetBool("GGFromBarbarians");
 	}
 #endif
 	m_bRoughTerrainEndsTurn = kResults.GetBool("RoughTerrainEndsTurn");
@@ -370,6 +425,32 @@ bool CvPromotionEntry::CacheResults(Database::Results& kResults, CvDatabaseUtili
 	m_bHasPostCombatPromotions = kResults.GetBool("HasPostCombatPromotions");
 	m_bPostCombatPromotionsExclusive = kResults.GetBool("PostCombatPromotionsExclusive");
 	m_bSapper = kResults.GetBool("Sapper");
+#if defined(MOD_BALANCE_CORE)
+	m_bIsNearbyCityPromotion = kResults.GetBool("IsNearbyCityPromotion");
+	m_bIsNearbyFriendlyCityPromotion = kResults.GetBool("IsNearbyFriendlyCityPromotion");
+	m_bIsNearbyEnemyCityPromotion = kResults.GetBool("IsNearbyEnemyCityPromotion");
+	m_bIsNearbyPromotion = kResults.GetBool("IsNearbyPromotion");
+	m_bIsFriendlyLands = kResults.GetBool("IsFriendlyLands");
+	m_bEnemyLands = kResults.GetBool("EnemyLands");
+	m_iNearbyRange = kResults.GetInt("NearbyRange");
+	const char* szAddedFromNearbyPromotion = kResults.GetText("AddedFromNearbyPromotion");
+	m_eAddedFromNearbyPromotion = (PromotionTypes)GC.getInfoTypeForString(szAddedFromNearbyPromotion, true);
+	const char* szUnitType = kResults.GetText("RequiredUnit");
+	m_eRequiredUnit = (UnitTypes)GC.getInfoTypeForString(szUnitType, true);
+	const char* szConvertDomainUnit = kResults.GetText("ConvertDomainUnit");
+	m_eConvertDomainUnit = (UnitTypes)GC.getInfoTypeForString(szConvertDomainUnit, true);
+	const char* szConvertDomain = kResults.GetText("ConvertDomain");
+	m_eConvertDomain = (DomainTypes)GC.getInfoTypeForString(szConvertDomain, true);
+	m_iStackedGreatGeneralExperience = kResults.GetInt("StackedGreatGeneralXP");
+	m_iPillageBonusStrength = kResults.GetInt("PillageBonusStrength");
+	m_iReligiousPressureModifier = kResults.GetInt("ReligiousPressureModifier");
+	m_iAdjacentCityDefesneMod = kResults.GetInt("AdjacentCityDefenseMod");
+	m_iNearbyEnemyDamage = kResults.GetInt("NearbyEnemyDamage");
+	const char* szAdjacentSameType = kResults.GetText("AdjacentSameType");
+	m_eAdjacentSameType = (PromotionTypes)GC.getInfoTypeForString(szAdjacentSameType, true);
+	m_iMilitaryProductionModifier = kResults.GetInt("MilitaryProductionModifier");
+	m_bHighSeaRaider = kResults.GetBool("HighSeaRaider");
+#endif
 	m_bCanHeavyCharge = kResults.GetBool("HeavyCharge");
 
 	m_iVisibilityChange = kResults.GetInt("VisibilityChange");
@@ -416,6 +497,12 @@ bool CvPromotionEntry::CacheResults(Database::Results& kResults, CvDatabaseUtili
 	m_iExtraAttacks = kResults.GetInt("ExtraAttacks");
 	m_bGreatGeneral = kResults.GetBool("GreatGeneral");
 	m_bGreatAdmiral = kResults.GetBool("GreatAdmiral");
+#if defined(MOD_PROMOTIONS_AURA_CHANGE)
+	if (MOD_PROMOTIONS_AURA_CHANGE) {
+		m_iAuraRangeChange = kResults.GetInt("AuraRangeChange");
+		m_iAuraEffectChange = kResults.GetInt("AuraEffectChange");
+	}
+#endif
 	m_iGreatGeneralModifier = kResults.GetInt("GreatGeneralModifier");
 	m_bGreatGeneralReceivesMovement = kResults.GetBool("GreatGeneralReceivesMovement");
 	m_iGreatGeneralCombatModifier = kResults.GetInt("GreatGeneralCombatModifier");
@@ -626,6 +713,7 @@ bool CvPromotionEntry::CacheResults(Database::Results& kResults, CvDatabaseUtili
 		}
 	}
 #if defined(MOD_BALANCE_CORE)
+	kUtility.SetYields(m_piYieldModifier, "UnitPromotions_YieldModifiers", "PromotionType", szPromotionType);
 	//UnitPromotions_YieldFromScouting
 	{
 		kUtility.InitializeArray(m_piYieldFromScouting, NUM_YIELD_TYPES, 0);
@@ -678,6 +766,32 @@ bool CvPromotionEntry::CacheResults(Database::Results& kResults, CvDatabaseUtili
 
 			const int iYield = pResults->GetInt("Yield");
 			m_piYieldFromKills[iYieldID] = iYield;
+		}
+	}
+	//UnitPromotions_GarrisonYield
+	{
+		kUtility.InitializeArray(m_piGarrisonYield, NUM_YIELD_TYPES, 0);
+
+		std::string sqlKey = "UnitPromotions_GarrisonYield";
+		Database::Results* pResults = kUtility.GetResults(sqlKey);
+		if(pResults == NULL)
+		{
+			const char* szSQL = "select Yields.ID as YieldID, UnitPromotions_GarrisonYield.* from UnitPromotions_GarrisonYield inner join Yields on YieldType = Yields.Type where PromotionType = ?";
+			pResults = kUtility.PrepareResults(sqlKey, szSQL);
+		}
+
+		CvAssert(pResults);
+		if(!pResults) return false;
+
+		pResults->Bind(1, szPromotionType);
+
+		while(pResults->Step())
+		{
+			const int iYieldID = pResults->GetInt("YieldID");
+			CvAssert(iYieldID > -1 && iYieldID < iNumYields);
+
+			const int iYield = pResults->GetInt("Yield");
+			m_piGarrisonYield[iYieldID] = iYield;
 		}
 	}
 
@@ -1282,6 +1396,20 @@ bool CvPromotionEntry::IsGreatAdmiral() const
 	return m_bGreatAdmiral;
 }
 
+#if defined(MOD_PROMOTIONS_AURA_CHANGE)
+/// Accessor: Does this Promotion change the range of the aura of a Great General or Great Admiral?
+int CvPromotionEntry::GetAuraRangeChange() const
+{
+	return m_iAuraRangeChange;
+}
+
+/// Accessor: Does this Promotion change the effect of the aura of a Great General or Great Admiral?
+int CvPromotionEntry::GetAuraEffectChange() const
+{
+	return m_iAuraEffectChange;
+}
+#endif
+
 /// Accessor: Increase in rate of great general creation
 int CvPromotionEntry::GetGreatGeneralModifier() const
 {
@@ -1502,6 +1630,10 @@ bool CvPromotionEntry::IsBarbarianOnly() const
 {
 	return m_bBarbarianOnly;
 }
+bool CvPromotionEntry::IsStrongerDamaged() const
+{
+	return m_bStrongerDamaged;
+}
 int CvPromotionEntry::NegatesPromotion() const
 {
 	return m_iNegatesPromotion;
@@ -1660,6 +1792,32 @@ ImprovementTypes CvPromotionEntry::GetCombatBonusImprovement() const
 	return m_eCombatBonusImprovement;
 }
 #endif
+#if defined(MOD_BALANCE_CORE)
+/// Get the UnitClass we want to receive the bonus from.
+UnitClassTypes CvPromotionEntry::GetCombatBonusFromNearbyUnitClass() const
+{
+	return m_iCombatBonusFromNearbyUnitClass;
+}
+/// Distance from this UnitClass
+int CvPromotionEntry::GetNearbyUnitClassBonusRange() const
+{
+	return m_iNearbyUnitClassBonusRange;
+}
+/// Bonus from this UnitClass
+int CvPromotionEntry::GetNearbyUnitClassBonus() const
+{
+	return m_iNearbyUnitClassBonus;
+}
+int CvPromotionEntry::GetWonderProductionModifier() const
+{
+	return m_iWonderProductionModifier;
+}
+/// Accessor: Double movement in hills
+bool CvPromotionEntry::IsMountainsDoubleMove() const
+{
+	return m_bMountainsDoubleMove;
+}
+#endif
 
 #if defined(MOD_PROMOTIONS_CROSS_MOUNTAINS)
 /// Accessor: Can cross mountains (but we'd rather they left them nice and straight!)
@@ -1682,6 +1840,14 @@ bool CvPromotionEntry::CanCrossOceans() const
 bool CvPromotionEntry::CanCrossIce() const
 {
 	return m_bCanCrossIce;
+}
+#endif
+
+#if defined(MOD_PROMOTIONS_GG_FROM_BARBARIANS)
+/// Accessor: Gets GG/GA points from barbarians
+bool CvPromotionEntry::IsGGFromBarbarians() const
+{
+	return m_bGGFromBarbarians;
 }
 #endif
 
@@ -1848,6 +2014,85 @@ bool CvPromotionEntry::IsSapper() const
 	return m_bSapper;
 }
 
+#if defined(MOD_BALANCE_CORE)
+bool CvPromotionEntry::IsNearbyCityPromotion() const
+{
+	return m_bIsNearbyCityPromotion;
+}
+bool CvPromotionEntry::IsNearbyFriendlyCityPromotion() const
+{
+	return m_bIsNearbyFriendlyCityPromotion;
+}
+bool CvPromotionEntry::IsNearbyEnemyCityPromotion() const
+{
+	return m_bIsNearbyEnemyCityPromotion;
+}
+bool CvPromotionEntry::IsNearbyPromotion() const
+{
+	return m_bIsNearbyPromotion;
+}
+bool CvPromotionEntry::IsFriendlyLands() const
+{
+	return m_bIsFriendlyLands;
+}
+bool CvPromotionEntry::IsEnemyLands() const
+{
+	return m_bEnemyLands;
+}
+int CvPromotionEntry::GetNearbyRange() const
+{
+	return m_iNearbyRange;
+}
+UnitTypes CvPromotionEntry::getRequiredUnit() const
+{
+	return m_eRequiredUnit;
+}
+PromotionTypes CvPromotionEntry::GetAdjacentSameType() const
+{
+	return m_eAdjacentSameType;
+}
+UnitTypes CvPromotionEntry::GetConvertDomainUnit() const
+{
+	return m_eConvertDomainUnit;
+}
+DomainTypes CvPromotionEntry::GetConvertDomain() const
+{
+	return m_eConvertDomain;
+}
+PromotionTypes CvPromotionEntry::AddedFromNearbyPromotion() const
+{
+	return m_eAddedFromNearbyPromotion;
+}
+int CvPromotionEntry::GetStackedGreatGeneralExperience() const
+{
+	return m_iStackedGreatGeneralExperience;
+}
+int CvPromotionEntry::GetPillageBonusStrengthPercent() const
+{
+	return m_iPillageBonusStrength;
+}
+int CvPromotionEntry::GetReligiousPressureModifier() const
+{
+	return m_iReligiousPressureModifier;
+}
+int CvPromotionEntry::GetAdjacentCityDefenseMod() const
+{
+	return m_iAdjacentCityDefesneMod;
+}
+int CvPromotionEntry::GetNearbyEnemyDamage() const
+{
+	return m_iNearbyEnemyDamage;
+}
+int CvPromotionEntry::GetMilitaryProductionModifier() const
+{
+	return m_iMilitaryProductionModifier;
+}
+bool CvPromotionEntry::IsHighSeaRaider() const
+{
+	return m_bHighSeaRaider;
+}
+#endif
+
 /// Accessor: Can this unit doa heavy charge (which either force an enemy to retreat or take extra damage)
 bool CvPromotionEntry::IsCanHeavyCharge() const
 {
@@ -1936,6 +2181,18 @@ int CvPromotionEntry::GetFeatureDefensePercent(int i) const
 	return -1;
 }
 #if defined(MOD_BALANCE_CORE)
+/// Modifier to yield by type
+int CvPromotionEntry::GetYieldModifier(int i) const
+{
+	CvAssertMsg(i < NUM_YIELD_TYPES, "Index out of bounds");
+	CvAssertMsg(i > -1, "Index out of bounds");
+	if(i > -1 && i < NUM_YIELD_TYPES && m_piYieldModifier)
+	{
+		return m_piYieldModifier[i];
+	}
+
+	return 0;
+}
 int CvPromotionEntry::GetYieldFromScouting(int i) const
 {
 	CvAssertMsg(i < NUM_YIELD_TYPES, "Index out of bounds");
@@ -1958,6 +2215,19 @@ int CvPromotionEntry::GetYieldFromKills(int i) const
 	if(i > -1 && i < NUM_YIELD_TYPES && m_piYieldFromKills)
 	{
 		return m_piYieldFromKills[i];
+	}
+
+	return 0;
+}
+
+int CvPromotionEntry::GetGarrisonYield(int i) const
+{
+	CvAssertMsg(i < NUM_YIELD_TYPES, "Index out of bounds");
+	CvAssertMsg(i > -1, "Index out of bounds");
+
+	if(i > -1 && i < NUM_YIELD_TYPES && m_piGarrisonYield)
+	{
+		return m_piGarrisonYield[i];
 	}
 
 	return 0;

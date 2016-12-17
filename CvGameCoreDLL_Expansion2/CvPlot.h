@@ -169,18 +169,25 @@ public:
 	int getBuildTurnsLeft(BuildTypes eBuild, PlayerTypes ePlayer, int iNowExtra, int iThenExtra) const;
 	int getFeatureProduction(BuildTypes eBuild, PlayerTypes ePlayer, CvCity** ppCity) const;
 
-	UnitHandle getBestDefender(PlayerTypes eOwner, PlayerTypes eAttackingPlayer = NO_PLAYER, const CvUnit* pAttacker = NULL, bool bTestAtWar = false, bool bTestPotentialEnemy = false, bool bTestCanMove = false, bool bNoncombatAllowed = false) const;
-	UnitHandle getBestGarrison(PlayerTypes eOwner) const;
+	CvUnit* getBestDefender(PlayerTypes eOwner, PlayerTypes eAttackingPlayer = NO_PLAYER, const CvUnit* pAttacker = NULL, bool bTestAtWar = false, bool bIgnoreVisibility = false, bool bTestCanMove = false, bool bNoncombatAllowed = false) const;
+	CvUnit* getBestGarrison(PlayerTypes eOwner) const;
 	CvUnit* getSelectedUnit() const;
 	int getUnitPower(PlayerTypes eOwner = NO_PLAYER) const;
 
-	int defenseModifier(TeamTypes eDefender, bool bIgnored, bool bHelp = false) const;
+	int defenseModifier(TeamTypes eDefender, bool bIgnoreImprovement, bool bIgnoreFeature, bool bForHelp = false) const;
 	int movementCost(const CvUnit* pUnit, const CvPlot* pFromPlot, int iMovesRemaining) const;
 	int MovementCostNoZOC(const CvUnit* pUnit, const CvPlot* pFromPlot, int iMovesRemaining) const;
 #if defined(MOD_GLOBAL_STACKING_RULES)
 	inline int getUnitLimit() const 
 	{
-		return isCity() ? GC.getCITY_UNIT_LIMIT() : (GC.getPLOT_UNIT_LIMIT() + getAdditionalUnitsFromImprovement() + getStackingUnits());
+		if(isWater())
+		{
+			return (GC.getPLOT_UNIT_LIMIT() + getAdditionalUnitsFromImprovement());
+		}
+		else		
+		{
+			return isCity() ? (GC.getCITY_UNIT_LIMIT() + getStackingUnits()) : (GC.getPLOT_UNIT_LIMIT() + getAdditionalUnitsFromImprovement() + getStackingUnits());
+		}
 	}
 #endif
 
@@ -197,8 +204,9 @@ public:
 	CvCity* GetAdjacentCity() const;
 	int GetNumAdjacentDifferentTeam(TeamTypes eTeam, bool bIgnoreWater) const;
 	int GetNumAdjacentMountains() const;
+	int GetNumPassableNeighbors(int iRings, PlayerTypes ePlayer, DomainTypes eDomain) const;
 #if defined(MOD_BALANCE_CORE_SETTLER)
-	int countPassableNeighbors(bool bWater, CvPlot** aPassableNeighbors=NULL) const;
+	int countPassableNeighbors(DomainTypes eDomain=NO_DOMAIN, CvPlot** aPassableNeighbors=NULL) const;
 	bool IsChokePoint() const;
 	bool IsLandbridge(int iMinDistanceSaved, int iMinOceanSize) const;
 #endif
@@ -241,11 +249,11 @@ public:
 	bool isActiveVisible(bool bDebug) const;
 	bool isActiveVisible() const;
 #if defined(MOD_BALANCE_CORE)
-	bool isVisibleToCivTeam(bool bNoObserver = false) const;
+	bool isVisibleToCivTeam(bool bNoObserver = false, bool bNoMinor = false) const;
 #else
 	bool isVisibleToCivTeam() const;
 #endif
-	bool isVisibleToEnemyTeam(TeamTypes eFriendlyTeam) const;
+	bool isVisibleToEnemy(PlayerTypes eFriendlyPlayer) const;
 	bool isVisibleToWatchingHuman() const;
 	bool isAdjacentVisible(TeamTypes eTeam, bool bDebug=false) const;
 	bool isAdjacentNonvisible(TeamTypes eTeam) const;
@@ -302,12 +310,16 @@ public:
 	bool isVisibleEnemyDefender(const CvUnit* pUnit) const;
 	CvUnit* getVisibleEnemyDefender(PlayerTypes ePlayer) const;
 	int getNumDefenders(PlayerTypes ePlayer) const;
+	int getNumNavalDefenders(PlayerTypes ePlayer) const;
 	int getNumVisibleEnemyDefenders(const CvUnit* pUnit) const;
 	int getNumVisiblePotentialEnemyDefenders(const CvUnit* pUnit) const;
 	int getNumUnitsOfAIType(UnitAITypes eType, int& iFirstUnitID) const;
 	bool isVisibleEnemyUnit(PlayerTypes ePlayer) const;
 	bool isVisibleEnemyUnit(const CvUnit* pUnit) const;
 	bool isVisibleOtherUnit(PlayerTypes ePlayer) const;
+
+	bool isEnemyUnit(PlayerTypes ePlayer, bool bCombat, bool bCheckVisibility) const;
+	bool isNeutralUnit(PlayerTypes ePlayer, bool bCombat, bool bCheckVisibility) const;
 
 	//units which can cause or lift a blockade
 	bool IsBlockadeUnit(PlayerTypes ePlayer, bool bFriendly) const;
@@ -386,6 +398,8 @@ public:
 	int ComputeYieldFromTwoAdjacentImprovement(CvImprovementEntry& kImprovement, ImprovementTypes eValue, YieldTypes eYield) const;
 	int ComputeYieldFromOtherAdjacentImprovement(CvImprovementEntry& kImprovement, YieldTypes eYield) const;
 	int ComputeYieldFromAdjacentTerrain(CvImprovementEntry& kImprovement, YieldTypes eYield) const;
+	int ComputeYieldFromAdjacentResource(CvImprovementEntry& kImprovement, YieldTypes eYield) const;
+	int ComputeYieldFromAdjacentPlot(CvImprovementEntry& kImprovement, YieldTypes eYield) const;
 #else
 	int ComputeCultureFromAdjacentImprovement(CvImprovementEntry& kImprovement, ImprovementTypes eValue) const;
 #endif
@@ -508,10 +522,11 @@ public:
 			if (eTerrain != NO_TERRAIN) {
 				CvTerrainInfo* pkTerrainInfo = GC.getTerrainInfo(eTerrain);
 				if (pkTerrainInfo) {
-					if (!bIgnoreTerrainDamage) {
+					// no damage for units on montain cities
+					if (!bIgnoreTerrainDamage && !isCity())
+					{						
 						damage += pkTerrainInfo->getTurnDamage();
 					}
-					
 					if (bExtraTerrainDamage) {
 						damage += pkTerrainInfo->getExtraTurnDamage();
 					}
@@ -556,8 +571,11 @@ public:
 	void setTerrainType(TerrainTypes eNewValue, bool bRecalculate = true, bool bRebuildGraphics = true);
 
 	void setFeatureType(FeatureTypes eNewValue, int iVariety = -1);
-
+#if defined(MOD_PSEUDO_NATURAL_WONDER)
+	bool IsNaturalWonder(bool orPseudoNatural = false) const;
+#else
 	bool IsNaturalWonder() const;
+#endif
 
 	ResourceTypes getResourceType(TeamTypes eTeam = NO_TEAM) const;
 	ResourceTypes getNonObsoleteResourceType(TeamTypes eTeam = NO_TEAM) const;
@@ -642,6 +660,7 @@ public:
 
 	void setPlotCity(CvCity* pNewValue);
 
+	int getWorkingCityID() const;
 	CvCity* getWorkingCity() const;
 	void updateWorkingCity();
 
@@ -758,10 +777,10 @@ public:
 	void getVisibleImprovementState(ImprovementTypes& eType, bool& bWorked);				// determines how the improvement state is shown in the engine
 	void getVisibleResourceState(ResourceTypes& eType, bool& bImproved, bool& bWorked);		// determines how the resource state is shown in the engine
 
-	UnitHandle getCenterUnit();
-	const UnitHandle getCenterUnit() const;
+	CvUnit* getCenterUnit();
+	const CvUnit* getCenterUnit() const;
 	const CvUnit* getDebugCenterUnit() const;
-	void setCenterUnit(UnitHandle pNewValue);
+	void setCenterUnit(CvUnit* pNewValue);
 
 	int getInvisibleVisibilityCount(TeamTypes eTeam, InvisibleTypes eInvisible) const;
 	bool isInvisibleVisible(TeamTypes eTeam, InvisibleTypes eInvisible) const;
@@ -893,11 +912,12 @@ public:
 	bool IsWithinDistanceOfUnitClass(PlayerTypes ePlayer, UnitClassTypes eUnitClass, int iDistance, bool bIsFriendly, bool bIsEnemy) const;
 	bool IsWithinDistanceOfUnitCombatType(PlayerTypes ePlayer, UnitCombatTypes eUnitCombat, int iDistance, bool bIsFriendly, bool bIsEnemy) const;
 	bool IsWithinDistanceOfUnitPromotion(PlayerTypes ePlayer, PromotionTypes eUnitPromotion, int iDistance, bool bIsFriendly, bool bIsEnemy) const;
-
+	bool IsWithinDistanceOfCity(const CvUnit* eThisUnit, int iDistance, bool bIsFriendly, bool bIsEnemy) const;
 	bool IsAdjacentToUnit(PlayerTypes ePlayer, UnitTypes eOtherUnit, bool bIsFriendly, bool bIsEnemy) const;
 	bool IsAdjacentToUnitClass(PlayerTypes ePlayer, UnitClassTypes eUnitClass, bool bIsFriendly, bool bIsEnemy) const;
 	bool IsAdjacentToUnitCombatType(PlayerTypes ePlayer, UnitCombatTypes eUnitCombat, bool bIsFriendly, bool bIsEnemy) const;
 	bool IsAdjacentToUnitPromotion(PlayerTypes ePlayer, PromotionTypes eUnitPromotion, bool bIsFriendly, bool bIsEnemy) const;
+	bool IsAdjacentToTradeRoute() const;
 #endif
 	bool IsAdjacentToImprovement(ImprovementTypes iImprovementType) const;
 	bool IsWithinDistanceOfImprovement(ImprovementTypes iImprovementType, int iDistance) const;
@@ -913,6 +933,8 @@ public:
 	bool IsEnemyCityAdjacent(TeamTypes eMyTeam, const CvCity* pSpecifyCity) const;
 	int GetNumEnemyUnitsAdjacent(TeamTypes eMyTeam, DomainTypes eDomain, const CvUnit* pUnitToExclude = NULL, bool bCountRanged = true) const;
 	CvUnit* GetAdjacentEnemyUnit(TeamTypes eMyTeam, DomainTypes eDomain) const;
+	int GetAdjacentEnemyPower(PlayerTypes ePlayer) const;
+
 	int GetNumFriendlyUnitsAdjacent(TeamTypes eMyTeam, DomainTypes eDomain, const CvUnit* pUnitToExclude = NULL, bool bCountRanged = true) const;
 	bool IsFriendlyUnitAdjacent(TeamTypes eMyTeam, bool bCombatUnit) const;
 	int GetNumSpecificPlayerUnitsAdjacent(PlayerTypes ePlayer, const CvUnit* pUnitToExclude = NULL, const CvUnit* pExampleUnitType = NULL, bool bCombatOnly = true) const;
@@ -922,16 +944,17 @@ public:
 	bool GetPlotsAtRangeX(int iRange, bool bFromPlot, bool bWithLOS, std::vector<CvPlot*>& vResult) const;
 
 	void updateImpassable(TeamTypes eTeam = NO_TEAM);
+
+	bool hasSharedAdjacentArea(CvPlot* pOtherPlot) const;
 #endif
 
 	bool canPlaceUnit(PlayerTypes ePlayer) const;
-	CvPlot* getAdjacentPlotForUnit(PlayerTypes ePlayer, bool bLand, DirectionTypes ePreferredDirection=NO_DIRECTION) const;
 
 protected:
 	class PlotBoolField
 	{
 	public:
-		enum { eCount = 4, eSize = 32 };
+		enum config { eCount = 4, eSize = 32 };
 		DWORD m_dwBits[eCount];
 
 		bool GetBit(const uint uiEntry) const
@@ -1023,7 +1046,7 @@ protected:
 	float m_fPopupDelay;
 #endif
 
-	UnitHandle m_pCenterUnit;
+	CvUnit* m_pCenterUnit;
 
 	short m_apaiInvisibleVisibilityCount[MAX_TEAMS][NUM_INVISIBLE_TYPES];
 
@@ -1117,13 +1140,17 @@ void ClearPlotDeltas();
 struct SPlotWithScore
 {
 	SPlotWithScore(CvPlot* pPlot_, int score_) : pPlot(pPlot_), score(score_) {}
-    bool operator<(const SPlotWithScore& other) const
+    bool operator<(const SPlotWithScore& other) const //for sorting
     {
         return score < other.score;
     }
     bool operator<(const int ref) const
     {
         return score < ref;
+    }
+    bool operator==(const SPlotWithScore& other) const //for std::find
+    {
+        return pPlot == other.pPlot;
     }
 
 	CvPlot* pPlot;

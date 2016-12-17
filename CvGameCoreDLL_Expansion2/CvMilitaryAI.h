@@ -127,8 +127,7 @@ struct CvMilitaryTarget
 #if defined(MOD_BALANCE_CORE)
 		m_bOcean(false),
 #endif
-		iMusterNearbyUnitPower(0),
-		iTargetNearbyUnitPower(0),
+		iStrengthRatioTimes100(100),
 		m_iPathLength(0)
 	{
 	}
@@ -140,12 +139,12 @@ struct CvMilitaryTarget
 
 	CvCity* m_pTargetCity;
 	CvCity* m_pMusterCity;
-	int iTargetNearbyUnitPower;
-	int iMusterNearbyUnitPower;
+	int iStrengthRatioTimes100;
 	int m_iPathLength;
 	bool m_bAttackBySea;
 #if defined(MOD_BALANCE_CORE)
 	bool m_bOcean;
+	bool m_bNoLandPath;
 #endif
 };
 
@@ -166,11 +165,14 @@ struct SCachedTarget
 	int iMusterCity;
 	int bAttackBySea;
 	int bOcean;
+	int bNoLandPath;
 	int iScore;
 	int iTurnChosen;
 };
 
 typedef std::map<PlayerTypes,std::map<AIOperationTypes,SCachedTarget>> CachedTargetsMap;
+typedef std::map<CvCity*, std::map<CvCity*, int>> CachedDistancesMap;
+
 #endif
 
 //++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
@@ -250,20 +252,20 @@ public:
 
 	// Finding best cities to target
 #if defined(MOD_BALANCE_CORE_MILITARY)
-	bool GetCachedAttackTarget(PlayerTypes eEnemy, AIOperationTypes eAIOperationType);
+	bool HaveCachedAttackTarget(PlayerTypes eEnemy, AIOperationTypes eAIOperationType);
 	bool IsCurrentAttackTarget(CvCity* pCity);
 	void ClearCachedTargets();
-	CvMilitaryTarget FindBestAttackTargetCached(AIOperationTypes eAIOperationType, PlayerTypes eEnemy, int* piWinningScore = NULL);
+	CvMilitaryTarget FindBestAttackTargetCached(AIOperationTypes eAIOperationType, PlayerTypes eEnemy, int* piWinningScore = NULL, bool bCheckWar = false);
 	CvMilitaryTarget FindBestAttackTargetGlobal(AIOperationTypes eAIOperationType, int* piWinningScore = NULL, bool bCheckWar = false);
+
+	int GetCachedAttackTargetWaterDistance(CvCity* pCity, CvCity* pOtherCity);
+	int GetCachedAttackTargetLandDistance(CvCity* pCity, CvCity* pOtherCity);
+	void RefreshDistanceCaches();
 #endif
 	CvMilitaryTarget FindBestAttackTarget(AIOperationTypes eAIOperationType, PlayerTypes eEnemy, int* piWinningScore = NULL);
-	void CheckApproachFromLandAndSea(PlayerTypes eEnemy, CvMilitaryTarget& target);
+	void CheckApproachFromLandAndSea(CvMilitaryTarget& target, AIOperationTypes eAIOperationType);
 	int ScoreTarget(CvMilitaryTarget& target, AIOperationTypes eAIOperationType);
 	CityAttackApproaches EvaluateMilitaryApproaches(CvCity* pCity, bool bAttackByLand, bool bAttackBySea);
-	CvCity* GetNearestCoastalCityFriendly(PlayerTypes eEnemy) const;
-#if defined(MOD_BALANCE_CORE_MILITARY)
-	CvCity* GetNearestCoastalCityEnemy(PlayerTypes eEnemy) const;
-#endif
 
 	// Accessors to provide military data to other AI subsystems
 	ThreatTypes GetHighestThreat();
@@ -299,7 +301,8 @@ public:
 	};
 #endif
 
-	CvCity* GetMostThreatenedCity(int iIndex = 0, bool bIncludeFutureThreats=true); // pass in 0 for the most threatened city, 1 for the second most threatened, 2 for the third, etc.
+	CvCity* GetMostThreatenedCity(bool bIncludeFutureThreats=true);
+	vector<CvCity*> GetThreatenedCities(bool bIncludeFutureThreats=true);
 
 	int GetPercentOfRecommendedMilitarySize() const;
 	int GetPowerOfStrongestBuildableUnit(DomainTypes eDomain);
@@ -307,7 +310,7 @@ public:
 	{
 		return m_iNumAirUnits > 0;
 	};
-	UnitHandle FindBestUnitToScrap(bool bLand, bool bDeficitForcedDisband, int& iScore);
+	CvUnit* FindBestUnitToScrap(bool bLand, bool bDeficitForcedDisband, int& iScore);
 	ArmyType GetArmyBeingBuilt() const
 	{
 		return m_eArmyTypeBeingBuilt;
@@ -340,7 +343,7 @@ public:
 	void LogCityRazed(CvCity* pCity, PlayerTypes eOldOwner);
 	void LogPeace(PlayerTypes eOpponent);
 	void LogPeace(TeamTypes eOpponentTeam);
-	void LogDeficitScrapUnit(UnitHandle pUnit);
+	void LogDeficitScrapUnit(CvUnit* pUnit);
 	void LogMilitarySummaryMessage(const CvString& strMsg);
 
 #if defined(MOD_BALANCE_CORE)
@@ -357,6 +360,35 @@ public:
 	{
 		return m_iNumLandAttacksRequested;
 	};
+	int GetRecommendLandArmySize() const
+	{
+		return m_iRecommendedMilitarySize;
+	};
+	int GetRecommendNavySize() const
+	{
+		return m_iRecNavySize;
+	};
+	int GetNumLandUnits() const
+	{
+		return m_iNumLandUnits;
+	};
+	int GetNumNavalUnits() const
+	{
+		return m_iNumNavalUnits;
+	};
+	int GetNumAAUnits() const
+	{
+		return m_iNumAntiAirUnits;
+	};
+
+	void SetNumFreeCarrier(int iValue);
+	int GetNumFreeCarrier() const;
+
+	void SetNumFreeCargo(int iValue);
+	int GetNumFreeCargo() const;
+#endif
+#if defined(MOD_BALANCE_CORE)
+	void SetupDefenses(PlayerTypes ePlayer);
 #endif
 private:
 
@@ -371,6 +403,17 @@ private:
 	void WarStateChange(PlayerTypes ePlayer, WarStateTypes eNewWarState, WarStateTypes eOldWarState);
 	void UpdateMilitaryStrategies();
 	void UpdateOperations();
+#if defined(MOD_BALANCE_CORE)
+	void DoNuke(PlayerTypes ePlayer);
+	void DoBarbs();
+	void CheckLandDefenses(PlayerTypes ePlayer, CvCity* pThreatenedCity);
+	void CheckSeaDefenses(PlayerTypes ePlayer, CvCity* pThreatenedCity);
+	void DoLandAttacks(PlayerTypes ePlayer);
+	void DoSeaAttacks(PlayerTypes ePlayer);
+	void DoMinorCivAttacks(PlayerTypes ePlayer);
+	int GetEnemyLandValue(PlayerTypes ePlayer, CvMilitaryTarget& target);
+	int GetEnemySeaValue(PlayerTypes ePlayer, CvMilitaryTarget& target);
+#endif
 	void MakeEmergencyPurchases();
 	void MakeOffensivePurchases();
 	void RequestImprovements();
@@ -382,7 +425,8 @@ private:
 	void LogWarStateChange(PlayerTypes ePlayer, WarStateTypes eNewWarState, WarStateTypes eOldWarState);
 	void LogMilitaryStatus();
 	void LogAvailableForces();
-	void LogScrapUnit(UnitHandle pUnit, bool bDeficit, bool bConquest);
+	void LogScrapUnit(CvUnit* pUnit, bool bDeficit, bool bConquest);
+	void LogGiftUnit(CvUnit* pUnit, bool bDeficit, bool bConquest);
 	void LogAttackTargets(AIOperationTypes eAIOperationType, PlayerTypes eEnemy, CvWeightedVector<CvMilitaryTarget, SAFE_ESTIMATE_NUM_CITIES, true>& weightedTargetList);
 	void LogChosenTarget(AIOperationTypes eAIOperationType, PlayerTypes eEnemy, CvMilitaryTarget& target);
 	CvString GetLogFileName(CvString& playerName, bool bSummary=false) const;
@@ -407,6 +451,8 @@ private:
 
 #if defined(MOD_BALANCE_CORE_MILITARY)
 	CachedTargetsMap m_cachedTargets;
+	CachedDistancesMap m_cachedWaterDistances;
+	CachedDistancesMap m_cachedLandDistances;
 #endif
 
 	// Data recomputed each turn (no need to serialize)
@@ -430,6 +476,8 @@ private:
 	int m_iNumNavalAttacksRequested;
 #if defined(MOD_BALANCE_CORE)
 	int m_iCurrentWarFocus;
+	int m_iFreeCarrier;
+	int m_iFreeCargo;
 #endif
 	DefenseState m_eLandDefenseState;
 	DefenseState m_eNavalDefenseState;
@@ -475,16 +523,12 @@ bool IsTestStrategy_NeedAirCarriers(CvPlayer* pPlayer);
 
 // Functions that evaluate which operation to launch
 int ComputeRecommendedNavySize(CvPlayer* pPlayer);
-#if defined(MOD_BALANCE_CORE)
 int NumberOfFillableSlots(CvPlayer* pPlayer, PlayerTypes pEnemy, MultiunitFormationTypes formation, bool bRequiresNavalMoves=false, bool bMustBeDeepWaterNaval=false, CvPlot* pMuster=NULL, CvPlot* pTarget=NULL, int* piNumberSlotsRequired=NULL, int* piNumberLandReservesUsed=NULL);
-#else
-int NumberOfFillableSlots(CvPlayer* pPlayer, MultiunitFormationTypes formation, bool bRequiresNavalMoves=false, int* piNumberSlotsRequired=NULL, int* piNumberLandReservesUsed=NULL);
-#endif
 UnitAITypes FirstSlotCityCanFill(CvPlayer* pPlayer, MultiunitFormationTypes formation, bool bRequiresNavalMoves, bool bAtCoastalCity, bool bSecondaryUnit);
-#if defined(MOD_BALANCE_CORE)
 MultiunitFormationTypes GetCurrentBestFormationTypeForCityAttack();
-#endif
-CvPlot* GetCoastalPlotAdjacentToTarget(CvPlot *pTarget, CvArmyAI *pArmy);
+MultiunitFormationTypes GetCurrentBestFormationTypeForNavalAttack();
+MultiunitFormationTypes GetCurrentBestFormationTypeForPureNavalAttack();
+CvPlot* GetCoastalPlotNearPlot(CvPlot *pTarget);
 }
 
 #endif //CIV5_MILITARY_AI_H

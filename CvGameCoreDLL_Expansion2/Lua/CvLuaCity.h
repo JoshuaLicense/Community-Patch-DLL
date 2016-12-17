@@ -320,6 +320,9 @@ protected:
 	static int lGetNumTeamWonders(lua_State* L);
 	static int lGetNumNationalWonders(lua_State* L);
 	static int lGetNumBuildings(lua_State* L);
+#if defined(MOD_BALANCE_CORE)
+	static int lGetNumTotalBuildings(lua_State* L);
+#endif
 
 	static int lGetWonderProductionModifier(lua_State* L);
 	static int lChangeWonderProductionModifier(lua_State* L);
@@ -569,12 +572,14 @@ protected:
 #endif
 #if defined(MOD_API_LUA_EXTENSIONS) && defined(MOD_BALANCE_CORE)
 	LUAAPIEXTN(GetBaseYieldRateFromCSAlliance, int);
-	LUAAPIEXTN(GetCorporationYieldChange, int);
-	LUAAPIEXTN(GetCorporationYieldModChange, int);
-	LUAAPIEXTN(GetCorporationResourceQuantity, int);
-	LUAAPIEXTN(GetCorporationGPChange, int);
+	LUAAPIEXTN(GetBuildingYieldChangeFromCorporationFranchises, int);
+	LUAAPIEXTN(GetYieldChangeFromCorporationFranchises, int);
+	LUAAPIEXTN(GetTradeRouteCityMod, int);
+	LUAAPIEXTN(GetResourceQuantityPerXFranchises, int);
+	LUAAPIEXTN(GetGPRateModifierPerXFranchises, int);
 	LUAAPIEXTN(HasOffice, bool);
 	LUAAPIEXTN(IsFranchised, bool);
+	LUAAPIEXTN(DoFranchiseAtCity, bool);
 	LUAAPIEXTN(GetYieldChangeTradeRoute, int);
 	LUAAPIEXTN(GetSpecialistYieldChange, int);
 	LUAAPIEXTN(GetModFromWLTKD, int);
@@ -688,6 +693,7 @@ protected:
 	static int lSetAdditionalFood(lua_State* L);
 #endif
 #if defined(MOD_BALANCE_CORE_EVENTS)
+	static int lGetDisabledTooltip(lua_State* L);
 	static int lGetScaledEventChoiceValue(lua_State* L);
 	static int lIsCityEventChoiceActive(lua_State* L);
 	static int lDoCityEventChoice(lua_State* L);

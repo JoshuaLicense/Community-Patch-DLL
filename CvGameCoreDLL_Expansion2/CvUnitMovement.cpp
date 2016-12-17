@@ -14,6 +14,7 @@ int CvUnitMovement::GetCostsForMove(const CvUnit* pUnit, const CvPlot* pFromPlot
 	bool bFasterInHills = pTraits->IsFasterInHills();
 	bool bIgnoreTerrainCost = pUnit->ignoreTerrainCost();
 	bool bAmphibious = pUnit ? pUnit->isRiverCrossingNoPenalty() : false;
+	bool bHover = pUnit ? pUnit->IsHoveringUnit() : false;
 
 	TeamTypes eUnitTeam = pUnit->getTeam();
 	CvTeam& kUnitTeam = GET_TEAM(eUnitTeam);
@@ -87,8 +88,11 @@ int CvUnitMovement::GetCostsForMove(const CvUnit* pUnit, const CvPlot* pFromPlot
 	if (bFasterInHills && pToPlot->isHills())
 		bIgnoreTerrainCost = true;
 
+	if (bHover)
+		bIgnoreTerrainCost = true;
+
 #if defined(MOD_BALANCE_CORE)
-	if(MOD_BALANCE_CORE && bAmphibious && bRiverCrossing)
+	if (MOD_BALANCE_CORE && bAmphibious && bRiverCrossing)
 		bIgnoreTerrainCost = true;
 
 	if (MOD_BALANCE_CORE && pTraits->IsMountainPass() && pToPlot->isMountain())
@@ -99,10 +103,39 @@ int CvUnitMovement::GetCostsForMove(const CvUnit* pUnit, const CvPlot* pFromPlot
 	// preparation done, now here comes the interesting part
 	//----
 
-	if(pToPlot->isRoughGround() && pUnit->IsRoughTerrainEndsTurn())
+	//check border obstacle - great wall ends the turn
+	TeamTypes eToTeam = pToPlot->getTeam();
+	TeamTypes eFromTeam = pFromPlot->getTeam();
+	if(eToTeam != NO_TEAM && eUnitTeam != eToTeam && eToTeam != eFromTeam)
+	{
+		CvTeam& kToPlotTeam = GET_TEAM(eToTeam);
+		CvPlayer& kToPlotPlayer = GET_PLAYER(pToPlot->getOwner());
+
+		if(!kToPlotTeam.IsAllowsOpenBordersToTeam(eUnitTeam))
+		{
+			//only applies on land
+			if(kToPlotTeam.isBorderObstacle() || kToPlotPlayer.isBorderObstacle())
+			{
+				if(!pToPlot->isWater() && pUnit->getDomainType() == DOMAIN_LAND)
+				{
+					return INT_MAX;
+				}
+			}
+		}
+	}
+
+	if(pToPlot->isRoughGround() && pUnit->IsRoughTerrainEndsTurn() && !(bRouteFrom && bRouteTo))
 	{
 		// Is a unit's movement consumed for entering rough terrain?
 		return INT_MAX;
+	}
+	// This is a special Domain unit that can disembark and becomes a land unit. End Turn like normal disembarkation.
+	else if(pUnit->getDomainType() == DOMAIN_SEA && pUnit->isConvertUnit())
+	{
+		if(pToPlot->isCoastalLand(1) && pFromPlot->isWater())
+		{
+			return INT_MAX;
+		}
 	}
 	else if (bFullCostEmbarkStateChange)
 	{
@@ -114,14 +147,23 @@ int CvUnitMovement::GetCostsForMove(const CvUnit* pUnit, const CvPlot* pFromPlot
 		//moving into unknown tiles ends the turn for humans (to prevent information leakage from the displayed path)
 		return INT_MAX;
 	}
-	else if (bFreeEmbarkStateChange)
+	else if (bFreeEmbarkStateChange) //a cover charge still applies :)
 	{
-		iRegularCost = 0;
+		iRegularCost = iMoveDenominator/10;
 	}
 	else if (bCheapEmbarkStateChange)
 	{
 		iRegularCost = iMoveDenominator;
 	}
+#if defined(MOD_CARGO_SHIPS)
+	else if (pUnit->isCargo() && pUnit->getDomainType() == DOMAIN_LAND && GET_PLAYER(pUnit->getOwner()).GetPlayerTraits()->IsEmbarkedToLandFlatCost())
+	{
+		if(pToPlot->isCoastalLand(1) && pFromPlot->isWater())
+		{
+			iRegularCost = 0;
+		}
+	}
+#endif
 	else if(pUnit->flatMovementCost() || pUnit->getDomainType() == DOMAIN_AIR)
 	{
 		iRegularCost = iMoveDenominator;
@@ -156,13 +198,19 @@ int CvUnitMovement::GetCostsForMove(const CvUnit* pUnit, const CvPlot* pFromPlot
 			iRegularCost = std::max(1, (iRegularCost - pUnit->getExtraMoveDiscount()));
 		}
 
+		//now switch to high-precision costs
 		iRegularCost *= iMoveDenominator;
 
 		if(pToPlot->isHills() && pUnit->isHillsDoubleMove())
 		{
 			iRegularCost /= 2;
 		}
-
+#if defined(MOD_BALANCE_CORE)
+		else if(pToPlot->isMountain() && pUnit->isMountainsDoubleMove())
+		{
+			iRegularCost /= 2;
+		}
+#endif
 		else if((eToFeature == NO_FEATURE) ? pUnit->isTerrainDoubleMove(eToTerrain) : pUnit->isFeatureDoubleMove(eToFeature))
 		{
 			iRegularCost /= 2;
@@ -174,10 +222,44 @@ int CvUnitMovement::GetCostsForMove(const CvUnit* pUnit, const CvPlot* pFromPlot
 			iRegularCost *= 2;
 		}
 #endif
+
+		//extra movement cost in some instances
+		bool bSlowDown = false;
+		if(eToTeam != NO_TEAM && eUnitTeam != eToTeam)
+		{
+			if(!pToPlot->IsFriendlyTerritory(kPlayer.GetID()))
+			{
+				//unit itself may have a negative trait ...
+				bSlowDown = pUnit->isSlowInEnemyLand();
+
+				if (!bSlowDown)
+				{
+					//city might have special defense buildings
+					CvCity* pCity = pToPlot->getWorkingCity();
+					if (pCity)
+					{
+						if(!pToPlot->isWater() && pUnit->getDomainType() == DOMAIN_LAND)
+						{
+							bSlowDown = (pCity->GetBorderObstacleCity() > 0);
+						}
+						if(pToPlot->isWater() && (pUnit->getDomainType() == DOMAIN_SEA || pToPlot->needsEmbarkation(pUnit)))
+						{
+							bSlowDown = (pCity->GetBorderObstacleWater() > 0);
+						}
+					}
+				}
+			}
+		}
+
+		if (bSlowDown)
+		{
+			iRegularCost += iMoveDenominator;
+		}
 	}
 
 	//check routes
-	if( (bRouteFrom || bFakeRouteFrom) && 
+	if( !bHover &&
+		(bRouteFrom || bFakeRouteFrom) && 
 		(bRouteTo || bFakeRouteTo) && 
 		(!bRiverCrossing || kUnitTeam.isBridgeBuilding() || bAmphibious) )
 	{
@@ -200,65 +282,6 @@ int CvUnitMovement::GetCostsForMove(const CvUnit* pUnit, const CvPlot* pFromPlot
 		iRegularCost = std::min(iRegularCost, std::min(iRouteCost,iRouteFlatCost));
 	}
 
-	//check border obstacles
-	TeamTypes eTeam = pToPlot->getTeam();
-	if(eTeam != NO_TEAM)
-	{
-		CvTeam* pPlotTeam = &GET_TEAM(eTeam);
-		CvPlayer* pPlotPlayer = &GET_PLAYER(pToPlot->getOwner());
-
-		// Great Wall increases movement cost by 1
-		if(pPlotTeam->isBorderObstacle() || pPlotPlayer->isBorderObstacle())
-		{
-			if(!pToPlot->isWater() && pUnit->getDomainType() == DOMAIN_LAND)
-			{
-				// Don't apply penalty to OUR team or teams we've given open borders to
-				if(eUnitTeam != eTeam && !pPlotTeam->IsAllowsOpenBordersToTeam(eUnitTeam))
-				{
-					iRegularCost += iMoveDenominator;
-				}
-			}
-		}
-#if defined(MOD_BALANCE_CORE)
-		else if (eUnitTeam != eTeam)
-		{
-			//cheap checks first
-			if(!pToPlot->isWater() && pUnit->getDomainType() == DOMAIN_LAND)
-			{
-				//Plots worked by city with movement debuff reduce movement speed.
-				CvCity* pCity = pToPlot->getWorkingCity();
-				if(pCity != NULL)
-				{
-					if(pCity->GetBorderObstacleCity() > 0)
-					{
-						// Don't apply penalty to OUR team or teams we've given open borders to
-						if(!pPlotTeam->IsAllowsOpenBordersToTeam(eUnitTeam))
-						{
-							iRegularCost += iMoveDenominator;
-						}
-					}
-				}
-			}
-			if(pToPlot->isWater() && (pUnit->getDomainType() == DOMAIN_SEA || pToPlot->needsEmbarkation(pUnit)))
-			{
-				//Plots worked by city with movement debuff reduce movement speed.
-				CvCity* pCity = pToPlot->getWorkingCity();
-				if(pCity != NULL)
-				{
-					if(pCity->GetBorderObstacleWater() > 0)
-					{
-						// Don't apply penalty to OUR team or teams we've given open borders to
-						if(!pPlotTeam->IsAllowsOpenBordersToTeam(eUnitTeam))
-						{
-							iRegularCost += iMoveDenominator;
-						}
-					}
-				}
-			}
-		}
-#endif
-	}
-
 	return iRegularCost;
 }
 
@@ -266,6 +289,15 @@ int CvUnitMovement::GetCostsForMove(const CvUnit* pUnit, const CvPlot* pFromPlot
 int CvUnitMovement::MovementCost(const CvUnit* pUnit, const CvPlot* pFromPlot, const CvPlot* pToPlot, int iMovesRemaining, int iMaxMoves)
 {
 	if(IsSlowedByZOC(pUnit, pFromPlot, pToPlot))
+		return iMovesRemaining;
+
+	return MovementCostNoZOC(pUnit,pFromPlot,pToPlot,iMovesRemaining,iMaxMoves);
+}
+
+//	---------------------------------------------------------------------------
+int CvUnitMovement::MovementCostSelectiveZOC(const CvUnit* pUnit, const CvPlot* pFromPlot, const CvPlot* pToPlot, int iMovesRemaining, int iMaxMoves, const set<int>& plotsToIgnore)
+{
+	if(IsSlowedByZOC(pUnit, pFromPlot, pToPlot, plotsToIgnore))
 		return iMovesRemaining;
 
 	return MovementCostNoZOC(pUnit,pFromPlot,pToPlot,iMovesRemaining,iMaxMoves);
@@ -286,7 +318,7 @@ int CvUnitMovement::MovementCostNoZOC(const CvUnit* pUnit, const CvPlot* pFromPl
 }
 
 //	--------------------------------------------------------------------------------
-bool CvUnitMovement::IsSlowedByZOC(const CvUnit* pUnit, const CvPlot* pFromPlot, const CvPlot* pToPlot)
+bool CvUnitMovement::IsSlowedByZOC(const CvUnit* pUnit, const CvPlot* pFromPlot, const CvPlot* pToPlot, const set<int>& plotsToIgnore)
 {
 	if (pUnit->IsIgnoreZOC())
 		return false;
@@ -309,8 +341,11 @@ bool CvUnitMovement::IsSlowedByZOC(const CvUnit* pUnit, const CvPlot* pFromPlot,
 	for (int iCount=0; iCount<2; iCount++)
 	{
 		CvPlot* pAdjPlot = aPlotsToCheck[iCount];
-
 		if(!pAdjPlot)
+			continue;
+
+		//this is the only difference to the regular version below
+		if(plotsToIgnore.find(pAdjPlot->GetPlotIndex())!=plotsToIgnore.end())
 			continue;
 
 		// check city zone of control
@@ -344,6 +379,103 @@ bool CvUnitMovement::IsSlowedByZOC(const CvUnit* pUnit, const CvPlot* pFromPlot,
 			// At war with this unit's team?
 			TeamTypes eLoopUnitTeam = pLoopUnit->getTeam();
 			if(eLoopUnitTeam == BARBARIAN_TEAM || kUnitTeam.isAtWar(eLoopUnitTeam) || pLoopUnit->isAlwaysHostile(*pAdjPlot) )
+			{
+				// Same Domain?
+				DomainTypes eLoopUnitDomain = pLoopUnit->getDomainType();
+				if(eLoopUnitDomain != eUnitDomain)
+				{
+					// hovering units always exert a ZOC
+					if (pLoopUnit->IsHoveringUnit() || eLoopUnitDomain==DOMAIN_HOVER)
+					{
+						// continue on
+					}
+					// water unit can ZoC embarked land unit
+					else if(eLoopUnitDomain == DOMAIN_SEA && (pToPlot->needsEmbarkation(pUnit) || pFromPlot->needsEmbarkation(pUnit)) )
+					{
+						// continue on
+					}
+					else
+					{
+						// ignore this unit
+						continue;
+					}
+				}
+				else
+				{
+					//land units don't ZoC embarked units (if they stay embarked)
+					if(eLoopUnitDomain == DOMAIN_LAND && pToPlot->needsEmbarkation(pUnit) && pFromPlot->needsEmbarkation(pUnit))
+					{
+						continue;
+					}
+				}
+
+				//ok, all conditions fulfilled
+				return true;
+			}
+		}
+	}
+
+	return false;
+}
+
+//	--------------------------------------------------------------------------------
+bool CvUnitMovement::IsSlowedByZOC(const CvUnit* pUnit, const CvPlot* pFromPlot, const CvPlot* pToPlot)
+{
+	if (pUnit->IsIgnoreZOC())
+		return false;
+
+	// Zone of Control
+	if(GC.getZONE_OF_CONTROL_ENABLED() <= 0)
+		return false;
+
+	TeamTypes eUnitTeam = pUnit->getTeam();
+	DomainTypes eUnitDomain = pUnit->getDomainType();
+	CvTeam& kUnitTeam = GET_TEAM(eUnitTeam);
+
+	//there are only two plots we need to check
+	DirectionTypes moveDir = directionXY(pFromPlot,pToPlot);
+	int eRight = (int(moveDir) + 1) % 6;
+	int eLeft = (int(moveDir) + 5) % 6; 
+	CvPlot* aPlotsToCheck[2];
+	aPlotsToCheck[0] = plotDirection(pFromPlot->getX(),pFromPlot->getY(),(DirectionTypes)eRight);
+	aPlotsToCheck[1] = plotDirection(pFromPlot->getX(),pFromPlot->getY(),(DirectionTypes)eLeft);
+	for (int iCount=0; iCount<2; iCount++)
+	{
+		CvPlot* pAdjPlot = aPlotsToCheck[iCount];
+		if(!pAdjPlot)
+			continue;
+
+		// check city zone of control
+		if(pAdjPlot->isEnemyCity(*pUnit))
+			return true;
+
+		// Loop through all units to see if there's an enemy unit here
+		IDInfo* pAdjUnitNode = pAdjPlot->headUnitNode();
+		while(pAdjUnitNode != NULL)
+		{
+			CvUnit* pLoopUnit = NULL;
+			if((pAdjUnitNode->eOwner >= 0) && pAdjUnitNode->eOwner < MAX_PLAYERS)
+				pLoopUnit = (GET_PLAYER(pAdjUnitNode->eOwner).getUnit(pAdjUnitNode->iID));
+
+			pAdjUnitNode = pAdjPlot->nextUnitNode(pAdjUnitNode);
+
+			if(!pLoopUnit || pLoopUnit->isDelayedDeath()) 
+				continue;
+
+			if(pLoopUnit->isInvisible(eUnitTeam,false))
+				continue;
+
+			// Combat unit?
+			if(!pLoopUnit->IsCombatUnit())
+				continue;
+
+			// Embarked units don't have ZOC
+			if(pLoopUnit->isEmbarked())
+				continue;
+
+			// At war with this unit's team?
+			TeamTypes eLoopUnitTeam = pLoopUnit->getTeam();
+			if(kUnitTeam.isAtWar(eLoopUnitTeam) || pLoopUnit->isAlwaysHostile(*pAdjPlot))
 			{
 				// Same Domain?
 				DomainTypes eLoopUnitDomain = pLoopUnit->getDomainType();

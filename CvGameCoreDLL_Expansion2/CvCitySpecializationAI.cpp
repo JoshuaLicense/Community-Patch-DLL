@@ -220,6 +220,9 @@ void CvCitySpecializationXMLEntries::DeleteArray()
 CvCitySpecializationAI::CvCitySpecializationAI():
 	m_bSpecializationsDirty(false),
 	m_bInterruptWonders(false),
+#if defined(MOD_BALANCE_CORE)
+	m_bInterruptBuildings(false),
+#endif
 	m_eNextSpecializationDesired(NO_CITY_SPECIALIZATION),
 	m_eNextWonderDesired(NO_BUILDING),
 	m_iWonderCityID(-1),
@@ -253,6 +256,9 @@ void CvCitySpecializationAI::Reset()
 {
 	m_bSpecializationsDirty = false;
 	m_bInterruptWonders = false;
+#if defined(MOD_BALANCE_CORE)
+	m_bInterruptBuildings = false;
+#endif
 	m_eNextSpecializationDesired = NO_CITY_SPECIALIZATION;
 	m_eNextWonderDesired = NO_BUILDING;
 	m_iWonderCityID = -1;
@@ -272,6 +278,9 @@ void CvCitySpecializationAI::Read(FDataStream& kStream)
 
 	kStream >> m_bSpecializationsDirty;
 	kStream >> m_bInterruptWonders;
+#if defined(MOD_BALANCE_CORE)
+	kStream >> m_bInterruptBuildings;
+#endif
 	kStream >> m_eNextSpecializationDesired;
 	kStream >> (int&)m_eNextWonderDesired;
 	kStream >> m_iWonderCityID;
@@ -298,6 +307,9 @@ void CvCitySpecializationAI::Write(FDataStream& kStream) const
 
 	kStream << m_bSpecializationsDirty;
 	kStream << m_bInterruptWonders;
+#if defined(MOD_BALANCE_CORE)
+	kStream << m_bInterruptBuildings;
+#endif
 	kStream << m_eNextSpecializationDesired;
 	kStream << m_eNextWonderDesired;
 	kStream << m_iWonderCityID;
@@ -362,21 +374,33 @@ void CvCitySpecializationAI::DoTurn()
 		m_bSpecializationsDirty = false;
 		m_iLastTurnEvaluated = GC.getGame().getGameTurn();
 
+#if defined(MOD_BALANCE_CORE)
+		// Do we need to choose production again at all our cities?
+		if(m_bInterruptWonders || m_bInterruptBuildings)
+#else
 		// Do we need to choose production again at all our cities?
 		if(m_bInterruptWonders)
+#endif
 		{
 			CvCity* pLoopCity = NULL;
 			for(pLoopCity = m_pPlayer->firstCity(&iCityLoop); pLoopCity != NULL; pLoopCity = m_pPlayer->nextCity(&iCityLoop))
 			{
 				if(!pLoopCity->IsBuildingUnitForOperation())
 				{
+#if defined(MOD_BALANCE_CORE)
+					pLoopCity->AI_chooseProduction(m_bInterruptWonders, m_bInterruptBuildings);
+#else
 					pLoopCity->AI_chooseProduction(true /*bInterruptWonders*/);
+#endif
 				}
 			}
 		}
 
 		// Reset this flag -- need a new high priority event before we'll interrupt again
 		m_bInterruptWonders = false;
+#if defined(MOD_BALANCE_CORE)
+		m_bInterruptBuildings = false;
+#endif
 	}
 }
 
@@ -403,6 +427,9 @@ void CvCitySpecializationAI::SetSpecializationsDirty(CitySpecializationUpdateTyp
 		case SPECIALIZATION_UPDATE_NOW_AT_WAR:
 		case SPECIALIZATION_UPDATE_MY_CITY_CAPTURED:
 			m_bInterruptWonders = true;
+#if defined(MOD_BALANCE_CORE)
+			m_bInterruptBuildings = true;
+#endif
 			break;
 		default:
 			// Don't set it to false for these other cases!
@@ -649,7 +676,7 @@ void CvCitySpecializationAI::WeightSpecializations()
 		}
 		iFoodYieldWeight *= max(1, iFlavorGrowth);
 		iFoodYieldWeight += iFlavorExpansion * GC.getAI_CITY_SPECIALIZATION_FOOD_WEIGHT_FLAVOR_EXPANSION() /* 5 */;
-		iFoodYieldWeight += (iNumUnownedTiles * 100) / pArea->getNumTiles() * GC.getAI_CITY_SPECIALIZATION_FOOD_WEIGHT_PERCENT_CONTINENT_UNOWNED() /* 5 */;;
+		iFoodYieldWeight += (iNumUnownedTiles * 100) / pArea->getNumTiles() * GC.getAI_CITY_SPECIALIZATION_FOOD_WEIGHT_PERCENT_CONTINENT_UNOWNED() /* 5 */;
 		iFoodYieldWeight += iNumCities * GC.getAI_CITY_SPECIALIZATION_FOOD_WEIGHT_NUM_CITIES() /* -50 */;
 		iFoodYieldWeight += iNumSettlers * GC.getAI_CITY_SPECIALIZATION_FOOD_WEIGHT_NUM_SETTLERS() /* -40 */;
 		if((iNumCities + iNumSettlers) == 1)
@@ -1349,32 +1376,16 @@ CvCity* CvCitySpecializationAI::FindBestWonderCity() const
 	int iBestProduction = 0;
 	int iProduction;
 
-	// First, see if we already have a wonder underway somewhere.  If so that's our wonder city
-	pLoopCity = NULL;//GetWonderBuildCity();
-
-	CvBuildingEntry* pkProductionBuildingInfo = NULL;
-	if(pLoopCity != NULL && pLoopCity->getProductionBuilding() != NO_BUILDING)
+	if (m_eNextWonderDesired != NO_BUILDING)
 	{
-		pkProductionBuildingInfo = GC.getBuildingInfo(pLoopCity->getProductionBuilding());
-	}
-
-	if(pkProductionBuildingInfo && m_pPlayer->GetWonderProductionAI()->IsWonder(*pkProductionBuildingInfo))
-	{
-		if(!pLoopCity->IsPuppet())
+		for (pLoopCity = m_pPlayer->firstCity(&iLoop); pLoopCity != NULL; pLoopCity = m_pPlayer->nextCity(&iLoop))
 		{
-			return pLoopCity;
-		}
-	}
-	else if(m_eNextWonderDesired != NO_BUILDING)
-	{
-		for(pLoopCity = m_pPlayer->firstCity(&iLoop); pLoopCity != NULL; pLoopCity = m_pPlayer->nextCity(&iLoop))
-		{
-			if(!pLoopCity->IsPuppet())
+			if (!pLoopCity->IsPuppet())
 			{
-				if(pLoopCity->canConstruct(m_eNextWonderDesired))
+				if (pLoopCity->canConstruct(m_eNextWonderDesired))
 				{
 					iProduction = pLoopCity->getCurrentProductionDifference(true, false);
-					if(pLoopCity->GetCityStrategyAI()->GetDefaultSpecialization() == GetWonderSpecialization())
+					if (pLoopCity->GetCityStrategyAI()->GetDefaultSpecialization() == GetWonderSpecialization())
 					{
 						iProduction = (iProduction * 3) / 2;
 					}
@@ -1382,7 +1393,7 @@ CvCity* CvCitySpecializationAI::FindBestWonderCity() const
 					// factor in Marble, etc.
 					iProduction = (iProduction * (100 + pLoopCity->GetWonderProductionModifier())) / 100;
 
-					if(iProduction > iBestProduction)
+					if (iProduction > iBestProduction)
 					{
 						pBestCity = pLoopCity;
 						iBestProduction = iProduction;
@@ -1434,7 +1445,7 @@ void CvCitySpecializationAI::FindBestSites()
 #endif
 
 			// Check if within range of any of our cities
-			CvCity* pNearestCity = m_pPlayer->GetClosestCity(pPlot);
+			CvCity* pNearestCity = m_pPlayer->GetClosestCityByEstimatedTurns(pPlot);
 			if(pNearestCity != NULL)
 			{
 				if(plotDistance(pPlot->getX(), pPlot->getY(), pNearestCity->getX(), pNearestCity->getY()) <= iEvalDistance)
@@ -1928,12 +1939,6 @@ int CvCitySpecializationAI::AdjustValueBasedOnBuildings(CvCity* pCity, YieldType
 	{
 		// +10% per point of yield change
 		iRtnValue = iRtnValue * (100 + (iYieldChanges * 10)) / 100;
-	}
-	iYieldChanges = pCity->GetCorporationYieldChange(eYield);
-	if(iYieldChanges > 0)
-	{
-		// +25% per point of yield change
-		iRtnValue = iRtnValue * (100 + (iYieldChanges * 25)) / 100;
 	}
 #endif
 

@@ -286,7 +286,6 @@ end
 local function UpdateTopPanelNow()
 
 	g_requestTopPanelUpdate = false
-
 	-----------------------------
 	-- Update science stats
 	-----------------------------
@@ -1319,7 +1318,7 @@ if civ5_mode then
 -- COMMUNITY PATCH CHANGES BELOW
 			local iUnhappinessPublicOpinion = g_activePlayer:GetUnhappinessFromPublicOpinion();
 			iUnhappinessPublicOpinion = iUnhappinessPublicOpinion + g_activePlayer:GetUnhappinessFromWarWeariness();
-			tips:insertLocalizedBulletIfNonZero( "TXT_KEY_TP_UNHAPPINESS_PUBLIC_OPINION", bnw_mode and iUnhappinessPublicOpinion or 0 )
+			tips:insertLocalizedBulletIfNonZero( "TXT_KEY_TP_UNHAPPINESS_PUBLIC_OPINION", iUnhappinessPublicOpinion)
 			local iUnhappinessFromStarving = g_activePlayer:GetUnhappinessFromCityStarving();
 			local iUnhappinessFromPillaged = g_activePlayer:GetUnhappinessFromCityPillaged();
 			local iUnhappinessFromGold = g_activePlayer:GetUnhappinessFromCityGold();
@@ -1610,18 +1609,9 @@ if civ5_mode then
 			local happyNeeded = g_activePlayer:GetGoldenAgeProgressThreshold()
 			-- CBP
 			local iGAPReligion = g_activePlayer:GetGAPFromReligion();
-			if (iGAPReligion > 0) then
-				tips:insert( "[NEWLINE]" .. L("TXT_KEY_TP_GOLDEN_AGE_ADDITION_RELIGION", iGAPReligion));
-			end
 			local iGAPTrait = g_activePlayer:GetGAPFromTraits();
-			if (iGAPTrait > 0) then
-				tips:insert( "[NEWLINE]" .. L("TXT_KEY_TP_GOLDEN_AGE_ADDITION_TRAIT", iGAPTrait));
-			end
 			local iGAPCities = g_activePlayer:GetGAPFromCities();
-			if (iGAPCities > 0) then
-				tips:insert( "[NEWLINE]" .. L("TXT_KEY_TP_GOLDEN_AGE_ADDITION_CITIES", iGAPCities));
-			end
-			-- END
+			--END
 			if goldenAgeTurns > 0 then
 				if bnw_mode and g_activePlayer:GetGoldenAgeTourismModifier() > 0 then
 					tips:insert( Locale.ToUpper"TXT_KEY_UNIQUE_GOLDEN_AGE_ANNOUNCE" )
@@ -1641,6 +1631,20 @@ if civ5_mode then
 				elseif excessHappiness < 0 then
 					tips:insert( "[COLOR_WARNING_TEXT]" .. L("TXT_KEY_TP_GOLDEN_AGE_LOSS", -excessHappiness) .. "[ENDCOLOR]" )
 				end
+				-- CBP
+				local iGAPReligion = g_activePlayer:GetGAPFromReligion();
+				if (iGAPReligion > 0) then
+					tips:insert( "[NEWLINE]" .. L("TXT_KEY_TP_GOLDEN_AGE_ADDITION_RELIGION", iGAPReligion));
+				end
+				
+				if (iGAPTrait > 0) then
+					tips:insert( "[NEWLINE]" .. L("TXT_KEY_TP_GOLDEN_AGE_ADDITION_TRAIT", iGAPTrait));
+				end
+				
+				if (iGAPCities > 0) then
+					tips:insert( "[NEWLINE]" .. L("TXT_KEY_TP_GOLDEN_AGE_ADDITION_CITIES", iGAPCities));
+				end
+				-- END
 			end
 			
 			if g_isBasicHelp then
@@ -2588,6 +2592,9 @@ function()
 	if g_clockFormat then
 		Controls.CurrentTime:SetText( os_date( g_clockFormat ) )
 	end
+
+	g_activePlayerID = Game.GetActivePlayer()
+	g_activePlayer = Players[g_activePlayerID]
 
 	if g_isPopupUp ~= UI.IsPopupUp() then
 		Controls.TopPanelMask:SetHide( g_isPopupUp or g_isSmallScreen )

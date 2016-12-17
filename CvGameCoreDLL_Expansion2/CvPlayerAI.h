@@ -43,7 +43,7 @@ public:
 
 	void AI_unitUpdate();
 #if defined(MOD_BALANCE_CORE)
-	void AI_conquerCity(CvCity* pCity, PlayerTypes eOldOwner, bool bGift);
+	void AI_conquerCity(CvCity* pCity, PlayerTypes eOldOwner, bool bGift, bool bAllowRaze);
 #else
 	void AI_conquerCity(CvCity* pCity, PlayerTypes eOldOwner);
 #endif
@@ -75,24 +75,20 @@ public:
 	CvPlot* FindBestMerchantTargetPlot(CvUnit* pGreatMerchant, bool bOnlySafePaths);
 #if defined(MOD_DIPLOMACY_CITYSTATES)
 	//For Great Diplomats
-	CvCity* FindBestDiplomatTargetCity(UnitHandle pUnit);
-	CvPlot* ChooseDiplomatTargetPlot(UnitHandle pUnit);
-	int ScoreCityForDiplomat(CvCity* pCity, UnitHandle pUnit);
+	CvCity* FindBestDiplomatTargetCity(CvUnit* pUnit);
+	CvPlot* ChooseDiplomatTargetPlot(CvUnit* pUnit);
+	int ScoreCityForDiplomat(CvCity* pCity, CvUnit* pUnit);
 	//And for messengers
-	CvCity* FindBestMessengerTargetCity(UnitHandle pUnit);
-	int ScoreCityForMessenger(CvCity* pCity, UnitHandle pUnit);
-	CvPlot* ChooseMessengerTargetPlot(UnitHandle pUnit);
+	CvCity* FindBestMessengerTargetCity(CvUnit* pUnit);
+	int ScoreCityForMessenger(CvCity* pCity, CvUnit* pUnit);
+	CvPlot* ChooseMessengerTargetPlot(CvUnit* pUnit);
 #endif
 
 	CvPlot* FindBestGreatGeneralTargetPlot(CvUnit* pGeneral, const std::vector<CvPlot*>& vPlotsToAvoid, int& iScore);
 	CvPlot* FindBestMusicianTargetPlot(CvUnit* pGreatMerchant, bool bOnlySafePaths);
 
 	// this are used by a city AI to signal that it is committing to build a unit for one of my operations
-#if defined(MOD_BALANCE_CORE)
-	virtual OperationSlot PeekAtNextUnitToBuildForOperationSlot(int iAreaID, CvCity* pCity);
-#else
-	virtual OperationSlot PeekAtNextUnitToBuildForOperationSlot(int iAreaID);
-#endif
+	virtual OperationSlot PeekAtNextUnitToBuildForOperationSlot(CvCity* pCity, bool& bCitySameAsMuster);
 	virtual OperationSlot CityCommitToBuildUnitForOperationSlot(int iAreaID, int iTurns, CvCity* pCity);
 	virtual void CityUncommitToBuildUnitForOperationSlot(OperationSlot thisSlot);
 	virtual void CityFinishedBuildingUnitForOperationSlot(OperationSlot thisSlot, CvUnit* pThisUnit);

@@ -19,20 +19,20 @@ typedef std::vector<std::pair<PlayerTypes,int>> DangerUnitVector;
 typedef std::vector<std::pair<PlayerTypes,int>> DangerCityVector;
 typedef std::set<std::pair<PlayerTypes,int>> UnitSet;
 
-struct SUnitStats
+struct SUnitInfo
 {
-	SUnitStats(const CvUnit* pUnit=NULL)
+	SUnitInfo(const CvUnit* pUnit=NULL)
 	{
 		m_pUnit = pUnit;
 		m_x = pUnit ? pUnit->plot()->getX() : 0;
 		m_y = pUnit ? pUnit->plot()->getY() : 0;
 		m_damage = pUnit ? pUnit->getDamage() : 0;
 	}
-	const bool operator<(const SUnitStats& rhs) const
+	const bool operator<(const SUnitInfo& rhs) const
 	{
 		return m_pUnit<rhs.m_pUnit;
 	}
-	const bool operator==(const SUnitStats& rhs) const
+	const bool operator==(const SUnitInfo& rhs) const
 	{
 		return (m_pUnit==rhs.m_pUnit && m_x==rhs.m_x && m_y==rhs.m_y && m_damage==rhs.m_damage);
 	}
@@ -43,6 +43,7 @@ struct SUnitStats
 	int m_damage;
 };
 
+#define DANGER_MAX_CACHE_SIZE 5
 struct CvDangerPlotContents
 {
 	CvDangerPlotContents()
@@ -68,8 +69,7 @@ struct CvDangerPlotContents
 		m_apCities.clear();
 
 		//reset cache
-		m_lastUnit = SUnitStats(NULL);
-		m_lastResult = 0;
+		m_lastResults.clear();
 	};
 
 	int GetDanger(const CvUnit* pUnit, AirActionType iAirAction = AIR_ACTION_ATTACK);
@@ -78,8 +78,6 @@ struct CvDangerPlotContents
 
 	// should not normally be used, primarily for compatibility
 	int GetDanger(PlayerTypes ePlayer);
-	bool IsUnderImmediateThreat(const CvUnit* pUnit);
-	bool IsUnderImmediateThreat(PlayerTypes ePlayer);
 	int GetDamageFromFeatures(PlayerTypes ePlayer) const;
 
 	// just for internal use
@@ -95,8 +93,7 @@ struct CvDangerPlotContents
 	DangerCityVector m_apCities;
 
 	//caching ...
-	SUnitStats m_lastUnit;
-	int m_lastResult;
+	std::vector< std::pair<SUnitInfo,int> > m_lastResults;
 };
 
 inline FDataStream & operator >> (FDataStream & kStream, CvDangerPlotContents & kStruct)
@@ -144,9 +141,6 @@ public:
 	int GetDanger(const CvPlot& pPlot, CvCity* pCity, const CvUnit* pPretendGarrison = NULL);
 	int GetDanger(const CvPlot& pPlot, PlayerTypes ePlayer);
 
-	bool IsUnderImmediateThreat(const CvPlot& pPlot, const CvUnit* pUnit);
-	bool IsUnderImmediateThreat(const CvPlot& pPlot, PlayerTypes ePlayer);
-
 	std::vector<CvUnit*> GetPossibleAttackers(const CvPlot& Plot) const;
 	bool UpdateDangerSingleUnit(CvUnit* pUnit, bool bIgnoreVisibility, bool bRemember);
 	bool IsKnownAttacker(PlayerTypes eOwner, int iUnitID) const;
@@ -183,7 +177,7 @@ protected:
 	double m_fMajorAfraidMod;
 	double m_fMajorFriendlyMod;
 	double m_fMajorNeutralMod;
-	double m_fMinorNeutralrMod;
+	double m_fMinorNeutralMinorMod;
 	double m_fMinorFriendlyMod;
 	double m_fMinorBullyMod;
 	double m_fMinorConquestMod;

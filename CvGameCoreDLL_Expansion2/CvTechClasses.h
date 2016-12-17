@@ -46,8 +46,8 @@ public:
 	int GetFirstFreeUnitClass() const;
 	int GetFirstFreeTechs() const;
 	int GetEmbarkedMoveChange() const;
-	int GetNumInternationalTradeRoutesChange() const;;
-	int GetInfluenceSpreadModifier() const;;
+	int GetNumInternationalTradeRoutesChange() const;
+	int GetInfluenceSpreadModifier() const;
 	int GetExtraVotesPerDiplomat() const;
 
 	int GetGridX() const;
@@ -111,7 +111,12 @@ public:
 #if defined(MOD_BALANCE_CORE)
 	int GetTechYieldChanges(int i, int j) const;
 	int GetHappiness() const;
+	bool IsCorporationsEnabled() const;
 #endif
+#if defined(MOD_CIV6_EUREKA)
+	int GetEurekaPerMillion() const;
+#endif
+
 private:
 	int m_iAIWeight;
 	int m_iAITradeModifier;
@@ -180,6 +185,10 @@ private:
 #if defined(MOD_BALANCE_CORE)
 	int** m_ppiTechYieldChanges;
 	int m_iHappiness;
+	bool m_bCorporationsEnabled;
+#endif
+#if defined(MOD_CIV6_EUREKA)
+	int m_iEurekaPerMillion;
 #endif
 
 #if defined(MOD_DIPLOMACY_CIV4_FEATURES)
@@ -350,6 +359,12 @@ public:
 	int GetResearchLeft(TechTypes eTech) const;
 	CvTechXMLEntries* GetTechs() const;
 
+#if defined(MOD_CIV6_EUREKA)
+	int GetEurekaCounter(TechTypes eTech) const;
+	int GetEurekaDiscount(TechTypes eTech) const;
+	void SetEurekaCounter(TechTypes eTech, int newEurakaCount);
+#endif
+
 private:
 	int GetMaxResearchOverflow(TechTypes eTech, PlayerTypes ePlayer) const;
 
@@ -358,6 +373,9 @@ private:
 	bool* m_pabHasTech;
 	bool* m_pabNoTradeTech;
 	int* m_paiResearchProgress;  // Stored in hundredths
+#if defined(MOD_CIV6_EUREKA)
+	int* m_paiEurekaCounter;
+#endif
 	int* m_paiTechCount;
 	CvTechXMLEntries* m_pTechs;
 	CvTeam* m_pTeam;

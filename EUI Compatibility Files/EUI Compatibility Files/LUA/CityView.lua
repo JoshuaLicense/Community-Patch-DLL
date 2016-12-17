@@ -73,6 +73,7 @@ local GetFaithTooltip = EUI.GetFaithTooltip
 local GetTourismTooltip = EUI.GetTourismTooltip
 --CBP
 local GetCityHappinessTooltip = EUI.GetCityHappinessTooltip
+local UpdateCityView
 --END
 
 include( "SupportFunctions" )
@@ -159,7 +160,7 @@ local g_previousCity, g_isCityViewDirty, g_isCityHexesDirty
 
 local g_isButtonPopupChooseProduction = false
 local g_isAutoClose
-
+local g_requestTopPanelUpdate
 local g_slotTexture = {
 	SPECIALIST_CITIZEN = "CitizenUnemployed.dds",
 	SPECIALIST_SCIENTIST = "CitizenScientist.dds",
@@ -423,10 +424,8 @@ local function GetSpecialistYields( city, specialist )
 		for yieldID = 0, YieldTypes.NUM_YIELD_TYPES-1 do
 			specialistYield = city:GetSpecialistYield( specialistID, yieldID )
 			-- COMMUNITY PATCH BEGINS
-			if(specialistYield > 0) then
-				local extraYield = city:GetSpecialistYieldChange( specialistID, yieldID)
-				specialistYield = (specialistYield + extraYield)
-			end
+			local extraYield = city:GetSpecialistYieldChange( specialistID, yieldID)
+			specialistYield = (specialistYield + extraYield)
 			-- COMMUNITY PATCH ENDS
 			specialistYieldModifier = city:GetBaseYieldRateModifier( yieldID )
 			if yieldID == YieldTypes.YIELD_CULTURE then
@@ -870,7 +869,9 @@ local function SetupBuildingList( city, buildings, buildingIM )
 				buildingYieldPerPop = buildingYieldPerPop + (row.Yield or 0)
 			end
 			buildingYieldRate = buildingYieldRate + buildingYieldPerPop * population / 100
-
+			-- Events
+			buildingYieldRate = buildingYieldRate + city:GetEventBuildingClassYield(buildingClassID, yieldID);
+			-- End 
 			buildingYieldRate = buildingYieldRate * cityYieldRateModifier + ( cityYieldRate - buildingYieldRate ) * buildingYieldModifier
 			tips:insertIf( isProducing and buildingYieldRate ~= 0 and buildingYieldRate / 100 .. tostring(YieldIcons[ yieldID ]) )
 		end
@@ -950,6 +951,7 @@ local function SelectionPurchase( orderID, itemID, yieldID, soundKey )
 				end
 			end
 			if isPurchase then
+				UpdateCityView()
 				Events.SpecificCityInfoDirty( cityOwnerID, cityID, CityUpdateTypes.CITY_UPDATE_TYPE_BANNER )
 				Events.SpecificCityInfoDirty( cityOwnerID, cityID, CityUpdateTypes.CITY_UPDATE_TYPE_PRODUCTION )
 				if soundKey then
@@ -1139,7 +1141,7 @@ local function SwapQueueItem( queuedItemNumber )
 	g_queuedItemNumber = queuedItemNumber or g_queuedItemNumber
 end
 
-local function UpdateCityProductionQueueNow( city, cityID, cityOwnerID, isVeniceException )
+local function UpdateCityProductionQueueNow (city, cityID, cityOwnerID, isVeniceException )
 	-------------------------------------------
 	-- Update Production Queue
 	-------------------------------------------
@@ -1149,6 +1151,8 @@ local function UpdateCityProductionQueueNow( city, cityID, cityOwnerID, isVenice
 	local isMaintain = false
 	local isQueueEmpty = queueLength < 1
 	Controls.ProductionFinished:SetHide( true )
+	g_BuildingSelectIM.ResetInstances();
+	g_WonderSelectIM.ResetInstances();
 
 	-- Production stored and needed
 	local storedProduction = city:GetProduction() + city:GetOverflowProduction() + city:GetFeatureProduction()
@@ -1246,6 +1250,7 @@ local function UpdateCityProductionQueueNow( city, cityID, cityOwnerID, isVenice
 	-------------------------------------------
 	-- Update Selection List
 	-------------------------------------------
+
 	local isSelectionList = not g_isViewingMode or isVeniceException or g_isDebugMode
 	Controls.SelectionScrollPanel:SetHide( not isSelectionList )
 	if isSelectionList then
@@ -1547,7 +1552,7 @@ end
 -- City View Update
 -------------------------------------------------
 local function UpdateCityViewNow()
-
+	g_requestTopPanelUpdate = true;
 	g_isCityViewDirty = false
 	local city = UI_GetHeadSelectedCity()
 
@@ -2266,7 +2271,7 @@ local function UpdateStuffNow()
 		UpdateWorkingHexesNow()
 	end
 end
-local function UpdateCityView()
+UpdateCityView = function()
 	g_isCityViewDirty = true
 	return ContextPtr:SetUpdate( UpdateStuffNow )
 end

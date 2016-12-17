@@ -62,6 +62,9 @@ void CvArmyAI::Reset(int iID, PlayerTypes eOwner, int iOperationID)
 	m_eDomainType = DOMAIN_LAND;
 	m_iFormationIndex = NO_MUFORMATION;
 	m_eAIState = NO_ARMYAISTATE;
+#if defined(MOD_BALANCE_CORE)
+	m_bOceanMoves = false;
+#endif
 
 	m_FormationEntries.clear();
 }
@@ -75,9 +78,9 @@ void CvArmyAI::Kill()
 	int iUnitID;
 	iUnitID = GetFirstUnitID();
 
-	while(iUnitID != ARMY_NO_UNIT)
+	while(iUnitID != ARMYSLOT_NO_UNIT)
 	{
-		UnitHandle pThisUnit = GET_PLAYER(GetOwner()).getUnit(iUnitID);
+		CvUnit* pThisUnit = GET_PLAYER(GetOwner()).getUnit(iUnitID);
 		if(pThisUnit)
 		{
 			pThisUnit->setArmyID(-1);
@@ -89,6 +92,12 @@ void CvArmyAI::Kill()
 	}
 
 	m_FormationEntries.clear();
+
+	CvAIOperation* pOperation = GET_PLAYER(GetOwner()).getAIOperation(m_iOperationID);
+	if (pOperation)
+		pOperation->DeleteArmyAI(m_iID);
+
+	GET_PLAYER(GetOwner()).deleteArmyAI(m_iID);
 }
 
 /// Read from binary data store
@@ -112,6 +121,9 @@ void CvArmyAI::Read(FDataStream& kStream)
 	kStream >> m_iFormationIndex;
 	kStream >> m_eAIState;
 	kStream >> m_iOperationID;
+#if defined(MOD_BALANCE_CORE)
+	kStream >> m_bOceanMoves;
+#endif
 
 	int iEntriesToRead;
 	kStream >> iEntriesToRead;
@@ -141,6 +153,9 @@ void CvArmyAI::Write(FDataStream& kStream) const
 	kStream << m_iFormationIndex;
 	kStream << m_eAIState;
 	kStream << m_iOperationID;
+#if defined(MOD_BALANCE_CORE)
+	kStream << m_bOceanMoves;
+#endif
 
 	kStream << (int)m_FormationEntries.size();
 	for(uint ui = 0; ui < m_FormationEntries.size(); ui++)
@@ -192,7 +207,7 @@ int CvArmyAI::GetMovementRate()
 	int iMovementAverage = 2;   // A reasonable default
 	int iNumUnits = 0;
 	int iTotalMovementAllowance = 0;
-	UnitHandle pUnit;
+	CvUnit* pUnit;
 
 	pUnit = GetFirstUnit();
 	while(pUnit)
@@ -211,15 +226,13 @@ int CvArmyAI::GetMovementRate()
 }
 
 /// Get center of mass of units in army (account for world wrap!)
-CvPlot* CvArmyAI::GetCenterOfMass(DomainTypes eDomainRequired)
+CvPlot* CvArmyAI::GetCenterOfMass(bool bClampToUnit, float* pfVarX, float* pfVarY)
 {
 	int iTotalX = 0;
 	int iTotalY = 0;
 	int iNumUnits = 0;
 
-#if defined(MOD_BALANCE_CORE)
-	UnitHandle pUnit = GetFirstUnit();
-
+	CvUnit* pUnit = GetFirstUnit();
 	if (!pUnit)
 		return NULL;
 
@@ -286,126 +299,44 @@ CvPlot* CvArmyAI::GetCenterOfMass(DomainTypes eDomainRequired)
 	if (!pCOM)
 		return NULL;
 
-	//don't return it directly but use the plot of the closest unit
-	pUnit = GetFirstUnit();
-	std::vector<SPlotWithScore> vPlots;
-	while (pUnit)
+	if (pfVarX)
+		*pfVarX = fVarX;
+	if (pfVarY)
+		*pfVarY = fVarY;
+
+	if (bClampToUnit)
 	{
-		if (eDomainRequired == NO_DOMAIN || pUnit->plot()->getDomain()==eDomainRequired)
+		//don't return it directly but use the plot of the closest unit
+		pUnit = GetFirstUnit();
+		std::vector<SPlotWithScore> vPlots;
+		while (pUnit)
 		{
-			int iDistToCOM = plotDistance(*pUnit->plot(),*pCOM);
-			int iDistToTarget = plotDistance(pUnit->getX(),pUnit->getY(),GetGoalX(),GetGoalY());
-			vPlots.push_back( SPlotWithScore(pUnit->plot(),iDistToCOM*100+iDistToTarget) );
-		}
-
-		pUnit = GetNextUnit();
-	}
-
-	if (vPlots.empty())
-		return NULL;
-
-	//this sorts ascending!
-	std::sort(vPlots.begin(),vPlots.end());
-	return vPlots.front().pPlot;
-
-#else
-	CvPlot* pRtnValue = NULL;
-	UnitHandle pUnit;
-	int iReferenceUnitX = -1;
-	int iWorldWidth = GC.getMap().getGridWidth();
-
-	pUnit = GetFirstUnit();
-	if(pUnit)
-	{
-		iReferenceUnitX = pUnit->getX();
-	}
-
-	while(pUnit)
-	{
-		int iUnitX = pUnit->getX();
-
-		bool bWorldWrapAdjust = false;
-		int iDiff = iUnitX - iReferenceUnitX;
-		if(abs(iDiff) > (iWorldWidth / 2))
-		{
-			bWorldWrapAdjust = true;
-		}
-
-		if(bWorldWrapAdjust)
-		{
-			iTotalX += iUnitX + iWorldWidth;
-		}
-		else
-		{
-			iTotalX += iUnitX;
-		}
-		iTotalY += pUnit->getY();
-		iNumUnits++;
-		pUnit = GetNextUnit();
-	}
-
-	if(iNumUnits > 0)
-	{
-		int iAverageX = (iTotalX + (iNumUnits / 2)) / iNumUnits;
-		if(iAverageX >= iWorldWidth)
-		{
-			iAverageX = iAverageX - iWorldWidth;
-		}
-		int iAverageY = (iTotalY + (iNumUnits / 2)) / iNumUnits;
-		pRtnValue = GC.getMap().plot(iAverageX, iAverageY);
-	}
-
-	// Domain check
-	if (eDomainRequired != NO_DOMAIN && pRtnValue)
-	{
-		if (pRtnValue->isWater() && eDomainRequired == DOMAIN_LAND || !pRtnValue->isWater() && eDomainRequired == DOMAIN_SEA)
-		{
-			// Find an adjacent plot that works
-			for (int iI = 0; iI < NUM_DIRECTION_TYPES; iI++)
+			if (pUnit->plot()->getDomain()==GetDomainType())
 			{
-				CvPlot *pLoopPlot = plotDirection(pRtnValue->getX(), pRtnValue->getY(), ((DirectionTypes)iI));
-				if (pLoopPlot != NULL)
-				{
-					if (pLoopPlot->isWater() && eDomainRequired == DOMAIN_SEA || !pLoopPlot->isWater() && eDomainRequired == DOMAIN_LAND)
-					{
-						return pLoopPlot;
-					}
-				}
+				int iDistToCOM = plotDistance(*pUnit->plot(),*pCOM);
+				int iDistToTarget = plotDistance(pUnit->getX(),pUnit->getY(),GetGoalX(),GetGoalY());
+				vPlots.push_back( SPlotWithScore(pUnit->plot(),iDistToCOM*100+iDistToTarget) );
 			}
 
-			// Try two plots out if really having problems
-			for (int iDX = -2; iDX <= 2; iDX++)
-			{
-				for (int iDY = -2; iDY <= 2; iDY++)
-				{
-					CvPlot *pLoopPlot = plotXYWithRangeCheck(pRtnValue->getX(), pRtnValue->getY(), iDX, iDY, 2);
-					if (pLoopPlot)
-					{
-						if (plotDistance(pRtnValue->getX(), pRtnValue->getY(), pLoopPlot->getX(), pLoopPlot->getY()) == 2)
-						{
-							if (pLoopPlot->isWater() && eDomainRequired == DOMAIN_SEA || !pLoopPlot->isWater() && eDomainRequired == DOMAIN_LAND)
-							{
-								return pLoopPlot;
-							}
-						}
-					}
-				}
-			}
-
-			// Give up - just use location of first unit
-			pUnit = GetFirstUnit();
-			pRtnValue = pUnit->plot();
+			pUnit = GetNextUnit();
 		}
+
+		if (vPlots.empty())
+			return NULL;
+
+		//this sorts ascending!
+		std::sort(vPlots.begin(),vPlots.end());
+		return vPlots.front().pPlot;
 	}
-	return pRtnValue;
-#endif
+	else
+		return pCOM;
 }
 
 /// Return distance from this plot of unit in army farthest away
 int CvArmyAI::GetFurthestUnitDistance(CvPlot* pPlot)
 {
 	int iLargestDistance = 0;
-	UnitHandle pUnit;
+	CvUnit* pUnit;
 	int iNewDistance;
 
 	pUnit = GetFirstUnit();
@@ -447,7 +378,7 @@ void CvArmyAI::SetFormationIndex(int iFormationIndex)
 			m_FormationEntries.clear();
 			for(int iI = 0; iI < iNumSlots; iI++)
 			{
-				slot.SetUnitID(ARMY_NO_UNIT);
+				slot.SetUnitID(ARMYSLOT_NO_UNIT);
 				slot.SetTurnAtCheckpoint(ARMYSLOT_UNKNOWN_TURN_AT_CHECKPOINT);
 				m_FormationEntries.push_back(slot);
 			}
@@ -468,7 +399,7 @@ int CvArmyAI::GetNumSlotsFilled() const
 
 	for(unsigned int iI = 0; iI < m_FormationEntries.size(); iI++)
 	{
-		if(m_FormationEntries[iI].m_iUnitID != ARMY_NO_UNIT)
+		if(m_FormationEntries[iI].m_iUnitID > ARMYSLOT_NO_UNIT)
 		{
 			iRtnValue++;
 		}
@@ -481,7 +412,7 @@ void CvArmyAI::SetEstimatedTurn(int iSlotID, int iTurns)
 {
 	int iTurnAtCheckpoint;
 
-	if(iTurns == ARMYSLOT_NOT_INCLUDING_IN_OPERATION || iTurns == ARMYSLOT_UNKNOWN_TURN_AT_CHECKPOINT)
+	if(iTurns == ARMYSLOT_UNKNOWN_TURN_AT_CHECKPOINT)
 	{
 		iTurnAtCheckpoint = iTurns;
 	}
@@ -494,44 +425,70 @@ void CvArmyAI::SetEstimatedTurn(int iSlotID, int iTurns)
 }
 
 /// What turn will the army as a whole arrive on target?
-int CvArmyAI::GetTurnAtNextCheckpoint() const
+int CvArmyAI::GetTurnOfLastUnitAtNextCheckpoint() const
 {
-	int iRtnValue = ARMYSLOT_NOT_INCLUDING_IN_OPERATION;
+	int iRtnValue = ARMYSLOT_UNKNOWN_TURN_AT_CHECKPOINT;
 
 	for(unsigned int iI = 0; iI < m_FormationEntries.size(); iI++)
 	{
-		if(m_FormationEntries[iI].GetUnitID() == ARMY_NO_UNIT)
+		if(m_FormationEntries[iI].GetUnitID() <= ARMYSLOT_NO_UNIT)
 			continue;
+
 		if(m_FormationEntries[iI].m_iEstimatedTurnAtCheckpoint == ARMYSLOT_UNKNOWN_TURN_AT_CHECKPOINT)
-		{
 			return ARMYSLOT_UNKNOWN_TURN_AT_CHECKPOINT;
-		}
-		else if(m_FormationEntries[iI].m_iEstimatedTurnAtCheckpoint > iRtnValue)
-		{
-			iRtnValue = m_FormationEntries[iI].m_iEstimatedTurnAtCheckpoint;
-		}
+		
+		iRtnValue = MAX(iRtnValue, m_FormationEntries[iI].m_iEstimatedTurnAtCheckpoint);
 	}
 
 	return iRtnValue;
 }
 
-/// Recalculate when each unit will arrive on target
+/// Recalculate when each unit will arrive at the current army position, whatever that is
 void CvArmyAI::UpdateCheckpointTurns()
 {
 	for(unsigned int iI = 0; iI < m_FormationEntries.size(); iI++)
 	{
 		// No reestimate for units being built
-		if(m_FormationEntries[iI].GetUnitID() != ARMY_NO_UNIT)
+		if(m_FormationEntries[iI].GetUnitID() > ARMYSLOT_NO_UNIT)
 		{
 			CvUnit* pUnit = GET_PLAYER(m_eOwner).getUnit(m_FormationEntries[iI].GetUnitID());
-			CvPlot* pMusterPlot = GC.getMap().plot(GetX(), GetY());
-			if(pUnit && pMusterPlot)
+			CvPlot* pCurrentPlot = GC.getMap().plot(GetX(), GetY());
+			if(pUnit && pCurrentPlot)
 			{
-				int iTurnsToReachCheckpoint = pUnit->TurnsToReachTarget(pMusterPlot, false, true, true);
-				if(iTurnsToReachCheckpoint < MAX_INT)
-					SetEstimatedTurn(iI, iTurnsToReachCheckpoint);
+				if(pUnit->plot() == pCurrentPlot)
+				{
+					SetEstimatedTurn(iI, 0);
+				}
 				else
-					SetEstimatedTurn(iI, ARMYSLOT_UNKNOWN_TURN_AT_CHECKPOINT);
+				{
+					//be lenient here, for some ops the muster point may be far away and intermittendly occupied by foreign units ...
+					int iFlags = CvUnit::MOVEFLAG_APPROX_TARGET_RING1 | CvUnit::MOVEFLAG_IGNORE_STACKING | CvUnit::MOVEFLAG_IGNORE_ZOC;
+					int iTurnsToReachCheckpoint = pUnit->TurnsToReachTarget(pCurrentPlot, iFlags, GC.getAI_OPERATIONAL_MAX_RECRUIT_TURNS_ENEMY_TERRITORY());
+					if(iTurnsToReachCheckpoint < MAX_INT)
+						SetEstimatedTurn(iI, iTurnsToReachCheckpoint);
+					else
+						SetEstimatedTurn(iI, ARMYSLOT_UNKNOWN_TURN_AT_CHECKPOINT);
+				}
+			}
+		}
+	}
+}
+
+void CvArmyAI::RemoveStuckUnits()
+{
+	CvAIOperation* pOperation = GET_PLAYER(GetOwner()).getAIOperation(GetOperationID());
+
+	if(pOperation->GetOperationState() < AI_OPERATION_STATE_MOVING_TO_TARGET)
+	{
+		for(unsigned int iI = 0; iI < m_FormationEntries.size(); iI++)
+		{
+			if(m_FormationEntries[iI].GetUnitID() > ARMYSLOT_NO_UNIT && m_FormationEntries[iI].GetTurnAtCheckpoint()==ARMYSLOT_UNKNOWN_TURN_AT_CHECKPOINT)
+			{
+				CvString strMsg;
+				strMsg.Format("Removing unit %d from army %d because no path to checkpoint",m_FormationEntries[iI].GetUnitID(),GetID());
+				pOperation->LogOperationSpecialMessage(strMsg);
+
+				RemoveUnit(m_FormationEntries[iI].GetUnitID());
 			}
 		}
 	}
@@ -544,7 +501,7 @@ int CvArmyAI::GetUnitsOfType(MultiunitPositionTypes ePosition) const
 
 	for(unsigned int iI = 0; iI < m_FormationEntries.size(); iI++)
 	{
-		if(m_FormationEntries[iI].m_iUnitID != ARMY_NO_UNIT)
+		if(m_FormationEntries[iI].m_iUnitID > ARMYSLOT_NO_UNIT)
 		{
 			CvUnit* pUnit = GET_PLAYER(m_eOwner).getUnit(m_FormationEntries[iI].m_iUnitID);
 			if(pUnit->getMoves() > 0)
@@ -567,7 +524,7 @@ int CvArmyAI::GetUnitsOfType(MultiunitPositionTypes ePosition) const
 /// Can all units in this army move on ocean?
 bool CvArmyAI::IsAllOceanGoing()
 {
-	UnitHandle pUnit;
+	CvUnit* pUnit;
 
 	pUnit = GetFirstUnit();
 	while(pUnit)
@@ -597,9 +554,9 @@ int CvArmyAI::GetTotalPower()
 	int iUnitID;
 	iUnitID = GetFirstUnitID();
 
-	while(iUnitID != ARMY_NO_UNIT)
+	while(iUnitID != ARMYSLOT_NO_UNIT)
 	{
-		UnitHandle pThisUnit = GET_PLAYER(GetOwner()).getUnit(iUnitID);
+		CvUnit* pThisUnit = GET_PLAYER(GetOwner()).getUnit(iUnitID);
 		if(pThisUnit)
 		{
 			iRtnValue += pThisUnit->GetPower();
@@ -665,24 +622,6 @@ void CvArmyAI::SetDomainType(DomainTypes domainType)
 	m_eDomainType = domainType;
 }
 
-/// Everyone in the water now?
-bool CvArmyAI::AreAllInWater()
-{
-	UnitHandle pUnit;
-
-	pUnit = GetFirstUnit();
-	while(pUnit)
-	{
-		if(!pUnit->plot()->isWater())
-		{
-			return false;
-		}
-		pUnit = GetNextUnit();
-	}
-
-	return true;
-}
-
 // GOAL ACCESSORS
 
 /// Retrieve target plot for army movement
@@ -720,21 +659,31 @@ int CvArmyAI::GetGoalY() const
 	return m_iGoalY;
 }
 
-/// Set target for army movement using X, Y coordinates
-void CvArmyAI::SetGoalXY(int iX, int iY)
+#if defined(MOD_BALANCE_CORE)
+//Water parameters
+void CvArmyAI::SetOceanMoves(bool bValue)
 {
-	m_iGoalX = iX;
-	m_iGoalY = iY;
+	if (bValue != m_bOceanMoves)
+	{
+		m_bOceanMoves = bValue;
+	}
 }
+
+/// Retrieve target plot X coordinate
+bool CvArmyAI::NeedOceanMoves() const
+{
+	return m_bOceanMoves;
+}
+#endif
 // UNIT HANDLING
 
 /// Add a unit to our army (and we know which slot)
 void CvArmyAI::AddUnit(int iUnitID, int iSlotNum)
 {
-	CvAssertMsg(iUnitID != ARMY_NO_UNIT,"Expect unit to be non-NULL");
+	CvAssertMsg(iUnitID != ARMYSLOT_NO_UNIT,"Expect unit to be non-NULL");
 
 	CvPlayer& thisPlayer = GET_PLAYER(m_eOwner);
-	UnitHandle pThisUnit = thisPlayer.getUnit(iUnitID);
+	CvUnit* pThisUnit = thisPlayer.getUnit(iUnitID);
 
 	// remove this unit from an army if it is already in one
 	thisPlayer.removeFromArmy(pThisUnit->getArmyID(), GetID());
@@ -751,7 +700,8 @@ void CvArmyAI::AddUnit(int iUnitID, int iSlotNum)
 	CvPlot* pMusterPlot = GC.getMap().plot(GetX(), GetY());
 	if(pMusterPlot)
 	{
-		int iTurnsToReachCheckpoint = pThisUnit->TurnsToReachTarget(pMusterPlot, true, true);
+		int iFlags = CvUnit::MOVEFLAG_APPROX_TARGET_RING1 | CvUnit::MOVEFLAG_IGNORE_STACKING | CvUnit::MOVEFLAG_IGNORE_ZOC;
+		int iTurnsToReachCheckpoint = pThisUnit->TurnsToReachTarget(pMusterPlot, iFlags, GC.getAI_OPERATIONAL_MAX_RECRUIT_TURNS_ENEMY_TERRITORY());
 		if(iTurnsToReachCheckpoint < MAX_INT)
 		{
 			SetEstimatedTurn(iSlotNum, iTurnsToReachCheckpoint);
@@ -762,24 +712,18 @@ void CvArmyAI::AddUnit(int iUnitID, int iSlotNum)
 /// Remove a unit from the army
 bool CvArmyAI::RemoveUnit(int iUnitToRemoveID)
 {
-	bool bWasOneOrMoreRemoved = false;
-	CvArmyFormationSlot slot;
-
 	for(int iI = 0; iI < (int)m_FormationEntries.size(); iI++)
 	{
-		slot = m_FormationEntries[iI];
+		CvArmyFormationSlot slot = m_FormationEntries[iI];
 		if(slot.GetUnitID() == iUnitToRemoveID)
 		{
-			UnitHandle pThisUnit = GET_PLAYER(GetOwner()).getUnit(iUnitToRemoveID);
+			CvUnit* pThisUnit = GET_PLAYER(GetOwner()).getUnit(iUnitToRemoveID);
 			if(pThisUnit)
 			{
 				// Clears unit's army ID and erase from formation entries
 				pThisUnit->setArmyID(-1);
-#if defined(MOD_BALANCE_CORE)
 				pThisUnit->AI_setUnitAIType(pThisUnit->getUnitInfo().GetDefaultUnitAIType());
-#endif
-				m_FormationEntries[iI].SetUnitID(ARMY_NO_UNIT);
-				bWasOneOrMoreRemoved = true;
+				m_FormationEntries[iI].SetUnitID(ARMYSLOT_NO_UNIT);
 
 				// Tell the associate operation that a unit was lost
 				CvAIOperation* pThisOperation = GET_PLAYER(GetOwner()).getAIOperation(m_iOperationID);
@@ -787,27 +731,18 @@ bool CvArmyAI::RemoveUnit(int iUnitToRemoveID)
 				{
 					pThisOperation->UnitWasRemoved(GetID(), iI);
 				}
+
+				return true;
 			}
 		}
 	}
 
-	return bWasOneOrMoreRemoved;
+	return false;
 }
 
 /// Is this part of an operation that allows units to be poached by tactical AI?
 bool CvArmyAI::CanTacticalAIInterruptUnit(int /* iUnitId */) const
 {
-	// If the operation is still recruiting, by all means interrupt it
-	if(m_eAIState == ARMYAISTATE_WAITING_FOR_UNITS_TO_REINFORCE)
-	{
-		return true;
-	}
-	// If the operation is still assembling, by all means interrupt it
-	if(m_eAIState == ARMYAISTATE_WAITING_FOR_UNITS_TO_REINFORCE ||
-	        m_eAIState == ARMYAISTATE_WAITING_FOR_UNITS_TO_CATCH_UP)
-	{
-		return true;
-	}
 	if(m_eOwner >=0 && m_eOwner < MAX_PLAYERS)
 	{
 		CvAIOperation* op = GET_PLAYER(m_eOwner).getAIOperation(m_iOperationID);
@@ -816,35 +751,36 @@ bool CvArmyAI::CanTacticalAIInterruptUnit(int /* iUnitId */) const
 			return op->CanTacticalAIInterruptOperation();
 		}
 	}
+
 	return false;
 }
 
-/// Retrieve units from the army - first call (ARMY_NO_UNIT if none found)
+/// Retrieve units from the army - first call (ARMYSLOT_NO_UNIT if none found)
 int CvArmyAI::GetFirstUnitID()
 {
 	m_CurUnitIter = m_FormationEntries.begin();
 
 	if(m_CurUnitIter == m_FormationEntries.end())
 	{
-		return ARMY_NO_UNIT;
+		return ARMYSLOT_NO_UNIT;
 	}
 	else
 	{
 		// First entry could not be filled yet
 		while(m_CurUnitIter != m_FormationEntries.end())
 		{
-			if(m_CurUnitIter->GetUnitID() != ARMY_NO_UNIT)
+			if(m_CurUnitIter->GetUnitID() > ARMYSLOT_NO_UNIT)
 			{
 				return m_CurUnitIter->GetUnitID();
 			}
 			++m_CurUnitIter;
 		}
 
-		return ARMY_NO_UNIT;
+		return ARMYSLOT_NO_UNIT;
 	}
 }
 
-/// Retrieve units from the army - subsequent call (ARMY_NO_UNIT if none found)
+/// Retrieve units from the army - subsequent call (ARMYSLOT_NO_UNIT if none found)
 int CvArmyAI::GetNextUnitID()
 {
 	if(m_CurUnitIter != m_FormationEntries.end())
@@ -853,27 +789,27 @@ int CvArmyAI::GetNextUnitID()
 
 		while(m_CurUnitIter != m_FormationEntries.end())
 		{
-			if(m_CurUnitIter->GetUnitID() != ARMY_NO_UNIT)
+			if(m_CurUnitIter->GetUnitID() > ARMYSLOT_NO_UNIT)
 			{
 				return m_CurUnitIter->GetUnitID();
 			}
 			++m_CurUnitIter;
 		}
 
-		return ARMY_NO_UNIT;
+		return ARMYSLOT_NO_UNIT;
 	}
-	return ARMY_NO_UNIT;
+	return ARMYSLOT_NO_UNIT;
 }
 
-/// Retrieve units from the army - first call (UnitHandle version)
-UnitHandle CvArmyAI::GetFirstUnit()
+/// Retrieve units from the army - first call (CvUnit* version)
+CvUnit* CvArmyAI::GetFirstUnit()
 {
-	UnitHandle pRtnValue;
+	CvUnit* pRtnValue = NULL;
 
 	int iUnitID = GetFirstUnitID();
-	if(iUnitID != ARMY_NO_UNIT)
+	if(iUnitID != ARMYSLOT_NO_UNIT)
 	{
-		pRtnValue = UnitHandle(GET_PLAYER(m_eOwner).getUnit(iUnitID));
+		pRtnValue = GET_PLAYER(m_eOwner).getUnit(iUnitID);
 
 		FAssertMsg(pRtnValue, "Bogus unit in army - tell Ed");
 	}
@@ -881,15 +817,15 @@ UnitHandle CvArmyAI::GetFirstUnit()
 	return pRtnValue;
 }
 
-/// Retrieve units from the army - subsequent call (UnitHandle version)
-UnitHandle CvArmyAI::GetNextUnit()
+/// Retrieve units from the army - subsequent call (CvUnit* version)
+CvUnit* CvArmyAI::GetNextUnit()
 {
-	UnitHandle pRtnValue;
+	CvUnit* pRtnValue = NULL;
 
 	int iUnitID = GetNextUnitID();
-	if(iUnitID != ARMY_NO_UNIT)
+	if(iUnitID != ARMYSLOT_NO_UNIT)
 	{
-		pRtnValue = UnitHandle(GET_PLAYER(m_eOwner).getUnit(iUnitID));
+		pRtnValue = GET_PLAYER(m_eOwner).getUnit(iUnitID);
 
 		FAssertMsg(pRtnValue, "Bogus unit in army - tell Ed");
 	}
@@ -898,11 +834,11 @@ UnitHandle CvArmyAI::GetNextUnit()
 }
 
 /// Find first unit who is sitting in this domain
-UnitHandle CvArmyAI::GetFirstUnitInDomain(DomainTypes eDomain)
+CvUnit* CvArmyAI::GetFirstUnitInDomain(DomainTypes eDomain)
 {
-	UnitHandle pUnit, pCurrentUnit;
+	CvUnit* pUnit = NULL;
 
-	pCurrentUnit = GetFirstUnit();
+	CvUnit* pCurrentUnit = GetFirstUnit();
 	while(pCurrentUnit)
 	{
 		if(pCurrentUnit->plot()->isWater() && eDomain == DOMAIN_SEA || !pCurrentUnit->plot()->isWater() && eDomain == DOMAIN_LAND)
@@ -917,125 +853,11 @@ UnitHandle CvArmyAI::GetFirstUnitInDomain(DomainTypes eDomain)
 
 // PER TURN PROCESSING
 
-/// Process another turn for the army
-void CvArmyAI::DoTurn()
+/// does this army need to be deleted
+bool CvArmyAI::IsDelayedDeath()
 {
-	// do something with the army
-	DoDelayedDeath();
+	return (GetNumSlotsFilled() == 0 && m_eAIState != ARMYAISTATE_WAITING_FOR_UNITS_TO_REINFORCE);
 }
-
-/// Kill off the army if waiting to die (returns true if army was killed)
-bool CvArmyAI::DoDelayedDeath()
-{
-	if(GetNumSlotsFilled() == 0 && m_eAIState != ARMYAISTATE_WAITING_FOR_UNITS_TO_REINFORCE)
-	{
-		Kill();
-		return true;
-	}
-
-	return false;
-}
-
-CvPlot* CvArmyAI::DetectNearbyEnemy(PlayerTypes eEnemy, bool bNaval)
-{
-	UnitHandle pUnit = GetFirstUnit();
-	while(pUnit)
-	{
-		for(int iDirectionLoop = 0; iDirectionLoop < NUM_DIRECTION_TYPES; ++iDirectionLoop)
-		{
-			CvPlot* pAdjacentPlot = plotDirection(pUnit->getX(), pUnit->getY(), ((DirectionTypes)iDirectionLoop));
-			if(pAdjacentPlot != NULL && pAdjacentPlot->isWater()==bNaval && pAdjacentPlot->getOwner() == eEnemy)
-			{
-				UnitHandle pOtherUnit = pAdjacentPlot->getBestDefender(eEnemy);
-				if(pOtherUnit)
-				{
-					if(GC.getLogging() && GC.getAILogging())
-					{
-						CvString strMsg;
-						strMsg.Format("Ran into enemy unit during attack (x=%d y=%d). Need to declare war to continue!", pAdjacentPlot->getX(), pAdjacentPlot->getY());
-						GET_PLAYER(m_eOwner).getAIOperation(m_iOperationID)->LogOperationSpecialMessage(strMsg);
-					}
-
-					return pAdjacentPlot;
-				}
-			}
-		}
-		pUnit = GetNextUnit();
-	}
-
-	return NULL;
-}
-
-CvPlot* CvArmyAI::CheckTargetReached(PlayerTypes eEnemy, bool bNavalOp, int iMaxDistance)
-{
-	//check if we're at the target
-	CvPlot *pTargetPlot = GetGoalPlot();
-	CvPlot *pCenterOfMass = GetCenterOfMass(NO_DOMAIN);
-	if(pCenterOfMass && pTargetPlot && plotDistance(*pCenterOfMass,*pTargetPlot) <= iMaxDistance)
-		return pTargetPlot;
-
-	//check early termination if we ran into the enemy
-	if(GetArmyAIState() == ARMYAISTATE_MOVING_TO_DESTINATION)
-	{
-		CvPlot*	pEnemyPlot = DetectNearbyEnemy(eEnemy, bNavalOp);
-		if(pEnemyPlot != NULL)
-		{
-			CvCity* pCity = pEnemyPlot->getWorkingCity();
-			if(pCity != NULL)
-			{
-				if (bNavalOp && pCity->isAdjacentToArea(pTargetPlot->getArea()))
-					pEnemyPlot = pCity->plot();
-
-				if (!bNavalOp && pCity->getArea()==pTargetPlot->getArea())
-					pEnemyPlot = pCity->plot();
-
-				if (pEnemyPlot!=GetGoalPlot())
-				{
-					if(GC.getLogging() && GC.getAILogging())
-					{
-						CvString strMsg;
-						strMsg.Format("Switching target from %d,%d to closest city at %d,%d", GetGoalX(), GetGoalY(), pEnemyPlot->getX(), pEnemyPlot->getY() );
-						GET_PLAYER(m_eOwner).getAIOperation(m_iOperationID)->LogOperationSpecialMessage(strMsg);
-					}
-				}
-
-				return pEnemyPlot;
-			}
-		}
-	}
-
-	return NULL;
-}
-
-void CvArmyAI::PrepareForAttack(CvPlot * pTarget, PlayerTypes eEnemy)
-{
-	if (!pTarget || eEnemy==NO_PLAYER)
-		return;
-
-	// Notify Diplo AI we're in place for attack
-	if(!GET_TEAM(GET_PLAYER(GetOwner()).getTeam()).isAtWar(GET_PLAYER(eEnemy).getTeam()))
-	{
-		GET_PLAYER(GetOwner()).GetDiplomacyAI()->SetMusteringForAttack(eEnemy, true);
-	}
-
-	// Notify tactical AI to focus on this area
-	CvTemporaryZone zone;
-	if(pTarget->getWorkingCity() != NULL && pTarget->getWorkingCity()->getOwner() == eEnemy)
-	{
-		zone.SetX(pTarget->getWorkingCity()->getX());
-		zone.SetY(pTarget->getWorkingCity()->getY());
-	}
-	else
-	{
-		zone.SetX(pTarget->getX());
-		zone.SetY(pTarget->getY());
-	}
-
-	zone.SetTargetType(AI_TACTICAL_TARGET_CITY);
-	zone.SetLastTurn(GC.getGame().getGameTurn() + GC.getAI_TACTICAL_MAP_TEMP_ZONE_TURNS());
-	GET_PLAYER(m_eOwner).GetTacticalAI()->AddTemporaryZone(zone);
-}
-
 
 FDataStream& operator<<(FDataStream& saveTo, const CvArmyAI& readFrom)
 {
@@ -1053,7 +875,6 @@ FDataStream& operator<<(FDataStream& saveTo, const CvArmyFormationSlot& readFrom
 {
 	saveTo << readFrom.m_iUnitID;
 	saveTo << readFrom.m_iEstimatedTurnAtCheckpoint;
-	saveTo << readFrom.m_bStartedOnOperation;
 	return saveTo;
 }
 
@@ -1061,6 +882,5 @@ FDataStream& operator>>(FDataStream& loadFrom, CvArmyFormationSlot& writeTo)
 {
 	loadFrom >> writeTo.m_iUnitID;
 	loadFrom >> writeTo.m_iEstimatedTurnAtCheckpoint;
-	loadFrom >> writeTo.m_bStartedOnOperation;
 	return loadFrom;
 }

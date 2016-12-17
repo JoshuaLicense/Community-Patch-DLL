@@ -22,8 +22,8 @@
  ****************************************************************************
  ****************************************************************************/
 #define MOD_DLL_GUID {0xbf9bf7f0, 0xe078, 0x4d4e, { 0x8a, 0x3e, 0x84, 0x71, 0x2f, 0x85, 0xaa, 0x2b }} //{BF9BF7F0-E078-4d4e-8A3E-84712F85AA2B}
-#define MOD_DLL_NAME "Community Patch v79 (PNM v51+)"
-#define MOD_DLL_VERSION_NUMBER ((uint) 79)
+#define MOD_DLL_NAME "Community Patch v88 (PNM v51+)"
+#define MOD_DLL_VERSION_NUMBER ((uint) 88)
 #define MOD_DLL_VERSION_STATUS ""			// a (alpha), b (beta) or blank (released)
 #define MOD_DLL_CUSTOM_BUILD_NAME ""
 
@@ -32,25 +32,23 @@
 /////////////////////////////////////////
 
 // FIRST: Comment out this line to include all the achievements code (which don't work in modded games, so we don't need the code!)
-#define NO_ACHIEVEMENTS
-// SECOND: UN-COMMENT out this line to include Jai der Herr's Active Diplomacy mod for Multiplayer games.
-//#define MOD_ACTIVE_DIPLOMACY
+//#define NO_ACHIEVEMENTS
+//adds active diplomacy to Multiplayer games
+#define MOD_ACTIVE_DIPLOMACY			 gCustomMods.isACTIVE_DIPLOMACY()
 
 /////////////////////////////////
 //END MULTIPLAYER INSTRUCTIONS
 ////////////////////////////////////////
 
-/////////////////////////
-// INSTRUCTIONS FOR INCREASING THE NUMBER OF CIVS
-/////////////////////////////
+///////////////////////
+// BATTLE ROYALE CODE
+//////////////////////
 
-// UN-COMMENT out the line below to raise the max number of civilizations to 43.
-//#define MOD_GLOBAL_MAX_MAJOR_CIVS 43
-// WARNING! You will need to use OR include (if making a modpack) the '43 Civs CP MOD' from the CP downloads folder to use this!
+//If you enable this, you can do an 'observer' mode human player (i.e. submarine in ice) to do the battle royale! Includes code for CSV export of data
+//#define MOD_BATTLE_ROYALE
 
-////////////////////////////
-//END 43 CIV INSTRUCTIONS
-///////////////////////////////////
+//If you enable this, the CS AI can settle more cities.
+//#define MOD_MINOR_CAN_SETTLE
 
 /// simpler algorithm for scoring exploration plots
 #define MOD_CORE_ALTERNATIVE_EXPLORE_SCORE
@@ -61,6 +59,7 @@
 
 /// radical rewrite
 #define MOD_BALANCE_CORE_NEW_TACTICAL_AI
+#define MOD_CORE_NEW_DEPLOYMENT_LOGIC
 
 /// for testing
 #define MOD_CORE_REDUCE_RANDOMNESS
@@ -76,8 +75,6 @@
 	#define AUI_PLOT_OBSERVER_SEE_ALL_PLOTS
 	#define AUI_GAME_OBSERVER_CAN_OPEN_CITIES
 	#define AUI_PLOT_OBSERVER_NO_NW_POPUPS
-
-#define AUI_WORKER_EVALUATE_WORKER_RETREAT_AND_BUILD 
 
 /// Flavors that weren't previously fetched but were still (attempted to be) used in processing later are now fetched
 #define AUI_HOMELAND_FIX_ESTABLISH_HOMELAND_PRIORITIES_MISSING_FLAVORS
@@ -98,12 +95,6 @@
 #define AUI_TACTICAL_FIX_COMPUTE_EXPECTED_DAMAGE_AIR_UNITS
 /// Units that cannot caputre cities will not attempt to do so
 #define AUI_TACTICAL_FIX_NO_CAPTURE
-/// When checking the embark safety of a plot, use the plot the unit will be moving to instead of the target plot
-#define AUI_TACTICAL_FIX_MOVE_TO_USING_SAFE_EMBARK_CORRECT_PLOT
-/// Fixes the incorrect logic behind determining whether a unit could make it to an operation's next muster point in time
-#define AUI_TACTICAL_FIX_ALL_OPERATION_MOVES_CATCH_UP_TURNS
-/// When finding naval units to move to a target, the AI no longer ignores units for its pathfinder portion (so it now essentially works the same way as the land-based one)
-#define AUI_TACTICAL_FIX_FIND_CLOSEST_NAVAL_OPERATION_UNIT_DOESNT_IGNORE_UNITS
 /// Civilians that are not moved with BarbarianCivilianEscortMove now move using passive barbarian move
 #define AUI_TACTICAL_EXECUTE_BARBARIAN_MOVES_CIVILIANS_MOVE_PASSIVELY
 
@@ -153,8 +144,6 @@
 #define AUI_RELIGION_FIX_DO_FAITH_PURCHASES_ENHANCE_RELIGION
 /// Since Venice can purchase stuff at puppets, the function will no longer treat Venice's puppets as ordinary puppets
 #define AUI_RELIGION_FIX_ARE_ALL_OUR_CITIES_HAVE_FAITH_BUILDING_VENICE_PUPPETS
-/// If the first adjusted value is out of bounds, keep rerolling with the amount with which it is out of bounds until we remain in bounds
-#define AUI_DIPLOMACY_GET_RANDOM_PERSONALITY_WEIGHT_USE_REROLLS
 
 // unhappiness from public opinion scales linearly with dissatisfaction
 #define MOD_CORE_SMOOTH_PUBLIC_OPINION
@@ -173,11 +162,13 @@
 
 // Comment out this line to switch off all custom mod logging
 #define CUSTOMLOGDEBUG "CustomMods.log"
-// true/false to include/exclude file name and line number in the log
-#define CUSTOMLOGFILEINFO true
+// Define to include the file name and line number in the log
+#define CUSTOMLOGFILEINFO
+// Define to include the function name in the log
+#define CUSTOMLOGFUNCINFO
 
 // Comment out this line to switch off all unified yield logging
-#define UNIFIEDLOGDEBUG "UnifiedYields.log"
+// #define UNIFIEDLOGDEBUG "UnifiedYields.log"
 
 // Comment out this line to remove minidumps - see http://forums.civfanatics.com/showthread.php?t=498919
 // If minidumps are enabled, do NOT set GenerateDebugInfo=No (Props -> Config Props -> Linker -> Debugging)
@@ -217,6 +208,8 @@
 // Push various hard-coded values controlling the AI out into XML - see DB/CONFIG/AiInXml.sql for specific values
 #define MOD_CONFIG_AI_IN_XML                        gCustomMods.isCONFIG_AI_IN_XML()
 
+// If A declares war on B that preempts a co-op war, A is locked into the war for the same number of turns as if they had agreed to the co-op war (v86) 
+#define MOD_GLOBAL_EARLY_COOP_WAR_LOCK				gCustomMods.isGLOBAL_EARLY_COOP_WAR_LOCK()
 // Changes the stacking limits based on what the tile is (city, fort, plain, etc) - AFFECTS SAVE GAME DATA FORMAT
 #define MOD_GLOBAL_STACKING_RULES                   gCustomMods.isGLOBAL_STACKING_RULES()
 // This is the "No More Civilian Traffic Jams (NMCTJs) Mod" by Pazyryk - see http://forums.civfanatics.com/showthread.php?t=519754 (v45)
@@ -254,6 +247,8 @@
 #define MOD_GLOBAL_CS_LIBERATE_AFTER_BUYOUT         gCustomMods.isGLOBAL_CS_LIBERATE_AFTER_BUYOUT()
 // City States give different gifts depending on their type (cultural, religious, maritime, etc)
 #define MOD_GLOBAL_CS_GIFTS                         gCustomMods.isGLOBAL_CS_GIFTS()
+// Units gifted from City States receive XP from their spawning city, not the CS capital (v84)
+#define MOD_GLOBAL_CS_GIFTS_LOCAL_XP                gCustomMods.isGLOBAL_CS_GIFTS_LOCAL_XP()
 // City States allied to a major behave as an overseas territory of that major (v39)
 #define MOD_GLOBAL_CS_OVERSEAS_TERRITORY            gCustomMods.isGLOBAL_CS_OVERSEAS_TERRITORY()
 // City States at war with each other but allied to the same major will declare peace (v39)
@@ -282,6 +277,8 @@
 #define MOD_GLOBAL_NUKES_MELT_ICE                   gCustomMods.isGLOBAL_NUKES_MELT_ICE() 
 // Great Works can generate different yields than just culture (v25)
 #define MOD_GLOBAL_GREATWORK_YIELDTYPES             gCustomMods.isGLOBAL_GREATWORK_YIELDTYPES() 
+// Great Artists, Writers and Musicians that do NOT create Great Works can be "reborn" (v84)
+#define MOD_GLOBAL_NO_LOST_GREATWORKS               gCustomMods.isGLOBAL_NO_LOST_GREATWORKS() 
 // Units of this type will not be gifted by City States (v46)
 #define MOD_GLOBAL_EXCLUDE_FROM_GIFTS               gCustomMods.isGLOBAL_EXCLUDE_FROM_GIFTS()
 // Units of this type may move after being upgraded (v46)
@@ -292,7 +289,20 @@
 #define MOD_GLOBAL_SEPARATE_GP_COUNTERS             gCustomMods.isGLOBAL_SEPARATE_GP_COUNTERS()
 // Removes free GP (from buildings, policies, traits, etc) from the GP counters (v61)
 #define MOD_GLOBAL_TRULY_FREE_GP                    gCustomMods.isGLOBAL_TRULY_FREE_GP()
-
+// No auto spawn great prophets for human players, must select pulldown menu in Lua when you are ready to spawn one, only pre-Industrial era
+#define MOD_NO_AUTO_SPAWN_PROPHET					gCustomMods.isNO_AUTO_SPAWN_PROPHET()
+// Change Assyria's trait to choosing a free tech upon city conquest
+#define MOD_ALTERNATE_ASSYRIA_TRAIT					gCustomMods.isALTERNATE_ASSYRIA_TRAIT()
+// No repairing tiles in foreign lands -- prevents an exploit where a human player can pillage and repair
+#define MOD_NO_REPAIR_FOREIGN_LANDS					gCustomMods.isNO_REPAIR_FOREIGN_LANDS()
+// No yield from Ice Features
+#define MOD_NO_YIELD_ICE							gCustomMods.isNO_YIELD_ICE()
+// No major civ gifting exploit
+#define MOD_NO_MAJORCIV_GIFTING						gCustomMods.isNO_MAJORCIV_GIFTING()
+// no healing on mountains if not a city plot
+#define MOD_NO_HEALING_ON_MOUNTAINS					gCustomMods.isNO_HEALING_ON_MOUNTAINS()
+// Allows pillaging of permanent improvements if at war
+#define MOD_PILLAGE_PERMANENT_IMPROVEMENTS			gCustomMods.isPILLAGE_PERMANENT_IMPROVEMENTS()
 // Tech bonuses from other teams require an embassy or spy in their capital and not from just having met them (v30)
 #define MOD_DIPLOMACY_TECH_BONUSES                  gCustomMods.isDIPLOMACY_TECH_BONUSES()
 // Human players will auto-denounce AI players before going to war with them (v39)
@@ -304,6 +314,12 @@
 #define MOD_DIPLOMACY_CITYSTATES_RESOLUTIONS        (MOD_DIPLOMACY_CITYSTATES && gCustomMods.isDIPLOMACY_CITYSTATES_RESOLUTIONS())
 #define MOD_DIPLOMACY_CITYSTATES_HURRY              (MOD_DIPLOMACY_CITYSTATES && gCustomMods.isDIPLOMACY_CITYSTATES_HURRY())
 #endif
+
+// To turn off or on ships firing while in Cities
+#define MOD_SHIPS_FIRE_IN_CITIES_IMPROVEMENTS		 gCustomMods.isSHIPS_FIRE_IN_CITIES_IMPROVEMENTS()
+
+// Ability to add new natural wonder features with graphics
+#define MOD_PSEUDO_NATURAL_WONDER					gCustomMods.isPSEUDO_NATURAL_WONDER()
 
 //Flips open borders to apply in opposite ways- you have to give open borders to gain the tourism bonus
 #define MOD_BALANCE_FLIPPED_TOURISM_MODIFIER_OPEN_BORDERS
@@ -368,16 +384,29 @@
 #define MOD_BALANCE_CORE_JFD						(MOD_COMMUNITY_PATCH && gCustomMods.isBALANCE_CORE_JFD())
 #define MOD_BALANCE_CORE_MILITARY_RESISTANCE		(MOD_COMMUNITY_PATCH && gCustomMods.isBALANCE_CORE_MILITARY_RESISTANCE())
 #define MOD_BALANCE_CORE_PANTHEON_RESET_FOUND		(MOD_COMMUNITY_PATCH && gCustomMods.isBALANCE_CORE_PANTHEON_RESET_FOUND())
-#define MOD_BALANCE_CORE_DIPLO_VICTORY_REQUIRES_IDEOLOGY		(MOD_COMMUNITY_PATCH && gCustomMods.isBALANCE_CORE_DIPLO_VICTORY_REQUIRES_IDEOLOGY())
+#define MOD_BALANCE_CORE_VICTORY_GAME_CHANGES		(MOD_COMMUNITY_PATCH && gCustomMods.isBALANCE_CORE_VICTORY_GAME_CHANGES())
 #define MOD_BALANCE_CORE_EVENTS						(MOD_COMMUNITY_PATCH && gCustomMods.isBALANCE_CORE_EVENTS())
 #define MOD_NO_RANDOM_TEXT_CIVS						(MOD_COMMUNITY_PATCH && gCustomMods.isNO_RANDOM_TEXT_CIVS())
-
+#define MOD_BALANCE_RETROACTIVE_PROMOS				(MOD_COMMUNITY_PATCH && gCustomMods.isBALANCE_RETROACTIVE_PROMOS())
 #endif
-
+// activate eureka for tech cost bonus 'quest'
+#define MOD_CIV6_EUREKA								gCustomMods.isCIV6_EUREKAS()
+// Add a "worker cost" to improvement and delete the worker when he expands all his "strength"
+#define MOD_CIV6_WORKER								gCustomMods.isCIV6_TYPE_WORKER()
+// Roads are created by trade routes.
+#define MOD_CIV6_ROADS								gCustomMods.isCIV6_ROADS()
+// scale city-state yield per city owned
+#define MOD_CITY_STATE_SCALE						gCustomMods.isCITY_STATE_SCALE()
+// Changes melee ship units to be cargo carrying units with added promotions for ship and cargo
+#define MOD_CARGO_SHIPS								gCustomMods.isCARGO_SHIPS()
 // Changes for the CivIV Diplomacy Features mod by Putmalk - AFFECTS SAVE GAME DATA FORMAT (v36)
 #define MOD_DIPLOMACY_CIV4_FEATURES                 gCustomMods.isDIPLOMACY_CIV4_FEATURES()
 // Adds an option to Advanced Setup to allow gaining Great General and Great Admiral Points from fighting with Barbarians
-#define MOD_BARBARIAN_GG_GA_POINTS					gCustomMods.isBARBARIAN_GG_GA_POINTS
+#define MOD_BARBARIAN_GG_GA_POINTS					gCustomMods.isBARBARIAN_GG_GA_POINTS()
+// Grants Celts maximum up to 3 unimproved adjacent forests for faith
+#define MOD_ALTERNATE_CELTS							gCustomMods.isALTERNATE_CELTS()
+// Permits units to earn GG/GA points from killing barbarians (v83)
+#define MOD_TRAITS_GG_FROM_BARBARIANS               gCustomMods.isTRAITS_GG_FROM_BARBARIANS()
 // Permits land units to cross ice - AFFECTS SAVE GAME DATA FORMAT
 #define MOD_TRAITS_CROSSES_ICE                      gCustomMods.isTRAITS_CROSSES_ICE()
 // Permits cities to work more rings - AFFECTS SAVE GAME DATA FORMAT
@@ -394,9 +423,19 @@
 // Permits cities to work more rings - AFFECTS SAVE GAME DATA FORMAT
 #define MOD_POLICIES_CITY_WORKING                   gCustomMods.isPOLICIES_CITY_WORKING()
 
+// Restricts a Team from passing into the next era before they have found all techs of their current era
+#define MOD_ERA_RESTRICTION							gCustomMods.isERA_RESTRICTION()
+
+// turn on or off yields for terrains that have a feature with GetPlayerTraits()->IsTradeRouteOnly
+#define MOD_USE_TRADE_FEATURES						gCustomMods.isUSE_TRADE_FEATURES()
+
 // Permits cities to work more rings - AFFECTS SAVE GAME DATA FORMAT
 #define MOD_TECHS_CITY_WORKING                      gCustomMods.isTECHS_CITY_WORKING()
 
+// Permits variable great general and admiral aura ranges (v83)
+#define MOD_PROMOTIONS_AURA_CHANGE                  gCustomMods.isPROMOTIONS_AURA_CHANGE()
+// Permits units to earn GG/GA points from killing barbarians (v83)
+#define MOD_PROMOTIONS_GG_FROM_BARBARIANS           gCustomMods.isPROMOTIONS_GG_FROM_BARBARIANS()
 // Permits variable recon ranges by creating extra recon range promotions (like extra sight range)
 #define MOD_PROMOTIONS_VARIABLE_RECON               gCustomMods.isPROMOTIONS_VARIABLE_RECON()
 // Permits land units to cross mountains (like the Carthage trait)
@@ -514,6 +553,9 @@
 #define MOD_AI_SMART_TECH_FLAVOR_PROPAGATION_BUGFIX gCustomMods.isAI_SMART()
 // Minor adjustement to avoid further calculations if flavor value is zero.
 #define MOD_AI_SMART_OPTIMIZE_FLAVOR_WEIGHT_ROUNDTRIPS gCustomMods.isAI_SMART()
+
+// Features from the "Smart AI V3 mod" by Ninakoru - see http://forums.civfanatics.com/showthread.php?t=562319 (v85)
+#define MOD_AI_SMART_V3                             gCustomMods.isAI_SMART_V3()
 
 #endif
 
@@ -657,6 +699,11 @@
 //   GameEvents.UnitCaptureType.Add(function(iPlayer, iUnit, iUnitType, iByCiv) return iCaptureUnitType; end)
 #define MOD_EVENTS_UNIT_CAPTURE                     gCustomMods.isEVENTS_UNIT_CAPTURE()
 
+// Events sent as units perform actions (v86)
+//   GameEvents.UnitCanPillage.Add(function(iPlayer, iUnit, iImprovement, iRoute) return true end)
+//   GameEvents.UnitPillageGold.Add(function(iPlayer, iUnit, iImprovement, iGold) return iGold end)
+#define MOD_EVENTS_UNIT_ACTIONS                     gCustomMods.isEVENTS_UNIT_ACTIONS()
+
 // Events sent as units are promoted/upgraded
 //   GameEvents.CanHavePromotion.Add(function(iPlayer, iUnit, iPromotionType) return true end)
 //   GameEvents.UnitCanHavePromotion.Add(function(iPlayer, iUnit, iPromotionType) return true end)
@@ -700,6 +747,8 @@
 
 // Events sent about resolutions (v51)
 //   GameEvents.PlayerCanPropose.Add(function(iPlayer, iResolution, iChoice, bEnact) return true end)
+//   GameEvents.ResolutionProposing.Add(function(iPlayer, iLeague) return false; end) (v88)
+//   GameEvents.ResolutionVoting.Add(function(iPlayer, iLeague) return false; end) (v88)
 //   GameEvents.ResolutionResult.Add(function(iResolution, iChoice, bEnact, bPassed) end)
 #define MOD_EVENTS_RESOLUTIONS                      gCustomMods.isEVENTS_RESOLUTIONS()
 
@@ -819,6 +868,10 @@
 
 // Minor bug fixes (missing catch-all else clauses, etc) (v30 onwards)
 #define MOD_BUGFIX_MINOR 							(true)
+// Minor bug fixes in the Lua API (v86 onwards)
+#define MOD_BUGFIX_LUA_API 							(true)
+// Adds validation to setting plot values (type, terrain, feature, resource, improvement and route) to stop CTDs in the graphics engine (v86)
+#define MOD_BUGFIX_PLOT_VALIDATION					(true)
 // Fixes some minor issues with the random number generator (v83)
 #define MOD_BUGFIX_RANDOM							(true)
 // Fixes the spy name crash (v53)
@@ -880,6 +933,8 @@
 #define MOD_BUGFIX_UNIT_PREREQ_PROJECT              gCustomMods.isBUGFIX_UNIT_PREREQ_PROJECT()
 // Fixes a bug where hovering units can be chosen as rebels! (v39)
 #define MOD_BUGFIX_NO_HOVERING_REBELS               gCustomMods.isBUGFIX_NO_HOVERING_REBELS()
+// Fixes some bugs/regressions that disable the effect of IsNoMinorCivs of some strategies
+#define MOD_BUGFIX_MINOR_CIV_STRATEGIES				gCustomMods.isBUGFIX_MINOR_CIV_STRATEGIES()
 
 #endif // ACHIEVEMENT_HACKS
 
@@ -925,15 +980,33 @@ enum BattleTypeTypes
 #endif
 // Custom mod logger
 #if defined(CUSTOMLOGDEBUG)
-#define CUSTOMLOG(sFmt, ...) {																		\
-	CvString sMsg; CvString::format(sMsg, sFmt, __VA_ARGS__);										\
-	if (CUSTOMLOGFILEINFO) {																		\
-		CvString sLine; CvString::format(sLine, "%s[%i] - %s", __FILE__, __LINE__, sMsg.c_str());	\
-		LOGFILEMGR.GetLog(CUSTOMLOGDEBUG, FILogFile::kDontTimeStamp)->Msg(sLine.c_str());			\
-	} else {																						\
-		LOGFILEMGR.GetLog(CUSTOMLOGDEBUG, FILogFile::kDontTimeStamp)->Msg(sMsg.c_str());			\
-	}																								\
+#if defined(CUSTOMLOGFILEINFO) && defined(CUSTOMLOGFUNCINFO)
+#define CUSTOMLOG(sFmt, ...) {																					\
+	CvString sMsg; CvString::format(sMsg, sFmt, __VA_ARGS__);													\
+	CvString sLine; CvString::format(sLine, "%s[%i]: %s - %s", __FILE__, __LINE__, __FUNCTION__, sMsg.c_str());	\
+	LOGFILEMGR.GetLog(CUSTOMLOGDEBUG, FILogFile::kDontTimeStamp)->Msg(sLine.c_str());							\
 }
+#endif
+#if defined(CUSTOMLOGFILEINFO) && !defined(CUSTOMLOGFUNCINFO)
+#define CUSTOMLOG(sFmt, ...) {																					\
+	CvString sMsg; CvString::format(sMsg, sFmt, __VA_ARGS__);													\
+	CvString sLine; CvString::format(sLine, "%s[%i] - %s", __FILE__, __LINE__, sMsg.c_str());					\
+	LOGFILEMGR.GetLog(CUSTOMLOGDEBUG, FILogFile::kDontTimeStamp)->Msg(sLine.c_str());							\
+}
+#endif
+#if !defined(CUSTOMLOGFILEINFO) && defined(CUSTOMLOGFUNCINFO)
+#define CUSTOMLOG(sFmt, ...) {																					\
+	CvString sMsg; CvString::format(sMsg, sFmt, __VA_ARGS__);													\
+	CvString sLine; CvString::format(sLine, "%s - %s", __FUNCTION__, sMsg.c_str());								\
+	LOGFILEMGR.GetLog(CUSTOMLOGDEBUG, FILogFile::kDontTimeStamp)->Msg(sLine.c_str());							\
+}
+#endif
+#if !defined(CUSTOMLOGFILEINFO) && !defined(CUSTOMLOGFUNCINFO)
+#define CUSTOMLOG(sFmt, ...) {																					\
+	CvString sMsg; CvString::format(sMsg, sFmt, __VA_ARGS__);													\
+	LOGFILEMGR.GetLog(CUSTOMLOGDEBUG, FILogFile::kDontTimeStamp)->Msg(sMsg.c_str());							\
+}
+#endif
 #else
 #define CUSTOMLOG(sFmt, ...) __noop
 #endif
@@ -951,19 +1024,24 @@ enum BattleTypeTypes
 
 
 // Message wrappers
-#define SHOW_PLAYER_MESSAGE(pPlayer, szMessage)       DLLUI->AddMessage(0, pPlayer->GetID(), false, GC.getEVENT_MESSAGE_TIME(), szMessage)
-#define SHOW_CITY_MESSAGE(pCity, ePlayer, szMessage)  DLLUI->AddCityMessage(0, pCity->GetIDInfo(), ePlayer, false, GC.getEVENT_MESSAGE_TIME(), szMessage)
-#define SHOW_UNIT_MESSAGE(pUnit, ePlayer, szMessage)  DLLUI->AddUnitMessage(0, pUnit->GetIDInfo(), ePlayer, false, GC.getEVENT_MESSAGE_TIME(), szMessage)
-#define SHOW_PLOT_MESSAGE(pPlot, ePlayer, szMessage)  DLLUI->AddPlotMessage(0, pPlot->GetPlotIndex(), ePlayer, false, GC.getEVENT_MESSAGE_TIME(), szMessage)
-#define SHOW_PLOT_POPUP(pPlot, ePlayer, szMessage, fDelay)  pPlot->showPopupText(ePlayer, szMessage)
-
+#define SHOW_PLAYER_MESSAGE(pPlayer, szMessage)       if (pPlayer) DLLUI->AddMessage(0, pPlayer->GetID(), false, GC.getEVENT_MESSAGE_TIME(), szMessage)
+#define SHOW_CITY_MESSAGE(pCity, ePlayer, szMessage)  if (pCity) DLLUI->AddCityMessage(0, pCity->GetIDInfo(), ePlayer, false, GC.getEVENT_MESSAGE_TIME(), szMessage)
+#define SHOW_UNIT_MESSAGE(pUnit, ePlayer, szMessage)  if (pUnit) DLLUI->AddUnitMessage(0, pUnit->GetIDInfo(), ePlayer, false, GC.getEVENT_MESSAGE_TIME(), szMessage)
+#define SHOW_PLOT_MESSAGE(pPlot, ePlayer, szMessage)  if (pPlot) DLLUI->AddPlotMessage(0, pPlot->GetPlotIndex(), ePlayer, false, GC.getEVENT_MESSAGE_TIME(), szMessage)
+#define SHOW_PLOT_POPUP(pPlot, ePlayer, szMessage, fDelay)  if (pPlot) pPlot->showPopupText(ePlayer, szMessage)
 
 // GlobalDefines wrappers
-#define GD_INT_DECL(name)       int m_i##name
-#define GD_INT_DEF(name)        inline int get##name() { return m_i##name; }
-#define GD_INT_INIT(name, def)  m_i##name(def)
-#define GD_INT_CACHE(name)      m_i##name = getDefineINT(#name); CUSTOMLOG("<Defines>: %s = %i", #name, m_i##name)
-#define GD_INT_GET(name)        GC.get##name()
+#define GD_INT_DECL(name)         int m_i##name
+#define GD_INT_DEF(name)          inline int get##name() { return m_i##name; }
+#define GD_INT_INIT(name, def)    m_i##name(def)
+#define GD_INT_CACHE(name)        m_i##name = getDefineINT(#name); CUSTOMLOG("<Defines>: %s = %i", #name, m_i##name)
+#define GD_INT_GET(name)          GC.get##name()
+
+#define GD_FLOAT_DECL(name)       float m_f##name
+#define GD_FLOAT_DEF(name)        inline float get##name() { return m_f##name; }
+#define GD_FLOAT_INIT(name, def)  m_f##name(def)
+#define GD_FLOAT_CACHE(name)      m_f##name = getDefineFLOAT(#name); CUSTOMLOG("<Defines>: %s = %f", #name, m_f##name)
+#define GD_FLOAT_GET(name)        GC.get##name()
 
 
 // LUA API wrappers
@@ -1019,6 +1097,7 @@ enum BattleTypeTypes
 #define GAMEEVENT_CityCanAcquirePlot			"CityCanAcquirePlot",			"iiii"
 #define GAMEEVENT_CityCanAirlift				"CityCanAirlift",				"ii"
 #define GAMEEVENT_CityConnected					"CityConnected",				"iiiiib"
+#define GAMEEVENT_CityPuppeted					"CityPuppeted",					"ii"
 #define GAMEEVENT_CityConnections				"CityConnections",				"ib"
 #define GAMEEVENT_CityConstructed				"CityConstructed",				"iiibb"
 #define GAMEEVENT_CityCreated					"CityCreated",					"iiibb"
@@ -1034,8 +1113,6 @@ enum BattleTypeTypes
 #define GAMEEVENT_CustomMissionTargetPlot		"CustomMissionTargetPlot",		"iiiiiii"
 #define GAMEEVENT_CustomMissionTimerInc			"CustomMissionTimerInc",		"iiiiiii"
 #define GAMEEVENT_DeclareWar					"DeclareWar",					"iib"
-#define GAMEEVENT_DiplomacyStfu					"DiplomacyStfu",				"iiiiii"
-#define GAMEEVENT_DiplomacyStfuLeaveLeader		"DiplomacyStfuLeaveLeader",		"i"
 #define GAMEEVENT_EspionageCanMoveSpyTo			"EspionageCanMoveSpyTo",		"iii"
 #define GAMEEVENT_EspionageCanStageCoup			"EspionageCanStageCoup",		"iii"
 #define GAMEEVENT_EspionageResult				"EspionageResult",				"iiiii"
@@ -1100,7 +1177,9 @@ enum BattleTypeTypes
 #define GAMEEVENT_ReligionEnhanced				"ReligionEnhanced",				"iiii"
 #define GAMEEVENT_ReligionFounded				"ReligionFounded",				"iiiiiiii"
 #define GAMEEVENT_ReligionReformed				"ReligionReformed",				"iiiiiii"
+#define GAMEEVENT_ResolutionProposing			"ResolutionProposing",			"ii"
 #define GAMEEVENT_ResolutionResult				"ResolutionResult",				"iibb"
+#define GAMEEVENT_ResolutionVoting				"ResolutionVoting",				"ii"
 #define GAMEEVENT_TeamSetEra					"TeamSetEra",					"iib"
 #define GAMEEVENT_TerraformingMap				"TerraformingMap",				"ii"
 #define GAMEEVENT_TerraformingPlot				"TerraformingPlot",				"iiiiiiii"
@@ -1115,14 +1194,19 @@ enum BattleTypeTypes
 #define GAMEEVENT_UnitCanHaveName				"UnitCanHaveName",				"iii"
 #define GAMEEVENT_UnitCanHavePromotion			"UnitCanHavePromotion",			"iii"
 #define GAMEEVENT_UnitCanHaveUpgrade			"UnitCanHaveUpgrade",			"iiii"
+#define GAMEEVENT_UnitCanPillage				"UnitCanPillage",				"iiii"
 #define GAMEEVENT_UnitCanTransitMinorCity		"UnitCanTransitMinorCity",		"iiiiii"
 #define GAMEEVENT_UnitCaptured					"UnitCaptured",					"iiiibi"
 #define GAMEEVENT_UnitCaptureType				"UnitCaptureType",				"iiii"
 #define GAMEEVENT_UnitCityFounded				"UnitCityFounded",				"iiiii"
 #define GAMEEVENT_UnitCreated					"UnitCreated",					"iiiii"
+#define GAMEEVENT_UnitPillageGold				"UnitPillageGold",				"iiii"
 #define GAMEEVENT_UnitPrekill					"UnitPrekill",					"iiiiibi"
 #define GAMEEVENT_UnitPromoted					"UnitPromoted",					"iii"
 #define GAMEEVENT_UnitUpgraded					"UnitUpgraded",					"iiib"
+#define GAMEEVENT_IdeologyAdopted				"IdeologyAdopted",				"ii"
+#define GAMEEVENT_IdeologySwitched				"IdeologySwitched",				"iii"
+//JFD
 #define GAMEEVENT_PietyChanged              "PietyChange",                  "iii"
 #define GAMEEVENT_PietyRateChanged          "PietyRateChange",              "iii"
 #define GAMEEVENT_PlayerSecularizes         "PlayerSecularizes",            "iib"
@@ -1135,11 +1219,19 @@ enum BattleTypeTypes
 #define GAMEEVENT_GovernmentCooldownRateChanges "GovernmentCooldownRateChanges",    "ii"
 #define GAMEEVENT_GreatWorkCreated          "GreatWorkCreated",             "iii"
 #define GAMEEVENT_PlayerAdoptsCurrency		"PlayerAdoptsCurrency", "iii"
+//Contracts
+#define GAMEEVENT_GetNumContractUnit		"GetNumContractUnit", "ii"
+#define GAMEEVENT_GetContractMaintenance	"GetContractMaintenance", "ii"
+#define GAMEEVENT_GetContractDuration		"GetContractDuration", "ii"
+#define GAMEEVENT_ContractStarted			"ContractStarted", "iiii"
+#define GAMEEVENT_ContractEnded				"ContractEnded", "ii"
+#define GAMEEVENT_ContractsRefreshed		"ContractsRefreshed", ""
+//Other
 #define GAMEEVENT_CityBeginsWLTKD			"CityBeginsWLTKD", "iiii"
 #define GAMEEVENT_CityRazed					"CityRazed", "iii"
 #define GAMEEVENT_CityInvestedBuilding		"CityInvestedBuilding", "iiii"
 #define GAMEEVENT_CityInvestedUnit			"CityInvestedUnit", "iiii"
-// City Events
+// City and Player Events
 #define GAMEEVENT_EventActivated			"EventActivated", "ii"
 #define GAMEEVENT_CityEventActivated		"CityEventActivated", "iii"
 #define GAMEEVENT_EventChoiceActivated		"EventChoiceActivated", "ii"
@@ -1155,14 +1247,19 @@ enum BattleTypeTypes
 #define GAMEEVENT_EventChoiceCanTake		"EventChoiceCanTake", "ii"
 #define GAMEEVENT_CityEventChoiceCanTake    "CityEventChoiceCanTake", "iii"
 #define GAMEEVENT_EventCanTake				"EventCanTake", "ii"
-#define GAMEEVENT_CityEventCanTake			 "CityEventCanTake", "iii"
-
+#define GAMEEVENT_CityEventCanTake			"CityEventCanTake", "iii"
+#define GAMEEVENT_EventUnitCreated			"EventUnitCreated", "iii"
 
 // Serialization wrappers
 #define MOD_SERIALIZE
 
 #if defined(MOD_SERIALIZE)
-#define MOD_SERIALIZE_INIT_READ(stream) uint uiDllSaveVersion; stream >> uiDllSaveVersion
+
+//to help debug errors
+void CheckSentinel(uint);
+
+#define MOD_SERIALIZE_INIT_READ_NO_SENTINEL(stream) uint uiDllSaveVersion; stream >> uiDllSaveVersion;
+#define MOD_SERIALIZE_INIT_READ(stream) uint uiDllSaveVersion, uiSentinel; stream >> uiDllSaveVersion; stream >> uiSentinel; CheckSentinel(uiSentinel);
 #define MOD_SERIALIZE_READ(version, stream, member, def) if (uiDllSaveVersion >= version) { stream >> member; } else { member = def; }
 #define MOD_SERIALIZE_READ_AUTO(version, stream, member, size, def)   \
 	if (uiDllSaveVersion >= version) {                                \
@@ -1182,7 +1279,9 @@ enum BattleTypeTypes
 	} else {																	\
 		for (int iI = 0; iI < size; iI++) { (member)[iI] = def; }				\
 	}
-#define MOD_SERIALIZE_INIT_WRITE(stream) uint uiDllSaveVersion = MOD_DLL_VERSION_NUMBER; stream << uiDllSaveVersion
+
+#define MOD_SERIALIZE_INIT_WRITE_NO_SENTINEL(stream) uint uiDllSaveVersion = MOD_DLL_VERSION_NUMBER; stream << uiDllSaveVersion;
+#define MOD_SERIALIZE_INIT_WRITE(stream) uint uiDllSaveVersion = MOD_DLL_VERSION_NUMBER; stream << uiDllSaveVersion; stream << 0xDEADBEEF;
 #define MOD_SERIALIZE_WRITE(stream, member) CvAssert(uiDllSaveVersion == MOD_DLL_VERSION_NUMBER); stream << member
 #define MOD_SERIALIZE_WRITE_AUTO(stream, member) CvAssert(uiDllSaveVersion == MOD_DLL_VERSION_NUMBER); stream << member
 #define MOD_SERIALIZE_WRITE_ARRAY(stream, member, type, size) CvAssert(uiDllSaveVersion == MOD_DLL_VERSION_NUMBER); stream << ArrayWrapper<type>(size, member)
@@ -1240,6 +1339,7 @@ public:
 	int getOption(std::string sName, int defValue = 0);
 	int getCivOption(const char* szCiv, const char* szName, int defValue = 0);
 
+	MOD_OPT_DECL(GLOBAL_EARLY_COOP_WAR_LOCK);
 	MOD_OPT_DECL(CORE_DEBUGGING);
 	MOD_OPT_DECL(GLOBAL_STACKING_RULES);
 	MOD_OPT_DECL(GLOBAL_BREAK_CIVILIAN_1UPT);
@@ -1260,6 +1360,7 @@ public:
 	MOD_OPT_DECL(GLOBAL_CS_RAZE_RARELY);
 	MOD_OPT_DECL(GLOBAL_CS_LIBERATE_AFTER_BUYOUT);
 	MOD_OPT_DECL(GLOBAL_CS_GIFTS);
+	MOD_OPT_DECL(GLOBAL_CS_GIFTS_LOCAL_XP);
 	MOD_OPT_DECL(GLOBAL_CS_OVERSEAS_TERRITORY);
 	MOD_OPT_DECL(GLOBAL_CS_NO_ALLIED_SKIRMISHES);
 	MOD_OPT_DECL(GLOBAL_VENICE_KEEPS_RESOURCES);
@@ -1275,12 +1376,19 @@ public:
 	MOD_OPT_DECL(GLOBAL_PARATROOPS_AA_DAMAGE);
 	MOD_OPT_DECL(GLOBAL_NUKES_MELT_ICE); 
 	MOD_OPT_DECL(GLOBAL_GREATWORK_YIELDTYPES); 
+	MOD_OPT_DECL(GLOBAL_NO_LOST_GREATWORKS); 
 	MOD_OPT_DECL(GLOBAL_EXCLUDE_FROM_GIFTS);
 	MOD_OPT_DECL(GLOBAL_MOVE_AFTER_UPGRADE);
 	MOD_OPT_DECL(GLOBAL_CANNOT_EMBARK);
 	MOD_OPT_DECL(GLOBAL_SEPARATE_GP_COUNTERS);
 	MOD_OPT_DECL(GLOBAL_TRULY_FREE_GP);
-	
+	MOD_OPT_DECL(NO_AUTO_SPAWN_PROPHET);
+	MOD_OPT_DECL(ALTERNATE_ASSYRIA_TRAIT);
+	MOD_OPT_DECL(NO_REPAIR_FOREIGN_LANDS);
+	MOD_OPT_DECL(NO_YIELD_ICE);
+	MOD_OPT_DECL(NO_MAJORCIV_GIFTING);
+	MOD_OPT_DECL(NO_HEALING_ON_MOUNTAINS);
+	MOD_OPT_DECL(PILLAGE_PERMANENT_IMPROVEMENTS);
 	MOD_OPT_DECL(DIPLOMACY_TECH_BONUSES);
 	MOD_OPT_DECL(DIPLOMACY_AUTO_DENOUNCE);
 	MOD_OPT_DECL(DIPLOMACY_NO_LEADERHEADS);
@@ -1288,7 +1396,8 @@ public:
 	MOD_OPT_DECL(DIPLOMACY_CITYSTATES_QUESTS); 
 	MOD_OPT_DECL(DIPLOMACY_CITYSTATES_RESOLUTIONS); 
 	MOD_OPT_DECL(DIPLOMACY_CITYSTATES_HURRY);
-
+	MOD_OPT_DECL(SHIPS_FIRE_IN_CITIES_IMPROVEMENTS);
+	MOD_OPT_DECL(PSEUDO_NATURAL_WONDER);
 	MOD_OPT_DECL(COMMUNITY_PATCH);
 	MOD_OPT_DECL(BALANCE_CORE);
 	MOD_OPT_DECL(BALANCE_CORE_YIELDS);
@@ -1346,12 +1455,21 @@ public:
 	MOD_OPT_DECL(BALANCE_CORE_JFD);
 	MOD_OPT_DECL(BALANCE_CORE_MILITARY_RESISTANCE);
 	MOD_OPT_DECL(BALANCE_CORE_PANTHEON_RESET_FOUND);
-	MOD_OPT_DECL(BALANCE_CORE_DIPLO_VICTORY_REQUIRES_IDEOLOGY);
+	MOD_OPT_DECL(BALANCE_CORE_VICTORY_GAME_CHANGES);
 	MOD_OPT_DECL(BALANCE_CORE_EVENTS);
 	MOD_OPT_DECL(NO_RANDOM_TEXT_CIVS);
+	MOD_OPT_DECL(BALANCE_RETROACTIVE_PROMOS);
 
-	MOD_OPT_DECL(DIPLOMACY_CIV4_FEATURES); 
+	MOD_OPT_DECL(CIV6_WORKER);
+	MOD_OPT_DECL(CIV6_ROADS);
+	MOD_OPT_DECL(CIV6_EUREKAS);
+	MOD_OPT_DECL(CITY_STATE_SCALE);
+
+	MOD_OPT_DECL(DIPLOMACY_CIV4_FEATURES);
+	MOD_OPT_DECL(CARGO_SHIPS);
 	MOD_OPT_DECL(BARBARIAN_GG_GA_POINTS);
+	MOD_OPT_DECL(ALTERNATE_CELTS);
+	MOD_OPT_DECL(TRAITS_GG_FROM_BARBARIANS);
 	MOD_OPT_DECL(TRAITS_CROSSES_ICE);
 	MOD_OPT_DECL(TRAITS_CITY_WORKING);
 	MOD_OPT_DECL(TRAITS_OTHER_PREREQS);
@@ -1360,9 +1478,12 @@ public:
 	MOD_OPT_DECL(TRAITS_EXTRA_SUPPLY);
 
 	MOD_OPT_DECL(POLICIES_CITY_WORKING);
-
+	MOD_OPT_DECL(ERA_RESTRICTION);
+	MOD_OPT_DECL(USE_TRADE_FEATURES);
 	MOD_OPT_DECL(TECHS_CITY_WORKING);
 
+	MOD_OPT_DECL(PROMOTIONS_AURA_CHANGE);
+	MOD_OPT_DECL(PROMOTIONS_GG_FROM_BARBARIANS);
 	MOD_OPT_DECL(PROMOTIONS_VARIABLE_RECON);
 	MOD_OPT_DECL(PROMOTIONS_CROSS_MOUNTAINS);
 	MOD_OPT_DECL(PROMOTIONS_CROSS_OCEANS);
@@ -1404,7 +1525,7 @@ public:
 
 	MOD_OPT_DECL(AI_SECONDARY_WORKERS);
 	MOD_OPT_DECL(AI_SECONDARY_SETTLERS);
-
+	MOD_OPT_DECL(AI_SMART_V3);
 	MOD_OPT_DECL(AI_SMART);
 	MOD_OPT_DECL(AI_SMART_DEALS);
 	MOD_OPT_DECL(AI_SMART_GREAT_PEOPLE);
@@ -1457,6 +1578,7 @@ public:
 	MOD_OPT_DECL(EVENTS_UNIT_PREKILL);
 	MOD_OPT_DECL(EVENTS_UNIT_CAPTURE);
 	MOD_OPT_DECL(EVENTS_CAN_MOVE_INTO);
+	MOD_OPT_DECL(EVENTS_UNIT_ACTIONS);
 	MOD_OPT_DECL(EVENTS_UNIT_UPGRADES);
 	MOD_OPT_DECL(EVENTS_UNIT_DATA);
 	MOD_OPT_DECL(EVENTS_TRADE_ROUTES);
@@ -1478,7 +1600,7 @@ public:
 	MOD_OPT_DECL(EVENTS_RED_COMBAT_ABORT);
 	MOD_OPT_DECL(EVENTS_RED_COMBAT_RESULT);
 	MOD_OPT_DECL(EVENTS_RED_COMBAT_ENDED);
-
+	MOD_OPT_DECL(ACTIVE_DIPLOMACY);
 	MOD_OPT_DECL(API_ESPIONAGE);
 	MOD_OPT_DECL(API_TRADEROUTES);
 	MOD_OPT_DECL(API_RELIGION);
@@ -1516,6 +1638,7 @@ public:
 	MOD_OPT_DECL(BUGFIX_NO_HOVERING_REBELS);
 	MOD_OPT_DECL(BUGFIX_HOVERING_PATHFINDER);
 	MOD_OPT_DECL(BUGFIX_EMBARKING_PATHFINDER);
+	MOD_OPT_DECL(BUGFIX_MINOR_CIV_STRATEGIES);
 
 protected:
 	bool m_bInit;

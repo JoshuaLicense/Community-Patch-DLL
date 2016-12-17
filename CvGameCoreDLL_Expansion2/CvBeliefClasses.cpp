@@ -70,10 +70,11 @@ CvBeliefEntry::CvBeliefEntry() :
 	m_bRequiresImprovement(false),
 	m_bRequiresResource(false),
 	m_bRequiresNoImprovement(false),
-	m_bRequiresNoImprovementFeature(false),
+	m_bRequiresNoFeature(false),
 #endif
 
 #if defined(MOD_BALANCE_CORE_BELIEFS)
+	m_iGetPressureChangeTradeRoute(0),
 	m_bIsHalvedFollowers(false),
 	m_piYieldPerPop(NULL),
 	m_piYieldPerGPT(NULL),
@@ -99,6 +100,7 @@ CvBeliefEntry::CvBeliefEntry() :
 	m_iMissionaryInfluenceCS(0),
 	m_iHappinessPerPantheon(0),
 	m_iExtraVotes(0),
+	m_iPolicyReductionWonderXFollowerCities(0),
 	m_piMaxYieldPerFollower(NULL),
 #endif
 #if defined(MOD_BALANCE_CORE)
@@ -479,9 +481,9 @@ bool CvBeliefEntry::RequiresNoImprovement() const
 	return m_bRequiresNoImprovement;
 }
 /// Accessor: is this a belief that grants faith only from no improvements on a feature?
-bool CvBeliefEntry::RequiresNoImprovementFeature() const
+bool CvBeliefEntry::RequiresNoFeature() const
 {
-	return m_bRequiresNoImprovementFeature;
+	return m_bRequiresNoFeature;
 }
 #endif
 
@@ -490,6 +492,10 @@ bool CvBeliefEntry::RequiresNoImprovementFeature() const
 bool CvBeliefEntry::IsHalvedFollowers() const
 {
 	return m_bIsHalvedFollowers;
+}
+int CvBeliefEntry::GetPressureChangeTradeRoute() const
+{
+	return m_iGetPressureChangeTradeRoute;
 }
 /// Accessor:: Yield Per Pop
 int CvBeliefEntry::GetYieldPerPop(int i) const
@@ -656,6 +662,11 @@ int CvBeliefEntry::GetHappinessPerPantheon() const
 int CvBeliefEntry::GetExtraVotes() const
 {
 	return m_iExtraVotes;
+}
+/// Accessor: Extra Policy Reduction Wonder X Follower Cities
+int CvBeliefEntry::GetPolicyReductionWonderXFollowerCities() const
+{
+	return m_iPolicyReductionWonderXFollowerCities;
 }
 #endif
 #if defined(MOD_BALANCE_CORE)
@@ -866,7 +877,7 @@ int CvBeliefEntry::GetTerrainYieldChange(int i, int j) const
 #if defined(MOD_API_UNIFIED_YIELDS)
 int CvBeliefEntry::GetTradeRouteYieldChange(int i, int j) const
 {
-	CvAssertMsg(i < GC.getNumDomainInfos(), "Index out of bounds");
+	CvAssertMsg(i < NUM_DOMAIN_TYPES, "Index out of bounds");
 	CvAssertMsg(i > -1, "Index out of bounds");
 	CvAssertMsg(j < NUM_YIELD_TYPES, "Index out of bounds");
 	CvAssertMsg(j > -1, "Index out of bounds");
@@ -1090,15 +1101,17 @@ bool CvBeliefEntry::CacheResults(Database::Results& kResults, CvDatabaseUtility&
 	m_bRequiresImprovement			  = kResults.GetBool("RequiresImprovement");
 	m_bRequiresResource				  = kResults.GetBool("RequiresResource");
 	m_bRequiresNoImprovement		  = kResults.GetBool("RequiresNoImprovement");
-	m_bRequiresNoImprovementFeature	  = kResults.GetBool("RequiresNoImprovementFeature");
+	m_bRequiresNoFeature			  = kResults.GetBool("RequiresNoImprovementFeature");
 #endif
 #if defined(MOD_BALANCE_CORE_BELIEFS)
+	m_iGetPressureChangeTradeRoute = kResults.GetInt("PressureChangeTradeRoute");
 	m_bIsHalvedFollowers			  = kResults.GetBool("HalvedFollowers");
 	m_iCombatVersusOtherReligionOwnLands = kResults.GetInt("CombatVersusOtherReligionOwnLands");
 	m_iCombatVersusOtherReligionTheirLands = kResults.GetInt("CombatVersusOtherReligionTheirLands");
 	m_iMissionaryInfluenceCS = kResults.GetInt("MissionaryInfluenceCS");
 	m_iHappinessPerPantheon = kResults.GetInt("HappinessPerPantheon");
 	m_iExtraVotes = kResults.GetInt("ExtraVotes");
+	m_iPolicyReductionWonderXFollowerCities = kResults.GetInt("PolicyReductionWonderXFollowerCities");
 #endif
 #if defined(MOD_BALANCE_CORE)
 	const char* szCivilizationType = kResults.GetText("CivilizationType");
@@ -1527,8 +1540,14 @@ CvBeliefEntry* CvBeliefXMLEntries::GetEntry(int index)
 // CvReligionBeliefs
 //=====================================
 /// Constructor
-CvReligionBeliefs::CvReligionBeliefs():
-	m_paiBuildingClassEnabled(NULL)
+CvReligionBeliefs::CvReligionBeliefs() :
+#if !defined(MOD_BALANCE_CORE_BELIEFS)
+m_paiBuildingClassEnabled(NULL)
+#else
+m_ReligionBeliefs(NULL),
+m_BeliefLookup(NULL),
+m_eReligion(NO_RELIGION)
+#endif
 {
 	Reset();
 }
@@ -1547,7 +1566,7 @@ CvReligionBeliefs::CvReligionBeliefs(const CvReligionBeliefs& source)
 	m_BeliefLookup = source.m_BeliefLookup;
 	m_eReligion = source.m_eReligion;
 #endif
-
+#if !defined(MOD_BALANCE_CORE_BELIEFS)
 	m_paiBuildingClassEnabled = FNEW(int[GC.getNumBuildingClassInfos()], c_eCiv5GameplayDLL, 0);
 	for(int iI = 0; iI < GC.getNumBuildingClassInfos(); iI++)
 	{
@@ -1559,12 +1578,15 @@ CvReligionBeliefs::CvReligionBeliefs(const CvReligionBeliefs& source)
 
 		m_paiBuildingClassEnabled[iI] = source.m_paiBuildingClassEnabled[iI];
 	}
+#endif
 }
 
 /// Deallocate memory created in initialize
 void CvReligionBeliefs::Uninit()
 {
+#if !defined(MOD_BALANCE_CORE_BELIEFS)
 	SAFE_DELETE_ARRAY(m_paiBuildingClassEnabled);
+#endif
 }
 
 /// Reset data members
@@ -1616,7 +1638,7 @@ void CvReligionBeliefs::Reset()
 	m_eReligion = NO_RELIGION;
 	m_BeliefLookup = std::vector<int>(GC.GetGameBeliefs()->GetNumBeliefs(),0);
 #endif
-
+#if !defined(MOD_BALANCE_CORE_BELIEFS)
 	m_paiBuildingClassEnabled = FNEW(int[GC.getNumBuildingClassInfos()], c_eCiv5GameplayDLL, 0);
 	for(int iI = 0; iI < GC.getNumBuildingClassInfos(); iI++)
 	{
@@ -1628,6 +1650,7 @@ void CvReligionBeliefs::Reset()
 
 		m_paiBuildingClassEnabled[iI] = 0;
 	}
+#endif
 }
 #if defined(MOD_BALANCE_CORE)
 void CvReligionBeliefs::SetReligion(ReligionTypes eReligion)
@@ -1687,7 +1710,6 @@ void CvReligionBeliefs::AddBelief(BeliefTypes eBelief)
 
 	m_eObsoleteEra = belief->GetObsoleteEra();
 	m_eResourceRevealed = belief->GetResourceRevealed();
-#endif
 	for (int iI = 0; iI < GC.getNumBuildingClassInfos(); iI++)
 	{
 		if (belief->IsBuildingClassEnabled(iI))
@@ -1695,7 +1717,6 @@ void CvReligionBeliefs::AddBelief(BeliefTypes eBelief)
 			m_paiBuildingClassEnabled[iI]++;
 		}
 	}
-#if !defined(MOD_BALANCE_CORE_BELIEFS)
 	if(belief->GetSpreadModifierDoublingTech() != NO_TECH)
 	{
 		m_eSpreadModifierDoublingTech = belief->GetSpreadModifierDoublingTech();
@@ -1751,7 +1772,7 @@ bool CvReligionBeliefs::IsBeliefValid(BeliefTypes eBelief, ReligionTypes eReligi
 		}
 		if(eReligion != NO_RELIGION && pBeliefs->GetEntry(eBelief)->IsEnhancerBelief())
 		{
-			if(pCity != NULL && !pCity->GetCityReligions()->IsHolyCityForReligion(eReligion))
+			if (pCity != NULL && !pCity->GetCityReligions()->IsHolyCityForReligion(eReligion))
 			{
 				return false;
 			}
@@ -2209,6 +2230,21 @@ int CvReligionBeliefs::GetExtraVotes(PlayerTypes ePlayer) const
 		if(IsBeliefValid((BeliefTypes)*it, GetReligion(), ePlayer))
 		{
 			rtnValue += pBeliefs->GetEntry(*it)->GetExtraVotes();
+		}
+	}
+
+	return rtnValue;
+}
+int CvReligionBeliefs::GetPolicyReductionWonderXFollowerCities(PlayerTypes ePlayer) const
+{
+	CvBeliefXMLEntries* pBeliefs = GC.GetGameBeliefs();
+	int rtnValue = 0;
+
+	for(BeliefList::const_iterator it = m_ReligionBeliefs.begin(); it != m_ReligionBeliefs.end(); ++it)
+	{
+		if(IsBeliefValid((BeliefTypes)*it, GetReligion(), ePlayer))
+		{
+			rtnValue += pBeliefs->GetEntry(*it)->GetPolicyReductionWonderXFollowerCities();
 		}
 	}
 
@@ -3124,9 +3160,22 @@ int CvReligionBeliefs::GetMaxYieldModifierPerFollower(YieldTypes eYieldType, Pla
 }
 
 /// Does this belief allow a building to be constructed?
-bool CvReligionBeliefs::IsBuildingClassEnabled(BuildingClassTypes eType) const
+bool CvReligionBeliefs::IsBuildingClassEnabled(BuildingClassTypes eType, PlayerTypes ePlayer) const
 {
-	return m_paiBuildingClassEnabled[(int)eType];
+	CvBeliefXMLEntries* pBeliefs = GC.GetGameBeliefs();
+
+	for (BeliefList::const_iterator it = m_ReligionBeliefs.begin(); it != m_ReligionBeliefs.end(); ++it)
+	{
+		if (IsBeliefValid((BeliefTypes)*it, GetReligion(), ePlayer))
+		{
+			if (pBeliefs->GetEntry(*it)->IsBuildingClassEnabled((int)eType))
+			{
+				return true;
+			}
+		}
+	}
+
+	return false;
 }
 
 /// Is there a belief that allows faith buying of units
@@ -3242,7 +3291,7 @@ bool CvReligionBeliefs::RequiresNoImprovement(PlayerTypes ePlayer) const
 	return false;
 }
 /// Is there a belief that requires improvements?
-bool CvReligionBeliefs::RequiresNoImprovementFeature(PlayerTypes ePlayer) const
+bool CvReligionBeliefs::RequiresNoFeature(PlayerTypes ePlayer) const
 {
 	CvBeliefXMLEntries* pBeliefs = GC.GetGameBeliefs();
 
@@ -3250,7 +3299,7 @@ bool CvReligionBeliefs::RequiresNoImprovementFeature(PlayerTypes ePlayer) const
 	{
 		if(IsBeliefValid((BeliefTypes)*it, GetReligion(), ePlayer))
 		{
-			if (pBeliefs->GetEntry(*it)->RequiresNoImprovementFeature())
+			if (pBeliefs->GetEntry(*it)->RequiresNoFeature())
 			{
 				return true;
 			}
@@ -3308,6 +3357,22 @@ int CvReligionBeliefs::GetYieldPerPop(YieldTypes eYieldType, PlayerTypes ePlayer
 		if(IsBeliefValid((BeliefTypes)*it, GetReligion(), ePlayer))
 		{
 			rtnValue += pBeliefs->GetEntry(*it)->GetYieldPerPop(eYieldType);
+		}
+	}
+
+	return rtnValue;
+}
+/// Get bonus pressure from trade routes
+int CvReligionBeliefs::GetPressureChangeTradeRoute(PlayerTypes ePlayer) const
+{
+	CvBeliefXMLEntries* pBeliefs = GC.GetGameBeliefs();
+	int rtnValue = 0;
+
+	for(BeliefList::const_iterator it = m_ReligionBeliefs.begin(); it != m_ReligionBeliefs.end(); ++it)
+	{
+		if(IsBeliefValid((BeliefTypes)*it, GetReligion(), ePlayer))
+		{
+			rtnValue += pBeliefs->GetEntry(*it)->GetPressureChangeTradeRoute();
 		}
 	}
 
@@ -3630,7 +3695,7 @@ int CvReligionBeliefs::GetMaxYieldPerFollower(YieldTypes eYieldType, PlayerTypes
 
 	return rtnValue;
 }
-/// Get yield from beliefs from # of followers
+/// Get unique civ
 CivilizationTypes CvReligionBeliefs::GetUniqueCiv(PlayerTypes ePlayer) const
 {
 	CvBeliefXMLEntries* pBeliefs = GC.GetGameBeliefs();
@@ -3721,8 +3786,9 @@ void CvReligionBeliefs::Read(FDataStream& kStream)
 		m_BeliefLookup[iBeliefIndex] = 1;
 #endif
 	}
-
+#if !defined(MOD_BALANCE_CORE)
 	BuildingClassArrayHelpers::Read(kStream, m_paiBuildingClassEnabled);
+#endif
 }
 
 /// Serialization write
@@ -3781,20 +3847,21 @@ void CvReligionBeliefs::Write(FDataStream& kStream) const
 	{
 		CvInfosSerializationHelper::WriteHashed(kStream, (BeliefTypes)m_ReligionBeliefs[i]);
 	}
-
+#if !defined(MOD_BALANCE_CORE)
 	BuildingClassArrayHelpers::Write(kStream, m_paiBuildingClassEnabled, GC.getNumBuildingClassInfos());
+#endif
 }
 
 /// BELIEF HELPER CLASSES
 
 /// Is there an adjacent barbarian naval unit that could be converted?
 #if defined(MOD_EVENTS_UNIT_CAPTURE)
-bool CvBeliefHelpers::ConvertBarbarianUnit(const CvUnit *pByUnit, UnitHandle pUnit)
+bool CvBeliefHelpers::ConvertBarbarianUnit(const CvUnit *pByUnit, CvUnit* pUnit)
 #else
-bool CvBeliefHelpers::ConvertBarbarianUnit(CvPlayer *pPlayer, UnitHandle pUnit)
+bool CvBeliefHelpers::ConvertBarbarianUnit(CvPlayer *pPlayer, CvUnit* pUnit)
 #endif
 {
-	UnitHandle pNewUnit;
+	CvUnit* pNewUnit;
 	CvPlot *pPlot = pUnit->plot();
 
 #if defined(MOD_EVENTS_UNIT_CAPTURE)
@@ -3808,7 +3875,7 @@ bool CvBeliefHelpers::ConvertBarbarianUnit(CvPlayer *pPlayer, UnitHandle pUnit)
 	// Convert the barbarian into our unit
 	pNewUnit = pPlayer->initUnit(pUnit->getUnitType(), pUnit->getX(), pUnit->getY(), pUnit->AI_getUnitAIType(), NO_DIRECTION, true /*bNoMove*/, false);
 	CvAssertMsg(pNewUnit, "pNewUnit is not assigned a valid value");
-	pNewUnit->convert(pUnit.pointer(), false);
+	pNewUnit->convert(pUnit, false);
 	pNewUnit->setupGraphical();
 	pNewUnit->finishMoves(); // No move first turn
 

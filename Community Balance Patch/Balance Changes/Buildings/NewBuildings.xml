@@ -243,8 +243,8 @@
 			<ArtDefineTag>TEMPLE</ArtDefineTag>
 			<ConversionModifier>-20</ConversionModifier>
 			<Cost>-1</Cost>
-			<Defense>300</Defense>
-			<ExtraCityHitPoints>25</ExtraCityHitPoints>
+			<Defense>1000</Defense>
+			<ExtraCityHitPoints>50</ExtraCityHitPoints>
 			<ReligiousPressureModifier>25</ReligiousPressureModifier>
 			<MinAreaSize>-1</MinAreaSize>
 			<IconAtlas>COMMUNITY_ATLAS</IconAtlas>
@@ -262,6 +262,7 @@
 			<ArtDefineTag>ART_DEF_BUILDING_MARKET</ArtDefineTag>
 			<SpecialistType>SPECIALIST_MUSICIAN</SpecialistType>
 			<SpecialistCount>1</SpecialistCount>
+			<CultureRateModifier>10</CultureRateModifier>
 			<GreatWorkSlotType>GREAT_WORK_SLOT_MUSIC</GreatWorkSlotType>
 			<GreatWorkCount>1</GreatWorkCount>
 			<MinAreaSize>-1</MinAreaSize>
@@ -362,7 +363,7 @@
 			<Type>BUILDING_MOMA</Type>
 			<BuildingClass>BUILDINGCLASS_HERMITAGE</BuildingClass>
 			<Cost>125</Cost>
-			<PrereqTech>TECH_ARCHAEOLOGY</PrereqTech>
+			<PrereqTech>TECH_SCIENTIFIC_THEORY</PrereqTech>
 			<Help>TXT_KEY_BUILDING_MOMA_HELP</Help>
 			<Description>TXT_KEY_BUILDING_MOMA</Description>
 			<Civilopedia>TXT_KEY_CIV5_BUILDINGS_MOMA_TEXT</Civilopedia>
@@ -458,7 +459,7 @@
 			<Strategy>TXT_KEY_BUILDING_ODEON_STRATEGY</Strategy>
 			<Help>TXT_KEY_BUILDING_ODEON_HELP</Help>
 			<ArtDefineTag>COLESSEUM</ArtDefineTag>
-			<Defense>400</Defense>
+			<Defense>1000</Defense>
 			<GreatWorkSlotType>GREAT_WORK_SLOT_LITERATURE</GreatWorkSlotType>
 			<GreatWorkCount>1</GreatWorkCount>
 			<TechEnhancedTourism>2</TechEnhancedTourism>
@@ -475,7 +476,9 @@
 			<Cost>275</Cost>
 			<GoldMaintenance>2</GoldMaintenance>
 			<FreeStartEra>ERA_INDUSTRIAL</FreeStartEra>
-			<PrereqTech>TECH_CHIVALRY</PrereqTech>
+			<PrereqTech>TECH_STEEL</PrereqTech>
+			<GreatWorkSlotType>GREAT_WORK_SLOT_MUSIC</GreatWorkSlotType>
+			<GreatWorkCount>1</GreatWorkCount>
 			<Help>TXT_KEY_BUILDING_DOJO_HELP</Help>
 			<Description>TXT_KEY_BUILDING_DOJO</Description>
 			<Civilopedia>TXT_KEY_CIV5_BUILDINGS_DOJO_TEXT</Civilopedia>
@@ -562,6 +565,7 @@
 			<Strategy>TXT_KEY_BUILDING_JELLING_STONES_STRATEGY</Strategy>
 			<ArtDefineTag>ART_DEF_BUILDING_NATIONAL_EPIC</ArtDefineTag>
 			<GreatPeopleRateModifier>15</GreatPeopleRateModifier>
+			<AllowsWaterRoutes>true</AllowsWaterRoutes>
 			<HurryCostModifier>25</HurryCostModifier>
 			<MinAreaSize>-1</MinAreaSize>
 			<IconAtlas>COMMUNITY_ATLAS</IconAtlas>
@@ -583,8 +587,8 @@
 			<ReligiousPressureModifier>15</ReligiousPressureModifier>
 			<ConversionModifier>15</ConversionModifier>
 			<AllowsRangeStrike>true</AllowsRangeStrike>
-			<Defense>800</Defense>
-			<ExtraCityHitPoints>75</ExtraCityHitPoints>
+			<Defense>1800</Defense>
+			<ExtraCityHitPoints>125</ExtraCityHitPoints>
 			<HurryCostModifier>33</HurryCostModifier>
 			<IconAtlas>COMMUNITY_ATLAS</IconAtlas>
 			<PortraitIndex>16</PortraitIndex>
@@ -815,7 +819,7 @@
 			<Type>BUILDING_GROVE</Type>
 			<BuildingClass>BUILDINGCLASS_GROVE</BuildingClass>
 			<Cost>65</Cost>
-			<GoldMaintenance>1</GoldMaintenance>
+			<GoldMaintenance>0</GoldMaintenance>
 			<PrereqTech>TECH_THE_WHEEL</PrereqTech>
 			<Description>TXT_KEY_BUILDING_GROVE</Description>
 			<Civilopedia>TXT_KEY_CIV5_BUILDINGS_GROVE_TEXT</Civilopedia>

@@ -52,6 +52,21 @@ CvUnitEntry::CvUnitEntry(void) :
 #if defined(MOD_BALANCE_CORE)
 	m_iNumFreeLux(0),
 	m_iBeliefUnlock(NO_BELIEF),
+	m_bCultureFromExperienceOnDisband(false),
+	m_bIsConvertUnit(false),
+	m_bFreeUpgrade(false),
+	m_bUnitEraUpgrade(false),
+	m_bIsConvertOnDamage(false),
+	m_eConvertUnit(NO_UNIT),
+	m_iDamageThreshold(0),
+	m_bIsConvertOnFullHP(0),
+	m_bWarOnly(0),
+	m_bConvertEnemyUnitToBarbarian(false),
+	m_bWLTKD(false),
+	m_bGoldenAge(false),
+	m_bCultureBoost(0),
+	m_bExtraAttackHealthOnKill(false),
+	m_bHighSeaRaider(false),
 #endif
 	m_bSpreadReligion(false),
 	m_bRemoveHeresy(false),
@@ -60,12 +75,21 @@ CvUnitEntry::CvUnitEntry(void) :
 	m_bFoundReligion(false),
 	m_bRequiresEnhancedReligion(false),
 	m_bProhibitsSpread(false),
+#if defined(MOD_CIV6_WORKER)
+	m_iBuilderStrength(0),
+#endif
 	m_bCanBuyCityState(false),
 #if defined(MOD_GLOBAL_SEPARATE_GREAT_ADMIRAL)
 	m_bCanRepairFleet(false),
 	m_bCanChangePort(false),
 #endif
 	m_iCombat(0),
+#if defined(MOD_GLOBAL_STACKING_RULES)
+	m_iStackCombat(0),
+#endif
+#if defined(MOD_CARGO_SHIPS)
+	m_iCargoCombat(0),
+#endif
 	m_iCombatLimit(0),
 	m_iRangedCombat(0),
 	m_iRangedCombatLimit(0),
@@ -164,6 +188,9 @@ CvUnitEntry::CvUnitEntry(void) :
 	m_paeGreatWorks(NULL),
 #if defined(MOD_BALANCE_CORE)
 	m_paeGreatPersonEra(NULL),
+	m_piEraCombatStrength(NULL),
+	m_ppiEraUnitCombatType(NULL),
+	m_ppiEraUnitPromotions(NULL),
 #endif
 #if defined(MOD_GLOBAL_STACKING_RULES)
 	m_iNumberStackingUnits(0),
@@ -201,7 +228,16 @@ CvUnitEntry::~CvUnitEntry(void)
 	SAFE_DELETE_ARRAY(m_paszUnitNames);
 	SAFE_DELETE_ARRAY(m_paeGreatWorks);
 #if defined(MOD_BALANCE_CORE)
-	SAFE_DELETE_ARRAY(m_paeGreatPersonEra);	
+	SAFE_DELETE_ARRAY(m_paeGreatPersonEra);
+	SAFE_DELETE_ARRAY(m_piEraCombatStrength);
+	if(m_ppiEraUnitCombatType != NULL)
+	{
+		CvDatabaseUtility::SafeDelete2DArray(m_ppiEraUnitCombatType);
+	}
+	if(m_ppiEraUnitPromotions != NULL)
+	{
+		CvDatabaseUtility::SafeDelete2DArray(m_ppiEraUnitPromotions);
+	}
 #endif
 
 }
@@ -250,6 +286,7 @@ bool CvUnitEntry::CacheResults(Database::Results& kResults, CvDatabaseUtility& k
 #endif
 #if defined(MOD_BALANCE_CORE)
 	m_iNumFreeLux = kResults.GetInt("NumFreeLux");
+	m_bFreeUpgrade = kResults.GetBool("FreeUpgrade");
 #endif
 	m_bSpreadReligion = kResults.GetBool("SpreadReligion");
 	m_bRemoveHeresy = kResults.GetBool("RemoveHeresy");
@@ -258,6 +295,9 @@ bool CvUnitEntry::CacheResults(Database::Results& kResults, CvDatabaseUtility& k
 	m_bFoundReligion = kResults.GetBool("FoundReligion");
 	m_bRequiresEnhancedReligion = kResults.GetBool("RequiresEnhancedReligion");
 	m_bProhibitsSpread = kResults.GetBool("ProhibitsSpread");
+#if defined(MOD_CIV6_WORKER)
+	m_iBuilderStrength = kResults.GetInt("BuilderStrength");
+#endif
 	m_bCanBuyCityState = kResults.GetBool("CanBuyCityState");
 #if defined(MOD_GLOBAL_SEPARATE_GREAT_ADMIRAL)
 	m_bCanRepairFleet = kResults.GetBool("CanRepairFleet");
@@ -322,6 +362,10 @@ bool CvUnitEntry::CacheResults(Database::Results& kResults, CvDatabaseUtility& k
 
 #if defined(MOD_GLOBAL_STACKING_RULES)
 	m_iNumberStackingUnits = kResults.GetInt("NumberStackingUnits");
+	m_iStackCombat = kResults.GetInt("StackCombat");
+#endif
+#if defined(MOD_CARGO_SHIPS)
+	m_iCargoCombat = kResults.GetInt("CargoCombat");
 #endif
 
 	//References
@@ -361,6 +405,21 @@ bool CvUnitEntry::CacheResults(Database::Results& kResults, CvDatabaseUtility& k
 
 	szTextVal = kResults.GetText("BeliefRequired");
 	m_iBeliefUnlock = GC.getInfoTypeForString(szTextVal, true);
+	m_bCultureFromExperienceOnDisband = kResults.GetBool("CulExpOnDisbandUpgrade");
+	m_bIsConvertUnit = kResults.GetBool("IsConvertUnit");
+	m_bUnitEraUpgrade = kResults.GetBool("UnitEraUpgrade");
+	m_bIsConvertOnDamage = kResults.GetBool("ConvertOnDamage");
+	m_iDamageThreshold = kResults.GetInt("DamageThreshold");
+	szTextVal = kResults.GetText("ConvertUnit");
+	m_eConvertUnit = (UnitTypes)GC.getInfoTypeForString(szTextVal, true);
+	m_bIsConvertOnFullHP = kResults.GetBool("ConvertOnFullHP");
+	m_bWarOnly = kResults.GetBool("WarOnly");
+	m_bConvertEnemyUnitToBarbarian = kResults.GetBool("ConvertEnemyUnitToBarbarian");
+	m_bWLTKD = kResults.GetBool("WLTKDFromBirth");
+	m_bGoldenAge = kResults.GetBool("GoldenAgeFromBirth");
+	m_bCultureBoost = kResults.GetBool("CultureBoost");
+	m_bExtraAttackHealthOnKill = kResults.GetBool("ExtraAttackHealthOnKill");
+	m_bHighSeaRaider = kResults.GetBool("HighSeaRaider");
 #endif
 
 #if defined(MOD_EVENTS_CAN_MOVE_INTO)
@@ -408,6 +467,7 @@ bool CvUnitEntry::CacheResults(Database::Results& kResults, CvDatabaseUtility& k
 
 	//Arrays
 	const char* szUnitType = GetType();
+	const size_t lenUnitType = strlen(szUnitType);
 
 	kUtility.SetFlavors(m_piFlavorValue, "Unit_Flavors", "UnitType", szUnitType);
 
@@ -433,6 +493,7 @@ bool CvUnitEntry::CacheResults(Database::Results& kResults, CvDatabaseUtility& k
 #if defined(MOD_BALANCE_CORE)
 	kUtility.PopulateArrayByExistence(m_pbBuildOnFound, "BuildingClasses", "Unit_BuildOnFound", "BuildingClassType", "UnitType", szUnitType);
 	kUtility.PopulateArrayByExistence(m_pbBuildingClassPurchaseRequireds, "BuildingClasses", "Unit_BuildingClassPurchaseRequireds", "BuildingClassType", "UnitType", szUnitType);
+	kUtility.PopulateArrayByValue(m_piEraCombatStrength, "Eras", "Unit_EraCombatStrength", "EraType", "UnitType", szUnitType, "CombatStrength");
 #endif
 	//TechTypes
 	{
@@ -564,7 +625,61 @@ bool CvUnitEntry::CacheResults(Database::Results& kResults, CvDatabaseUtility& k
 		pMovementRates->Reset();
 
 	}
+#if defined(MOD_BALANCE_CORE)
+	//Populate m_ppiEraUnitCombatType
+	{
+		const int iNumUnitCombats = kUtility.MaxRows("UnitCombatInfos");
+		const int iNumEras = kUtility.MaxRows("Eras");
+		kUtility.Initialize2DArray(m_ppiEraUnitCombatType, iNumUnitCombats, iNumEras);
 
+		std::string sqlKey = "Units - EraCombatType";
+		Database::Results* pResults = kUtility.GetResults(sqlKey);
+		if(pResults == NULL)
+		{
+			pResults = kUtility.PrepareResults(sqlKey, "select UnitCombatInfos.ID as UnitCombatInfosID, Eras.ID as ErasID, Value from Unit_EraCombatType inner join UnitCombatInfos on UnitCombatType = UnitCombatInfos.Type inner join Eras on EraType = Eras.Type where UnitType = ?");
+		}
+
+		pResults->Bind(1, szUnitType, lenUnitType, false);
+
+		while(pResults->Step())
+		{
+			const int UnitCombatInfosID = pResults->GetInt(0);
+			const int ErasID = pResults->GetInt(1);
+			const int Value = pResults->GetInt(2);
+
+			m_ppiEraUnitCombatType[UnitCombatInfosID][ErasID] = Value;
+		}
+
+		pResults->Reset();
+	}
+
+	//Populate m_ppiEraUnitPromotions
+	{
+		const int iNumPromotions = kUtility.MaxRows("UnitPromotions");
+		const int iNumEras = kUtility.MaxRows("Eras");
+		kUtility.Initialize2DArray(m_ppiEraUnitPromotions, iNumPromotions, iNumEras);
+
+		std::string sqlKey = "Units - EraUnitPromotions";
+		Database::Results* pResults = kUtility.GetResults(sqlKey);
+		if(pResults == NULL)
+		{
+			pResults = kUtility.PrepareResults(sqlKey, "select UnitPromotions.ID as UnitPromotionsID, Eras.ID as ErasID, Value from Unit_EraUnitPromotions inner join UnitPromotions on PromotionType = UnitPromotions.Type inner join Eras on EraType = Eras.Type where UnitType = ?");
+		}
+
+		pResults->Bind(1, szUnitType, lenUnitType, false);
+
+		while(pResults->Step())
+		{
+			const int UnitPromotionsID = pResults->GetInt(0);
+			const int ErasID = pResults->GetInt(1);
+			const int Value = pResults->GetInt(2);
+
+			m_ppiEraUnitPromotions[UnitPromotionsID][ErasID] = Value;
+		}
+
+		pResults->Reset();
+	}
+#endif
 	// Calculate military Power and cache it
 	DoUpdatePower();
 
@@ -752,6 +867,10 @@ int CvUnitEntry::GetNumFreeLux() const
 {
 	return m_iNumFreeLux;
 }
+bool CvUnitEntry::IsFreeUpgrade() const
+{
+	return m_bFreeUpgrade;
+}
 /// Belief Unlock only (if faith purchasing enabled)
 int CvUnitEntry::GetBeliefUnlock() const
 {
@@ -781,6 +900,14 @@ int CvUnitEntry::GetReligiousStrength() const
 {
 	return m_iReligiousStrength;
 }
+
+#if defined(MOD_CIV6_WORKER)
+/// How strong is this builder unit?
+int CvUnitEntry::GetBuilderStrength() const
+{
+	return m_iBuilderStrength;
+}
+#endif
 
 /// Can this Unit Found a Religion?
 bool CvUnitEntry::IsFoundReligion() const
@@ -1191,6 +1318,73 @@ int CvUnitEntry::GetNumberStackingUnits() const
 {
 	return m_iNumberStackingUnits;
 }
+
+int CvUnitEntry::StackCombat() const
+{
+	return m_iStackCombat;
+}
+bool CvUnitEntry::IsCultureFromExperienceDisbandUpgrade() const
+{
+	return m_bCultureFromExperienceOnDisband;
+}
+bool CvUnitEntry::IsConvertUnit() const
+{
+	return m_bIsConvertUnit;
+}
+bool CvUnitEntry::IsConvertOnDamage() const
+{
+	return m_bIsConvertOnDamage;
+}
+bool CvUnitEntry::IsUnitEraUpgrade() const
+{
+	return m_bUnitEraUpgrade;
+}
+int CvUnitEntry::GetDamageThreshold() const
+{
+	return m_iDamageThreshold;
+}
+UnitTypes CvUnitEntry::GetConvertUnit() const
+{
+	return m_eConvertUnit;
+}
+bool CvUnitEntry::IsConvertOnFullHP() const
+{
+	return m_bIsConvertOnFullHP;
+}
+bool CvUnitEntry::IsWarOnly() const
+{
+	return m_bWarOnly;
+}
+bool CvUnitEntry::IsConvertEnemyUnitToBarbarian() const
+{
+	return m_bConvertEnemyUnitToBarbarian;
+}
+bool CvUnitEntry::IsWLTKDFromBirth() const
+{
+	return m_bWLTKD;
+}
+bool CvUnitEntry::IsGoldenAgeFromBirth() const
+{
+	return m_bGoldenAge;
+}
+bool CvUnitEntry::IsCultureBoost() const
+{
+	return m_bCultureBoost;
+}
+bool CvUnitEntry::IsExtraAttackHealthOnKill() const
+{
+	return m_bExtraAttackHealthOnKill;
+}
+bool CvUnitEntry::IsHighSeaRaider() const
+{
+	return m_bHighSeaRaider;
+}
+#endif
+#if defined(MOD_CARGO_SHIPS)
+int CvUnitEntry::CargoCombat() const
+{
+	return m_iCargoCombat;
+}
 #endif
 
 // ARRAYS
@@ -1330,6 +1524,41 @@ bool CvUnitEntry::GetBuildingClassPurchaseRequireds(int i) const
 	CvAssertMsg(i < GC.getNumBuildingClassInfos(), "Index out of bounds");
 	CvAssertMsg(i > -1, "Index out of bounds");
 	return m_pbBuildingClassPurchaseRequireds ? m_pbBuildingClassPurchaseRequireds[i] : false;
+}
+/// Does this Unit get a new combat strength when reaching a new Era?
+int CvUnitEntry::GetEraCombatStrength(int i) const
+{
+	CvAssertMsg(i < GC.getNumEraInfos(), "Index out of bounds");
+	CvAssertMsg(i > -1, "Index out of bounds");
+	return m_piEraCombatStrength ? m_piEraCombatStrength[i] : -1;
+}
+
+/// Accessor:: Does this Unit have a different CombatType in a new Era?
+int CvUnitEntry::GetUnitNewEraCombatType(int i, int j) const
+{
+	CvAssertMsg(i < GC.getNumUnitCombatClassInfos(), "Index out of bounds");
+	CvAssertMsg(i > -1, "Index out of bounds");
+	CvAssertMsg(j < GC.getNumEraInfos(), "Index out of bounds");
+	CvAssertMsg(j > -1, "Index out of bounds");
+	return m_ppiEraUnitCombatType ? m_ppiEraUnitCombatType[i][j] : 0;
+}
+int* CvUnitEntry::GetUnitNewEraCombatTypeChangesArray(int i)
+{
+	return m_ppiEraUnitCombatType[i];
+}
+/// Accessor:: Does this Unit get promotions in a new Era?
+int CvUnitEntry::GetUnitNewEraPromotions(int i, int j) const
+{
+	CvAssertMsg(i < GC.getNumPromotionInfos(), "Index out of bounds");
+	CvAssertMsg(i > -1, "Index out of bounds");
+	CvAssertMsg(j < GC.getNumEraInfos(), "Index out of bounds");
+	CvAssertMsg(j > -1, "Index out of bounds");
+	return m_ppiEraUnitPromotions ? m_ppiEraUnitPromotions[i][j] : 0;
+}
+
+int* CvUnitEntry::GetUnitNewEraPromotionsChangesArray(int i)
+{
+	return m_ppiEraUnitPromotions[i];
 }
 #endif
 
@@ -1502,9 +1731,11 @@ void CvUnitEntry::DoUpdatePower()
 	if(GetDomainType() == DOMAIN_SEA)
 	{
 #if defined(MOD_BUGFIX_UNIT_POWER_CALC)
-		if (!MOD_BUGFIX_UNIT_POWER_CALC) {
+		if (!MOD_BUGFIX_UNIT_POWER_CALC)
+		{
 #if defined(MOD_BUGFIX_UNIT_POWER_NAVAL_CONSISTENCY)
-			if (!MOD_BUGFIX_UNIT_POWER_NAVAL_CONSISTENCY) {
+			if (!MOD_BUGFIX_UNIT_POWER_NAVAL_CONSISTENCY)
+			{
 				// We can either ignore this or divide naval melee attacks by two, but if we leave this alone Destroyers are more than twice as powerful as Battleships!!!
 #endif
 #endif

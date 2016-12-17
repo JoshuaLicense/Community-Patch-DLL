@@ -97,6 +97,10 @@ public:
 	int  GetExtraAttacks() const;
 	bool IsGreatGeneral() const;
 	bool IsGreatAdmiral() const;
+#if defined(MOD_PROMOTIONS_AURA_CHANGE)
+	int GetAuraRangeChange() const;
+	int GetAuraEffectChange() const;
+#endif
 	int  GetGreatGeneralModifier() const;
 	bool IsGreatGeneralReceivesMovement() const;
 	int  GetGreatGeneralCombatModifier() const;
@@ -151,6 +155,12 @@ public:
 	bool IsCityStateOnly() const;
 	bool IsBarbarianOnly() const;
 	int GetMoraleBreakChance() const;
+	UnitClassTypes GetCombatBonusFromNearbyUnitClass() const;
+	int GetNearbyUnitClassBonusRange() const;
+	int GetNearbyUnitClassBonus() const;
+	int GetWonderProductionModifier() const;
+	bool IsStrongerDamaged() const;
+	bool IsMountainsDoubleMove() const;
 #endif
 	bool IsCannotBeChosen() const;
 	bool IsLostWithUpgrade() const;
@@ -189,6 +199,9 @@ public:
 #if defined(MOD_PROMOTIONS_CROSS_ICE)
 	bool CanCrossIce() const;
 #endif
+#if defined(MOD_PROMOTIONS_GG_FROM_BARBARIANS)
+	bool IsGGFromBarbarians() const;
+#endif
 	bool IsRoughTerrainEndsTurn() const;
 	bool IsHoveringUnit() const;
 	bool IsFlatMovementCost() const;
@@ -218,6 +231,27 @@ public:
 	bool IsIgnoreGreatGeneralBenefit() const;
 	bool IsIgnoreZOC() const;
 	bool IsSapper() const;
+#if defined(MOD_BALANCE_CORE)
+	bool IsNearbyCityPromotion() const;
+	bool IsNearbyFriendlyCityPromotion() const;
+	bool IsNearbyEnemyCityPromotion() const;
+	bool IsNearbyPromotion() const;
+	bool IsFriendlyLands() const;
+	bool IsEnemyLands() const;
+	int GetNearbyRange() const;
+	UnitTypes getRequiredUnit() const;
+	UnitTypes GetConvertDomainUnit() const;
+	DomainTypes GetConvertDomain() const;
+	PromotionTypes AddedFromNearbyPromotion() const;
+	int GetStackedGreatGeneralExperience() const;
+	int GetPillageBonusStrengthPercent() const;
+	int GetReligiousPressureModifier() const;
+	int GetAdjacentCityDefenseMod() const;
+	int GetNearbyEnemyDamage() const;
+	PromotionTypes GetAdjacentSameType() const;
+	int GetMilitaryProductionModifier() const;
+	bool IsHighSeaRaider() const;
+#endif
 	bool IsCanHeavyCharge() const;
 	bool HasPostCombatPromotions() const;
 	bool ArePostCombatPromotionsExclusive() const;
@@ -232,10 +266,12 @@ public:
 	int GetFeatureDefensePercent(int i) const;
 #if defined(MOD_BALANCE_CORE)
 	int GetYieldFromScouting(int i) const;
+	int GetYieldModifier(int i) const;
 #endif
 #if defined(MOD_API_UNIFIED_YIELDS)
 	int GetYieldFromKills(int i) const;
 	int GetYieldFromBarbarianKills(int i) const;
+	int GetGarrisonYield(int i) const;
 #endif
 	int GetUnitCombatModifierPercent(int i) const;
 	int GetUnitClassModifierPercent(int i) const;
@@ -325,6 +361,10 @@ protected:
 	int m_iExtraAttacks;
 	bool m_bGreatGeneral;
 	bool m_bGreatAdmiral;
+#if defined(MOD_PROMOTIONS_AURA_CHANGE)
+	int m_iAuraRangeChange;
+	int m_iAuraEffectChange;
+#endif
 	int m_iGreatGeneralModifier;
 	bool m_bGreatGeneralReceivesMovement;
 	int m_iGreatGeneralCombatModifier;
@@ -374,6 +414,7 @@ protected:
 	bool m_bIsLostOnMove;
 	bool m_bCityStateOnly;
 	bool m_bBarbarianOnly;
+	bool m_bStrongerDamaged;
 #endif
 	bool m_bCannotBeChosen;
 	bool m_bLostWithUpgrade;
@@ -402,6 +443,13 @@ protected:
 	int m_iNearbyImprovementBonusRange;
 	ImprovementTypes m_eCombatBonusImprovement;
 #endif
+#if defined(MOD_BALANCE_CORE)	
+	int m_iNearbyUnitClassBonus;
+	int m_iNearbyUnitClassBonusRange;
+	UnitClassTypes m_iCombatBonusFromNearbyUnitClass;
+	int m_iWonderProductionModifier;
+	bool m_bMountainsDoubleMove;
+#endif
 #if defined(MOD_PROMOTIONS_CROSS_MOUNTAINS)
 	bool m_bCanCrossMountains;
 #endif
@@ -410,6 +458,9 @@ protected:
 #endif
 #if defined(MOD_PROMOTIONS_CROSS_ICE)
 	bool m_bCanCrossIce;
+#endif
+#if defined(MOD_PROMOTIONS_GG_FROM_BARBARIANS)
+	bool m_bGGFromBarbarians;
 #endif
 	bool m_bRoughTerrainEndsTurn;
 	bool m_bHoveringUnit;
@@ -442,6 +493,27 @@ protected:
 	bool m_bHasPostCombatPromotions;
 	bool m_bPostCombatPromotionsExclusive;
 	bool m_bSapper;
+#if defined(MOD_BALANCE_CORE)
+	bool m_bIsNearbyCityPromotion;
+	bool m_bIsNearbyFriendlyCityPromotion;
+	bool m_bIsNearbyEnemyCityPromotion;
+	bool m_bIsNearbyPromotion;
+	bool m_bIsFriendlyLands;
+	bool m_bEnemyLands;
+	int m_iNearbyRange;
+	PromotionTypes m_eAddedFromNearbyPromotion;
+	UnitTypes m_eRequiredUnit;
+	UnitTypes m_eConvertDomainUnit;
+	DomainTypes m_eConvertDomain;
+	int m_iStackedGreatGeneralExperience;
+	int m_iPillageBonusStrength;
+	int m_iReligiousPressureModifier;
+	int m_iAdjacentCityDefesneMod;
+	int m_iNearbyEnemyDamage;
+	PromotionTypes m_eAdjacentSameType;
+	int m_iMilitaryProductionModifier;
+	bool m_bHighSeaRaider;
+#endif
 	bool m_bCanHeavyCharge;
 
 	CvString m_strSound;
@@ -453,10 +525,12 @@ protected:
 	int* m_piFeatureDefensePercent;
 #if defined(MOD_BALANCE_CORE)
 	int* m_piYieldFromScouting;
+	int* m_piYieldModifier;
 #endif
 #if defined(MOD_API_UNIFIED_YIELDS)
 	int* m_piYieldFromKills;
 	int* m_piYieldFromBarbarianKills;
+	int* m_piGarrisonYield;
 #endif
 	int* m_piUnitCombatModifierPercent;
 	int* m_piUnitClassModifierPercent;

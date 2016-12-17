@@ -79,6 +79,7 @@
  *   SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
  **********************************************************************/
+#include "CvGameCoreDLLPCH.h"
 #include <windows.h>
 #include <tchar.h>
 #include <stdio.h>
@@ -1020,7 +1021,7 @@ BOOL StackWalker::ShowCallstack(HANDLE hThread, const CONTEXT *context, PReadPro
   if (m_modulesLoaded == FALSE)
     this->LoadModules();  // ignore the result...
 
-  if (this->m_sw->m_hDbhHelp == NULL)
+  if (this->m_sw == NULL || this->m_sw->m_hDbhHelp == NULL)
   {
     SetLastError(ERROR_DLL_INIT_FAILED);
     return FALSE;

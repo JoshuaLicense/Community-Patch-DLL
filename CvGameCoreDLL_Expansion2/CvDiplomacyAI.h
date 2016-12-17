@@ -59,13 +59,14 @@ FDataStream& operator>>(FDataStream&, DeclarationLogData&);
 class CvDiplomacyAI
 {
 public:
+	// This has been moved to CvEnums.h to make compatible for MOD_ACTIVE_DIPLOMACY
 #if !defined(MOD_ACTIVE_DIPLOMACY)
 	enum DiplomacyPlayerType
 	{
-	    DIPLO_FIRST_PLAYER		=  0,
-	    DIPLO_ALL_PLAYERS		= -1,
-	    DIPLO_AI_PLAYERS		= -2,
-	    DIPLO_HUMAN_PLAYERS		= -3
+		DIPLO_FIRST_PLAYER		=  0,
+		DIPLO_ALL_PLAYERS		= -1,
+		DIPLO_AI_PLAYERS		= -2,
+		DIPLO_HUMAN_PLAYERS		= -3
 	};
 #endif
 
@@ -382,6 +383,8 @@ public:
 	void DoAddWantsDefensivePactWithPlayer(PlayerTypes ePlayer);
 	void DoCancelWantsDefensivePactWithPlayer(PlayerTypes ePlayer);
 	bool IsCanMakeDefensivePactRightNow(PlayerTypes ePlayer);
+
+	bool IsGoodChoiceForDefensivePact(PlayerTypes ePlayer);
 #endif
 	/////////////////////////////////////////////////////////
 	// Issues of Dispute
@@ -585,6 +588,12 @@ public:
 	int GetOtherPlayerNumMajorsConquered(PlayerTypes ePlayer) const;
 	void SetOtherPlayerNumMajorsConquered(PlayerTypes ePlayer, int iValue);
 	void ChangeOtherPlayerNumMajorsConquered(PlayerTypes ePlayer, int iChange);
+
+#if defined(MOD_BALANCE_CORE)
+	int GetNumTimesTheyPlottedAgainstUs(PlayerTypes ePlayer) const;
+	void SetNumTimesTheyPlottedAgainstUs(PlayerTypes ePlayer, int iValue);
+	void ChangeNumTimesTheyPlottedAgainstUs(PlayerTypes ePlayer, int iChange);
+#endif
 
 	// Get the amount of warmonger hatred they generated
 	int GetOtherPlayerWarmongerAmount(PlayerTypes ePlayer);
@@ -1355,6 +1364,13 @@ public:
 	bool IsGoingForCultureVictory();
 	bool IsGoingForSpaceshipVictory();
 
+#if defined(MOD_BALANCE_CORE)
+	bool IsCloseToSSVictory();
+	bool IsCloseToDominationVictory();
+	bool IsCloseToCultureVictory();
+	bool IsCloseToDiploVictory();
+#endif
+
 	bool IsPlayerValid(PlayerTypes eOtherPlayer, bool bMyTeamIsValid = false);
 
 	// Messages sent to other players about protected Minor Civs
@@ -1398,7 +1414,7 @@ public:
 	void SetDeclarationLogTurnForIndex(int iIndex, int iNewValue);
 	void ChangeDeclarationLogTurnForIndex(int iIndex, int iChange);
 
-	CvDeal* GetDealToRenew(int* piDealType = NULL);
+	CvDeal* GetDealToRenew(int* piDealType = NULL, PlayerTypes eOtherPlayer = NO_PLAYER);
 	void ClearDealToRenew();
 
 	void KilledPlayerCleanup (PlayerTypes eKilledPlayer);
@@ -1691,6 +1707,7 @@ private:
 		char m_aiOtherPlayerNumMajorsConquered[MAX_MAJOR_CIVS];
 
 #if defined(MOD_API_EXTENSIONS)
+		char m_aiTheyPlottedAgainstUs[MAX_MAJOR_CIVS];
 		int m_aiOtherPlayerWarmongerAmountTimes100[MAX_MAJOR_CIVS];
 #else
 		int m_aiOtherPlayerWarmongerAmount[MAX_MAJOR_CIVS];
@@ -1756,8 +1773,6 @@ private:
 		short m_aiPlayerVassalageTurnsSincePeacefullyRevokedVassalage[MAX_MAJOR_CIVS];
 		short m_aiPlayerVassalageTurnsSinceForcefullyRevokedVassalage[MAX_MAJOR_CIVS];
 
-		char m_aeGlobalState[MAX_MAJOR_CIVS];
-
 		bool m_abMoveTroopsRequestAccepted[MAX_MAJOR_CIVS];
 		short m_aiMoveTroopsRequestCounter[MAX_MAJOR_CIVS];
 		
@@ -1790,7 +1805,6 @@ private:
 
 	short* m_paiNumTimesDemandedWhenVassal;
 	bool* m_pabPlayerBrokenVassalAgreement;
-	char* m_paeGlobalState;
 
 	bool* m_pabMoveTroopsRequestAccepted;
 	short* m_paiMoveTroopsRequestCounter;
@@ -2046,6 +2060,7 @@ private:
 	char* m_paiOtherPlayerNumMajorsAttacked;
 	char* m_paiOtherPlayerNumMajorsConquered;
 #if defined(MOD_API_EXTENSIONS)
+	char* m_paiTheyPlottedAgainstUs;
 	int*  m_paiOtherPlayerWarmongerAmountTimes100;
 #else
 	int*  m_paiOtherPlayerWarmongerAmount;
@@ -2066,16 +2081,15 @@ private:
 	StateAllWars m_eStateAllWars;
 
 	// Other
-#if !defined(MOD_ACTIVE_DIPLOMACY)
 	typedef std::vector<PlayerTypes> PlayerTypesArray;
 	PlayerTypesArray	m_aGreetPlayers;
-#else
 	// JdH =>
 	void DoUpdateHumanTradePriority(PlayerTypes ePlayer, int iOpinionWeight);
 	// JdH <=
-#endif
 	DiplomacyPlayerType	m_eTargetPlayer;
-
+#if defined(MOD_ACTIVE_DIPLOMACY)
+	DiplomacyPlayerType	m_eTargetPlayerType;
+#endif
 	// Data members for injecting test messages
 	PlayerTypes			m_eTestToPlayer;
 	DiploStatementTypes m_eTestStatement;

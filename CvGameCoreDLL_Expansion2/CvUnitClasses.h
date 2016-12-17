@@ -67,6 +67,7 @@ public:
 #if defined(MOD_BALANCE_CORE)
 	int GetNumFreeLux() const;
 	int GetBeliefUnlock() const;
+	bool IsFreeUpgrade() const;
 #endif
 	bool IsSpreadReligion() const;
 	int GetReligionSpreads() const;
@@ -75,12 +76,21 @@ public:
 	bool IsRequiresEnhancedReligion() const;
 	bool IsProhibitsSpread() const;
 	bool IsRemoveHeresy() const;
+#if defined(MOD_CIV6_WORKER)
+	int GetBuilderStrength() const;
+#endif
 	bool IsCanBuyCityState() const;
 #if defined(MOD_GLOBAL_SEPARATE_GREAT_ADMIRAL)
 	bool IsCanRepairFleet() const;
 	bool IsCanChangePort() const;
 #endif
 	int GetCombat() const;
+#if defined(MOD_GLOBAL_STACKING_RULES)
+	int StackCombat() const;
+#endif
+#if defined(MOD_CARGO_SHIPS)
+	int CargoCombat() const;
+#endif
 	void SetCombat(int iNum);
 	int GetCombatLimit() const;
 	int GetRangedCombat() const;
@@ -186,7 +196,20 @@ public:
 	int GetCooldown() const;
 	int GetGlobalFaithCooldown() const;
 	bool IsMounted() const;
-
+	bool IsCultureFromExperienceDisbandUpgrade() const;
+	bool IsConvertUnit() const;
+	bool IsUnitEraUpgrade() const;
+	bool IsConvertOnDamage() const;
+	int GetDamageThreshold() const;
+	UnitTypes GetConvertUnit() const;
+	bool IsConvertOnFullHP() const;
+	bool IsWarOnly() const;
+	bool IsConvertEnemyUnitToBarbarian() const;
+	bool IsWLTKDFromBirth() const;
+	bool IsGoldenAgeFromBirth() const;
+	bool IsCultureBoost() const;
+	bool IsExtraAttackHealthOnKill() const;
+	bool IsHighSeaRaider() const;
 #endif
 	// Accessor Functions (Arrays)
 	int GetPrereqAndTechs(int i) const;
@@ -209,6 +232,11 @@ public:
 #if defined(MOD_BALANCE_CORE)
 	bool GetBuildOnFound(int i) const;
 	bool GetBuildingClassPurchaseRequireds(int i) const;
+	int GetEraCombatStrength(int i) const;
+	int GetUnitNewEraCombatType(int i, int j) const;
+	int* GetUnitNewEraCombatTypeChangesArray(int i);
+	int GetUnitNewEraPromotions(int i, int j) const;
+	int* GetUnitNewEraPromotionsChangesArray(int i);
 #endif
 	bool GetFreePromotions(int i) const;
 
@@ -259,6 +287,7 @@ private:
 #endif
 #if defined(MOD_BALANCE_CORE)
 	int m_iNumFreeLux;
+	bool m_bFreeUpgrade;
 #endif
 	bool m_bSpreadReligion;
 	int m_iReligionSpreads;
@@ -267,12 +296,21 @@ private:
 	bool m_bRequiresEnhancedReligion;
 	bool m_bProhibitsSpread;
 	bool m_bRemoveHeresy;
+#if defined(MOD_CIV6_WORKER)
+	int m_iBuilderStrength;
+#endif
 	bool m_bCanBuyCityState;
 #if defined(MOD_GLOBAL_SEPARATE_GREAT_ADMIRAL)
 	bool m_bCanRepairFleet;
 	bool m_bCanChangePort;
 #endif
 	int m_iCombat;
+#if defined(MOD_GLOBAL_STACKING_RULES)
+	int m_iStackCombat;
+#endif
+#if defined(MOD_CARGO_SHIPS)
+	int m_iCargoCombat;
+#endif
 	int m_iCombatLimit;
 	int m_iRangedCombat;
 	int m_iRangedCombatLimit;
@@ -339,6 +377,20 @@ private:
 	int m_iCooldown;
 	int m_iGlobalFaithCooldown;
 	int m_iBeliefUnlock;
+	bool m_bCultureFromExperienceOnDisband;
+	bool m_bIsConvertUnit;
+	bool m_bUnitEraUpgrade;
+	bool m_bIsConvertOnDamage;
+	int m_iDamageThreshold;
+	UnitTypes m_eConvertUnit;
+	bool m_bIsConvertOnFullHP;
+	bool m_bWarOnly;
+	bool m_bConvertEnemyUnitToBarbarian;
+	bool m_bWLTKD;
+	bool m_bGoldenAge;
+	bool m_bCultureBoost;
+	bool m_bExtraAttackHealthOnKill;
+	bool m_bHighSeaRaider;
 #endif
 	int m_iCultureBombRadius;
 	int m_iGoldenAgeTurns;
@@ -395,6 +447,9 @@ private:
 #if defined(MOD_BALANCE_CORE)
 	bool* m_pbBuildOnFound;
 	bool* m_pbBuildingClassPurchaseRequireds;
+	int* m_piEraCombatStrength;
+	int** m_ppiEraUnitCombatType;
+	int** m_ppiEraUnitPromotions;
 #endif
 	bool* m_pbFreePromotions;
 

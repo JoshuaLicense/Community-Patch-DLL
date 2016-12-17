@@ -189,9 +189,35 @@ int CvPolicyAI::ChooseNextPolicy(CvPlayer* pPlayer)
 
 					if(pkPolicyInfo->GetFlavorValue(eFlavor) > 0)
 					{
-						if(bSeekingDiploVictory && (GC.getFlavorTypes((FlavorTypes)iFlavor) == "FLAVOR_DIPLOMACY"))
+						if(GC.getFlavorTypes((FlavorTypes)iFlavor) == "FLAVOR_DIPLOMACY")
 						{
-							iWeight += m_PolicyAIWeights.GetWeight(iPolicyLoop);
+							if(bSeekingDiploVictory)
+							{
+								iWeight += m_PolicyAIWeights.GetWeight(iPolicyLoop);
+							}
+							else if(bSeekingConquestVictory)
+							{
+								iWeight -= m_PolicyAIWeights.GetWeight(iPolicyLoop);
+							}
+							else
+							{
+								for(int iMinorCivLoop = MAX_MAJOR_CIVS; iMinorCivLoop < MAX_CIV_PLAYERS; iMinorCivLoop++)
+								{
+									PlayerTypes eMinor = (PlayerTypes) iMinorCivLoop;
+									if(eMinor == NO_PLAYER)
+										continue;
+
+									// Loop through all minors - if we're itching to conquer, bail out on diplo policies.
+									if(GET_PLAYER(eMinor).isMinorCiv() && GET_PLAYER(eMinor).isAlive())
+									{
+										if(pPlayer->GetDiplomacyAI()->GetMinorCivApproach(eMinor) >= MINOR_CIV_APPROACH_CONQUEST)
+										{
+											iWeight -= m_PolicyAIWeights.GetWeight(iPolicyLoop);
+											break;
+										}
+									}
+								}
+							}
 						}
 						if(bSeekingConquestVictory && (GC.getFlavorTypes((FlavorTypes)iFlavor) == "FLAVOR_OFFENSE" || GC.getFlavorTypes((FlavorTypes)iFlavor) == "FLAVOR_MILITARY_TRAINING"))
 						{
@@ -213,10 +239,10 @@ int CvPolicyAI::ChooseNextPolicy(CvPlayer* pPlayer)
 			{
 				iWeight *= (m_pCurrentPolicies->GetPolicies()->GetPolicyEntry(iPolicyLoop)->GetLevel() + 1);
 			}
-			if(pPlayer->GetCorporateFounderID() == -1)
+			if(!pPlayer->GetCorporations()->HasFoundedCorporation())
 			{
 				//Corporate-specific policies should only be taken if you have a corporation.
-				if(m_pCurrentPolicies->GetPolicies()->GetPolicyEntry(iPolicyLoop)->IsOrderCorp() || m_pCurrentPolicies->GetPolicies()->GetPolicyEntry(iPolicyLoop)->IsFreedomCorp() || m_pCurrentPolicies->GetPolicies()->GetPolicyEntry(iPolicyLoop)->IsAutocracyCorp())
+				if(m_pCurrentPolicies->GetPolicies()->GetPolicyEntry(iPolicyLoop)->IsCorporationOfficesAsFranchises() ||m_pCurrentPolicies->GetPolicies()->GetPolicyEntry(iPolicyLoop)->IsCorporationRandomForeignFranchise() || m_pCurrentPolicies->GetPolicies()->GetPolicyEntry(iPolicyLoop)->IsCorporationFreeFranchiseAbovePopular())
 				{
 					iWeight = 0;
 				}
@@ -258,6 +284,21 @@ int CvPolicyAI::ChooseNextPolicy(CvPlayer* pPlayer)
 					else
 					{
 						iWeight *= 5;
+					}
+					if(GC.getGame().GetGameReligions()->GetNumReligionsStillToFound() <= 0 && pPlayer->GetReligions()->GetReligionCreatedByPlayer() <= RELIGION_PANTHEON)
+					{
+						iWeight = 0;
+					}
+				}
+				if(ePolicyBranch == (PolicyBranchTypes)GC.getInfoTypeForString("POLICY_BRANCH_PATRONAGE", true))
+				{
+					if(GC.getGame().GetNumMinorCivsAlive() <= 0)
+					{
+						iWeight = 0;
+					}
+					else if(pPlayer->GetDiplomacyAI()->GetNumMinorCivApproach(MINOR_CIV_APPROACH_FRIENDLY) <= 0)
+					{
+						iWeight = 0;
 					}
 				}
 			}
@@ -567,7 +608,7 @@ void CvPolicyAI::DoChooseIdeology(CvPlayer *pPlayer)
 	// Next look at free policies we can get
 	iFreedomPriority += PolicyHelpers::GetNumFreePolicies(eFreedomBranch) * GC.getIDEOLOGY_SCORE_PER_FREE_TENET();
 	iAutocracyPriority += PolicyHelpers::GetNumFreePolicies(eAutocracyBranch) * GC.getIDEOLOGY_SCORE_PER_FREE_TENET();
-	iOrderPriority += PolicyHelpers::GetNumFreePolicies(eOrderBranch) * GC.getIDEOLOGY_SCORE_PER_FREE_TENET();;
+	iOrderPriority += PolicyHelpers::GetNumFreePolicies(eOrderBranch) * GC.getIDEOLOGY_SCORE_PER_FREE_TENET();
 
 	stage = "After Free Policies";
 	LogIdeologyChoice(stage, iFreedomPriority, iAutocracyPriority, iOrderPriority);
@@ -598,7 +639,7 @@ void CvPolicyAI::DoChooseIdeology(CvPlayer *pPlayer)
 				}
 				else if (eOtherPlayerIdeology == eOrderBranch)
 				{
-					iAutocracyPriority += GC.getIDEOLOGY_SCORE_HOSTILE();;
+					iAutocracyPriority += GC.getIDEOLOGY_SCORE_HOSTILE();
 					iFreedomPriority += GC.getIDEOLOGY_SCORE_HOSTILE();
 				}
 				break;
@@ -758,9 +799,104 @@ void CvPolicyAI::DoChooseIdeology(CvPlayer *pPlayer)
 		eChosenBranch = eOrderBranch;
 	}
 	pPlayer->GetPlayerPolicies()->SetPolicyBranchUnlocked(eChosenBranch, true, false);
-	pPlayer->GetCulture()->SetTurnIdeologyAdopted(GC.getGame().getGameTurn());
 	LogBranchChoice(eChosenBranch);
-
+#if defined(MOD_BALANCE_CORE)
+	int iPolicyGEorGM = pPlayer->GetPlayerTraits()->GetPolicyGEorGM();
+	if(iPolicyGEorGM > 0)
+	{
+		CvCity* pLoopCity;
+		int iLoop;
+		int iValue = iPolicyGEorGM * (pPlayer->GetCurrentEra() + 1);
+		SpecialistTypes eBestSpecialist = NO_SPECIALIST;
+		int iRandom = GC.getGame().getJonRandNum(100, "Random GE or GM value");
+		if(iRandom <= 33)
+		{
+			eBestSpecialist = (SpecialistTypes)GC.getInfoTypeForString("SPECIALIST_ENGINEER");
+		}
+		else if(iRandom > 34 && iRandom <= 66)
+		{
+			eBestSpecialist = (SpecialistTypes)GC.getInfoTypeForString("SPECIALIST_SCIENTIST");
+		}
+		else if(iRandom > 66)
+		{
+			eBestSpecialist = (SpecialistTypes)GC.getInfoTypeForString("SPECIALIST_MERCHANT");			
+		}
+		if(eBestSpecialist != NULL)
+		{
+			for(pLoopCity = pPlayer->firstCity(&iLoop); pLoopCity != NULL; pLoopCity = pPlayer->nextCity(&iLoop))
+			{
+				if(eBestSpecialist == (SpecialistTypes)GC.getInfoTypeForString("SPECIALIST_ENGINEER"))
+				{
+					pLoopCity->changeProduction(iValue);
+				}
+				else if(eBestSpecialist == (SpecialistTypes)GC.getInfoTypeForString("SPECIALIST_MERCHANT"))
+				{
+					pPlayer->GetTreasury()->ChangeGold(iValue);
+				}
+				else if(eBestSpecialist == (SpecialistTypes)GC.getInfoTypeForString("SPECIALIST_SCIENTIST"))
+				{
+					TechTypes eCurrentTech = pPlayer->GetPlayerTechs()->GetCurrentResearch();
+					if(eCurrentTech == NO_TECH)
+					{
+						pPlayer->changeOverflowResearch(iValue);
+						if(pPlayer->getOverflowResearch() <= 0)
+						{
+							pPlayer->setOverflowResearch(0);
+						}
+					}
+					else
+					{
+						GET_TEAM(pPlayer->getTeam()).GetTeamTechs()->ChangeResearchProgress(eCurrentTech, iValue, pPlayer->GetID());
+						if(GET_TEAM(pPlayer->getTeam()).GetTeamTechs()->GetResearchProgress(eCurrentTech) <= 0)
+						{
+							GET_TEAM(pPlayer->getTeam()).GetTeamTechs()->SetResearchProgress(eCurrentTech, 0, pPlayer->GetID());
+						}
+					}
+				}
+				CvSpecialistInfo* pkSpecialistInfo = GC.getSpecialistInfo(eBestSpecialist);
+				if(pkSpecialistInfo)
+				{
+					int iGPThreshold = pLoopCity->GetCityCitizens()->GetSpecialistUpgradeThreshold((UnitClassTypes)pkSpecialistInfo->getGreatPeopleUnitClass());
+					iGPThreshold *= 100;
+					//Get % of threshold for test.
+					iGPThreshold *= iPolicyGEorGM;
+					iGPThreshold /= 100;
+				
+					pLoopCity->GetCityCitizens()->ChangeSpecialistGreatPersonProgressTimes100(eBestSpecialist, iGPThreshold);
+					if(pPlayer->GetID() == GC.getGame().getActivePlayer())
+					{
+						iGPThreshold /= 100;
+						char text[256] = {0};
+						float fDelay = 0.5f;
+						sprintf_s(text, "[COLOR_WHITE]+%d[ENDCOLOR][ICON_GREAT_PEOPLE]", iGPThreshold);
+						DLLUI->AddPopupText(pLoopCity->getX(),pLoopCity->getY(), text, fDelay);
+						CvNotifications* pNotification = pPlayer->GetNotifications();
+						if(pNotification)
+						{
+							CvString strMessage = GetLocalizedText("TXT_KEY_POLICY_ADOPT_GP_BONUS", iGPThreshold);
+							CvString strSummary;
+							// Class specific specialist message
+							if((UnitClassTypes)pkSpecialistInfo->getGreatPeopleUnitClass() == GC.getInfoTypeForString("UNITCLASS_MERCHANT"))
+							{
+								strMessage = GetLocalizedText("TXT_KEY_POLICY_ADOPT_GP_BONUS_MERCHANT", iGPThreshold);
+							}
+							else if((UnitClassTypes)pkSpecialistInfo->getGreatPeopleUnitClass() == GC.getInfoTypeForString("UNITCLASS_ENGINEER"))
+							{
+								strMessage = GetLocalizedText("TXT_KEY_POLICY_ADOPT_GP_BONUS_ENGINEER", iGPThreshold);
+							}
+							else if((UnitClassTypes)pkSpecialistInfo->getGreatPeopleUnitClass() == GC.getInfoTypeForString("UNITCLASS_SCIENTIST"))
+							{
+								strMessage = GetLocalizedText("TXT_KEY_POLICY_ADOPT_GP_BONUS_SCIENTIST", iGPThreshold);
+							}
+							strSummary = GetLocalizedText("TXT_KEY_POLICY_ADOPT_SUMMARY_GP_BONUS");
+							pNotification->Add(NOTIFICATION_GENERIC, strMessage, strSummary, -1, -1, -1);
+						}
+					}
+				}
+			}
+		}
+	}
+#endif
 #if defined(MOD_BUGFIX_MISSING_POLICY_EVENTS)
 	if (MOD_BUGFIX_MISSING_POLICY_EVENTS)
 	{

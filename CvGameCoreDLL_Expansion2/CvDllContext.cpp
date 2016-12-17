@@ -50,16 +50,6 @@
 CvDllGameContext* CvDllGameContext::s_pSingleton = NULL;
 HANDLE CvDllGameContext::s_hHeap = INVALID_HANDLE_VALUE;
 
-//---------
-//#define DEBUG_UNIT_MOVES
-#if defined (DEBUG_UNIT_MOVES)
-int g_iTargetX = -1;
-int g_iTargetY = -1;
-CvUnit* g_pLastUnit = NULL;
-int g_iCurPlotIndex = 0;
-#endif
-//---------
-
 //------------------------------------------------------------------------------
 //------------------------------------------------------------------------------
 CvDllGameContext::CvDllGameContext()
@@ -935,7 +925,7 @@ bool CvDllGameContext::RandomNumberGeneratorSyncCheck(PlayerTypes ePlayer, ICvRa
 unsigned int CvDllGameContext::CreateRandomNumberGenerator()
 {
 	uint index = m_uiRngCounter++;
-	std::pair<uint, CvRandom*> entry(index, FNEW(CvRandom, c_eCiv5GameplayDLL, 0));
+	std::pair<uint, CvRandom*> entry(index, FNEW(CvRandom( CvString::format("GenericRng%02d",index).c_str() ), c_eCiv5GameplayDLL, 0));
 
 	m_RandomNumberGenerators.push_back(entry);
 	return index;
@@ -1056,60 +1046,35 @@ void CvDllGameContext::TEMPOnHexUnitChanged(ICvUnit1* pUnit)
 {
 	CvUnit* pkUnit = GC.UnwrapUnitPointer(pUnit);
 
-#if defined(DEBUG_UNIT_MOVES)
-	std::vector<STacticalPlot> vResult;
-	CvPlot *pTarget = GC.getMap().plot(g_iTargetX,g_iTargetY);
-
-	if (g_pLastUnit != pkUnit)
-	{
-		g_pLastUnit = pkUnit;
-		g_iCurPlotIndex = 0;
-	}
-
-	TacticalAIHelpers::GetPreferredPlotsForUnit(pkUnit,pTarget,true,vResult);
-	if (g_iCurPlotIndex<vResult.size())
-	{
-		CvPlot* pPlot = GC.getMap().plot(vResult[g_iCurPlotIndex].m_iX, vResult[g_iCurPlotIndex].m_iY);
-		if(pPlot)
-		{
-			auto_ptr<ICvPlot1> pDllPlot = GC.WrapPlotPointer(pPlot);
-			GC.GetEngineUserInterface()->AddHexToUIRange(pDllPlot.get());
-		}
-	}
-
-	g_iCurPlotIndex++;
-	if (g_iCurPlotIndex==5)
-		g_iCurPlotIndex = 0;
-#else
-	SPathFinderUserData data(pkUnit,CvUnit::MOVEFLAG_NO_INTERMEDIATE_STOPS|CvUnit::MOVEFLAG_IGNORE_STACKING,1);
+	SPathFinderUserData data(pkUnit,CvUnit::MOVEFLAG_IGNORE_STACKING,1);
 	data.ePathType = PT_UNIT_REACHABLE_PLOTS;
 
-	ReachablePlots plots = GC.GetInterfacePathFinder().GetPlotsInReach(pkUnit->getX(),pkUnit->getY(),data,0);
+	//potential deadlock - need to use special pathfinder instance
+	ReachablePlots plots = GC.GetPathFinder().GetPlotsInReach(pkUnit->getX(),pkUnit->getY(),data);
 	for (ReachablePlots::iterator it = plots.begin(); it != plots.end(); ++it)
 	{
-		CvPlot* pPlot = GC.getMap().plotByIndexUnchecked(it->first);
+		CvPlot* pPlot = GC.getMap().plotByIndexUnchecked(it->iPlotIndex);
 		if(pPlot)
 		{
 			auto_ptr<ICvPlot1> pDllPlot = GC.WrapPlotPointer(pPlot);
 			GC.GetEngineUserInterface()->AddHexToUIRange(pDllPlot.get());
 		}
 	}
-#endif
 }
 
 //------------------------------------------------------------------------------
 void CvDllGameContext::TEMPOnHexUnitChangedAttack(ICvUnit1* pUnit)
 {
 	CvUnit* pkUnit = GC.UnwrapUnitPointer(pUnit);
-	CvTwoLayerPathFinder& thePathfinder = GC.GetInterfacePathFinder();
 
-	SPathFinderUserData data(pkUnit,CvUnit::MOVEFLAG_NO_INTERMEDIATE_STOPS|CvUnit::MOVEFLAG_DECLARE_WAR|CvUnit::MOVEFLAG_ATTACK,1);
+	SPathFinderUserData data(pkUnit,CvUnit::MOVEFLAG_DECLARE_WAR|CvUnit::MOVEFLAG_ATTACK,1);
 	data.ePathType = PT_UNIT_REACHABLE_PLOTS;
 
-	ReachablePlots plots = GC.GetInterfacePathFinder().GetPlotsInReach(pkUnit->getX(),pkUnit->getY(),data,0);
+	//potential deadlock - need to use special pathfinder instance
+	ReachablePlots plots = GC.GetPathFinder().GetPlotsInReach(pkUnit->getX(),pkUnit->getY(),data);
 	for (ReachablePlots::iterator it = plots.begin(); it != plots.end(); ++it)
 	{
-		CvPlot* pPlot = GC.getMap().plotByIndexUnchecked(it->first);
+		CvPlot* pPlot = GC.getMap().plotByIndexUnchecked(it->iPlotIndex);
 		if(pPlot && pPlot->isVisible(pkUnit->getTeam()) && (pPlot->isVisibleEnemyUnit(pkUnit) || pPlot->isEnemyCity(*pkUnit)))
 		{
 			auto_ptr<ICvPlot1> pDllPlot = GC.WrapPlotPointer(pPlot);
@@ -1124,7 +1089,7 @@ ICvEnumerator* CvDllGameContext::TEMPCalculatePathFinderUpdates(ICvUnit1* pHeadS
 	CvUnit* pkUnit = GC.UnwrapUnitPointer(pHeadSelectedUnit);
 
 	SPathFinderUserData data(pkUnit,CvUnit::MOVEFLAG_DECLARE_WAR);
-	SPath path = GC.GetInterfacePathFinder().GetPath(pkUnit->getX(), pkUnit->getY(), iMouseMapX, iMouseMapY, data);
+	SPath path = GC.GetPathFinder().GetPath(pkUnit->getX(), pkUnit->getY(), iMouseMapX, iMouseMapY, data);
 
 	if (!!path)
 	{

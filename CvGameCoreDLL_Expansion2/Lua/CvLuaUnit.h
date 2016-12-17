@@ -202,6 +202,10 @@ protected:
 	static int lGetBuildType(lua_State* L);
 	static int lWorkRate(lua_State* L);
 
+#if defined(MOD_CIV6_WORKER)
+	static int lGetBuilderStrength(lua_State* L);
+#endif
+
 	static int lIsNoBadGoodies(lua_State* L);
 	static int lIsOnlyDefensive(lua_State* L);
 
@@ -214,6 +218,12 @@ protected:
 	static int lIsWork(lua_State* L);
 	static int lIsGoldenAge(lua_State* L);
 	static int lCanCoexistWithEnemyUnit(lua_State* L);
+
+#if defined(MOD_BALANCE_CORE)
+	static int lIsContractUnit(lua_State* L);
+	static int lIsSpecificContractUnit(lua_State* L);
+	static int lGetContractUnit(lua_State* L);
+#endif
 
 	static int lIsGreatPerson(lua_State* L);
 
@@ -323,6 +333,9 @@ protected:
 #if defined(MOD_API_LUA_EXTENSIONS) && defined(MOD_PROMOTIONS_CROSS_ICE)
 	LUAAPIEXTN(CanCrossIce, bool);
 #endif
+#if defined(MOD_API_LUA_EXTENSIONS) && defined(MOD_PROMOTIONS_GG_FROM_BARBARIANS)
+	LUAAPIEXTN(IsGGFromBarbarians, bool);
+#endif
 	static int lIsNeverInvisible(lua_State* L);
 	static int lIsInvisible(lua_State* L);
 
@@ -361,6 +374,7 @@ protected:
 #if defined(MOD_BALANCE_CORE)
 	static int lBarbarianCombatBonus(lua_State* L);
 	static int lIsMounted(lua_State* L);
+	static int lIsStrongerDamaged(lua_State* L);
 #endif
 	static int lDomainModifier(lua_State* L);
 	static int lGetStrategicResourceCombatPenalty(lua_State* L);
@@ -500,9 +514,14 @@ protected:
 	static int lIsIgnoreGreatGeneralBenefit(lua_State* L);
 	static int lGetReverseGreatGeneralModifier(lua_State* L);
 	static int lGetGreatGeneralCombatModifier(lua_State* L);
+#if defined(MOD_API_LUA_EXTENSIONS) && defined(MOD_PROMOTIONS_AURA_CHANGE)
+	LUAAPIEXTN(GetAuraRange, int);
+	LUAAPIEXTN(GetAuraEffect, int);
+#endif
 	static int lIsNearSapper(lua_State* L);
 #if defined(MOD_BALANCE_CORE)
 	static int lIsHalfNearSapper(lua_State* L);
+	static int lGetNearbyUnitClassModifierFromUnitClass(lua_State* L);
 #endif
 	static int lGetNearbyImprovementModifier(lua_State* L);
 	static int lIsFriendlyUnitAdjacent(lua_State* L);

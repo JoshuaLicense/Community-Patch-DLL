@@ -319,11 +319,12 @@ protected:
 	static int lGetUnculturedHappinessChangeBuildingGlobal(lua_State* L);
 	static int lGetIlliteracyHappinessChangeBuildingGlobal(lua_State* L);
 	static int lGetMinorityHappinessChangeBuildingGlobal(lua_State* L);
-	static int lGetBuildingCorporateYieldChange(lua_State* L);
 	static int lGetBuildingCorporateGPChange(lua_State* L);
 	static int lGetPromiseDuration(lua_State* L);
 	static int lGetCorporationFounder(lua_State* L);
+	static int lGetCorporationHeadquarters(lua_State* L);
 	static int lGetNumCorporationsFounded(lua_State* L);
+	static int lGetNumAvailableCorporations(lua_State* L);
 #if defined(MOD_BALANCE_CORE_RESOURCE_MONOPOLIES)
 	static int lGetGreatestPlayerResourceMonopoly(lua_State* L);
 #endif
@@ -395,6 +396,10 @@ protected:
 	static int lGetNumLeaguesEverFounded(lua_State* L);
 	static int lGetLeague(lua_State* L);
 	static int lGetActiveLeague(lua_State* L);
+#if defined(MOD_BALANCE_CORE)
+	static int lDoEnactResolution(lua_State* L);
+	static int lDoRepealResolution(lua_State* L);
+#endif
 	
 	static int lIsProcessingMessages(lua_State* L);
 
@@ -476,6 +481,33 @@ protected:
 	LUAAPIEXTN(AnyoneHasTech, bool, iTechType);
 	LUAAPIEXTN(AnyoneHasUnit, bool, iUnitType);
 	LUAAPIEXTN(AnyoneHasUnitClass, bool, iUnitClassType);
+#endif
+
+#if defined(MOD_BALANCE_CORE)
+	static int lFoundCorporation(lua_State* L);
+	static int lCanFoundCorporation(lua_State* L);
+	static int lIsCorporationFounded(lua_State* L);
+
+	//Contracts
+	static int lDoUpdateContracts(lua_State* L);
+	static int lGetNumActiveContracts(lua_State* L);
+	static int lGetNumInactiveContracts(lua_State* L);
+	static int lGetNumAvailableContracts(lua_State* L);
+	static int lGetNumUnavailableContracts(lua_State* L);
+	static int lGetActiveContract(lua_State* L);
+	static int lGetInactiveContract(lua_State* L);
+	static int lIsContractActive(lua_State* L);
+	static int lIsContractAvailable(lua_State* L);
+	static int lSetContractUnits(lua_State* L);
+	static int lGetContractUnits(lua_State* L);
+	static int lGetInactiveContractUnitList(lua_State* L);
+	static int lGetActiveContractUnitList(lua_State* L);
+#endif
+
+#if defined(MOD_BATTLE_ROYALE)
+	// Lua CSV Logging Functions
+	static int lDeleteCSV(lua_State* L);
+	static int lWriteCSV(lua_State* L);
 #endif
 };
 

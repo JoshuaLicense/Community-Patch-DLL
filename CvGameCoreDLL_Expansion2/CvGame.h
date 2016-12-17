@@ -34,7 +34,10 @@ class CvGameTrade;
 class CvTacticalAnalysisMap;
 class CvAdvisorCounsel;
 class CvAdvisorRecommender;
-
+#if defined(MOD_BALANCE_CORE)
+class CvGameCorporations;
+class CvGameContracts;
+#endif
 
 class CvGameInitialItemsOverrides
 {
@@ -142,10 +145,11 @@ public:
 
 	int getNumHumanPlayers();
 	int GetNumMinorCivsEver();
+	int GetNumMinorCivsAlive();
 	int getNumHumansInHumanWars(PlayerTypes ignorePlayer = NO_PLAYER);
 	int getNumSequentialHumans(PlayerTypes ignorePlayer = NO_PLAYER);
 
-	int getGameTurn();
+	int getGameTurn() const;
 	void setGameTurn(int iNewValue);
 	void incrementGameTurn();
 	int getTurnYear(int iGameTurn);
@@ -418,6 +422,9 @@ public:
 
 	bool isGreatPersonBorn(CvString& szName) const;
 	void addGreatPersonBornName(const CvString& szName);
+#if defined(MOD_API_EXTENSIONS)
+	void removeGreatPersonBornName(const CvString& szName);
+#endif
 
 	CvRandom& getMapRand();
 	int getMapRandNum(int iNum, const char* pszLog);
@@ -428,9 +435,9 @@ public:
 	int getAsyncRandNum(int iNum, const char* pszLog);
 
 #if defined(MOD_CORE_REDUCE_RANDOMNESS)
-	//experimental
-	int	getSmallFakeRandNum(int iNum, CvPlot& input);
-	int	getSmallFakeRandNum(int iNum);
+	//get random number from gamestate without a seed in the generator
+	int	getSmallFakeRandNum(int iNum, const CvPlot& input);
+	int	getSmallFakeRandNum(int iNum, int iExtraSeed);
 #endif
 
 	int calculateSyncChecksum();
@@ -439,7 +446,7 @@ public:
 #if defined(MOD_BALANCE_CORE)
 	void debugSyncChecksum();
 
-	PlayerTypes GetCorporationFounder( int iCorporateID ) const;
+	PlayerTypes GetCorporationFounder( CorporationTypes eCorporation ) const;
 	int GetNumCorporationsFounded() const;
 #if defined (MOD_BALANCE_CORE_RESOURCE_MONOPOLIES)
 	PlayerTypes GetGreatestPlayerResourceMonopoly(ResourceTypes eResource) const;
@@ -451,8 +458,7 @@ public:
 	uint getNumReplayMessages() const;
 	const CvReplayMessage* getReplayMessage(uint i) const;
 #if defined(MOD_BALANCE_CORE_HAPPINESS)
-	void CorpCheck();
-	void getGlobalAverage() const;
+	void updateGlobalAverage();
 	int GetCultureAverage() const;
 	void SetCultureAverage(int iValue);
 	int GetScienceAverage() const;
@@ -511,7 +517,7 @@ public:
 
 	UnitTypes GetRandomSpawnUnitType(PlayerTypes ePlayer, bool bIncludeUUs, bool bIncludeRanged);
 #if defined(MOD_GLOBAL_CS_GIFT_SHIPS)
-	UnitTypes GetCompetitiveSpawnUnitType(PlayerTypes ePlayer, bool bIncludeUUs, bool bIncludeRanged, bool bIncludeShips, bool bNoResource = false);
+	UnitTypes GetCompetitiveSpawnUnitType(PlayerTypes ePlayer, bool bIncludeUUs, bool bIncludeRanged, bool bIncludeShips, bool bNoResource = false, bool bIncludeOwnUUsOnly = false);
 #else
 	UnitTypes GetCompetitiveSpawnUnitType(PlayerTypes ePlayer, bool bIncludeUUs, bool bIncludeRanged);
 #endif
@@ -527,7 +533,9 @@ public:
 #else
 	UnitTypes GetRandomUniqueUnitType(bool bIncludeCivsInGame, bool bIncludeStartEra, bool bIncludeOldEras, bool bIncludeRanged);
 #endif
-
+#if defined(MOD_BALANCE_CORE)
+	bool DoSpawnUnitsAroundTargetCity(PlayerTypes ePlayer, CvCity* pCity, int iNumber, bool bIncludeUUs, bool bIncludeShips, bool bNoResource, bool bIncludeOwnUUsOnly);
+#endif
 	CvSiteEvaluatorForSettler* GetSettlerSiteEvaluator();
 	CvSiteEvaluatorForStart* GetStartSiteEvaluator();
 	CvStartPositioner* GetStartPositioner();
@@ -536,10 +544,12 @@ public:
 	CvGameCulture* GetGameCulture();
 	CvGameLeagues* GetGameLeagues();
 	CvGameTrade* GetGameTrade();
-	CvTacticalAnalysisMap* GetTacticalAnalysisMap();
-
 #if defined(MOD_API_LUA_EXTENSIONS)
 	CvString getDllGuid() const;
+#endif
+#if defined(MOD_BALANCE_CORE)
+	CvGameCorporations* GetGameCorporations();
+	CvGameContracts* GetGameContracts();
 #endif
 
 	int GetAction(int iKeyStroke, bool bAlt, bool bShift, bool bCtrl);
@@ -651,7 +661,10 @@ public:
 	bool AnyoneHasUnit(UnitTypes iUnitType) const;
 	bool AnyoneHasUnitClass(UnitClassTypes iUnitClassType) const;
 #endif
-
+#if defined(MOD_BALANCE_CORE_JFD)	
+	void SetContractUnits(ContractTypes eContract, UnitTypes eUnit, int iValue);
+	int GetContractUnits(ContractTypes eContract, UnitTypes eUnit) const;
+#endif
 	//Function to determine city size from city population
 	unsigned int GetVariableCitySizeFromPopulation(unsigned int nPopulation);
 
@@ -664,8 +677,11 @@ public:
 #endif
 
 	void SetClosestCityMapDirty();
-	int GetClosestCityDistance( const CvPlot* pPlot );
-	CvCity* GetClosestCity( const CvPlot* pPlot );
+	//assuming a typical unit with baseMoves==2
+	int GetClosestCityDistanceInTurns( const CvPlot* pPlot );
+	CvCity* GetClosestCityByEstimatedTurns( const CvPlot* pPlot );
+	int GetClosestCityDistanceInPlots(const CvPlot* pPlot);
+	CvCity* GetClosestCityByPlots(const CvPlot* pPlot);
 
 	//------------------------------------------------------------
 	//------------------------------------------------------------
@@ -794,6 +810,9 @@ protected:
 
 	int** m_apaiPlayerVote;
 	int** m_ppaaiTeamVictoryRank;
+#if defined(MOD_BALANCE_CORE_JFD)
+	int** m_ppaiContractUnits;
+#endif
 
 	Database::Results* m_pDiploResponseQuery;
 
@@ -820,12 +839,16 @@ protected:
 	CvGameCulture*             m_pGameCulture;
 	CvGameLeagues*             m_pGameLeagues;
 	CvGameTrade*               m_pGameTrade;
-	CvTacticalAnalysisMap*     m_pTacticalMap;
 
 	CvAdvisorCounsel*          m_pAdvisorCounsel;
 	CvAdvisorRecommender*      m_pAdvisorRecommender;
 
 	CvGameDeals                m_kGameDeals;
+
+#if defined(MOD_BALANCE_CORE)
+	CvGameCorporations*		   m_pGameCorporations;
+	CvGameContracts*		   m_pGameContracts;
+#endif
 
 	//necessary because we only want to hide the mouseover of the most recently moused over unit -KS
 	int                        m_iLastMouseoverUnitID;
@@ -844,7 +867,8 @@ protected:
 #if defined(MOD_BALANCE_CORE_SPIES)
 	int		m_iLargestBasePotential;
 #endif
-	CvDistanceMap m_globalCityDistance;
+	CvDistanceMapTurns m_globalCityDistanceTurns;
+	CvDistanceMapPlots m_globalCityDistancePlots;
 
 	//----------------------------------------------------------------
 

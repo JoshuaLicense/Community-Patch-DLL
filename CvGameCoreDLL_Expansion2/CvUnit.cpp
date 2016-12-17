@@ -67,14 +67,19 @@ int saiTaskWhenKilled[100] = {0};
 
 namespace FSerialization
 {
-std::set<CvUnit*> unitsToCheck;
+
+//is it wise to store pointers here?
+//anyway vector seems better than set because of the defined ordering
+//a set of IDInfos would be best but we don't know the ID when creating the unit
+std::vector<CvUnit*> unitsToCheck;
+
 void SyncUnits()
 {
 	if(GC.getGame().isNetworkMultiPlayer())
 	{
 		PlayerTypes authoritativePlayer = GC.getGame().getActivePlayer();
 
-		std::set<CvUnit*>::const_iterator i;
+		std::vector<CvUnit*>::const_iterator i;
 		for(i = unitsToCheck.begin(); i != unitsToCheck.end(); ++i)
 		{
 			const CvUnit* unit = *i;
@@ -102,7 +107,7 @@ void SyncUnits()
 // clears ALL deltas for ALL units
 void ClearUnitDeltas()
 {
-	std::set<CvUnit*>::iterator i;
+	std::vector<CvUnit*>::iterator i;
 	for(i = unitsToCheck.begin(); i != unitsToCheck.end(); ++i)
 	{
 		CvUnit* unit = *i;
@@ -157,7 +162,7 @@ CvUnit::CvUnit() :
 	, m_iRiverCrossingNoPenaltyCount("CvUnit::m_iRiverCrossingNoPenaltyCount", m_syncArchive)
 	, m_iEnemyRouteCount("CvUnit::m_iEnemyRouteCount", m_syncArchive)
 	, m_iRivalTerritoryCount("CvUnit::m_iRivalTerritoryCount", m_syncArchive)
-	, m_iMustSetUpToRangedAttackCount("CvUnit::m_iMustSetUpToRangedAttackCount", m_syncArchive)
+	, m_iIsSlowInEnemyLandCount("CvUnit::m_iIsSlowInEnemyLandCount", m_syncArchive)
 	, m_iRangeAttackIgnoreLOSCount("CvUnit::m_iRangeAttackIgnoreLOSCount", m_syncArchive)
 	, m_iCityAttackOnlyCount("CvUnit::m_iCityAttackOnlyCount", m_syncArchive)
 	, m_iCaptureDefeatedEnemyCount("CvUnit::m_iCaptureDefeatedEnemyCount", m_syncArchive)
@@ -165,6 +170,9 @@ CvUnit::CvUnit() :
 	, m_iAlwaysHealCount("CvUnit::m_iAlwaysHealCount", m_syncArchive)
 	, m_iHealOutsideFriendlyCount("CvUnit::m_iHealOutsideFriendlyCount", m_syncArchive)
 	, m_iHillsDoubleMoveCount("CvUnit::m_iHillsDoubleMoveCount", m_syncArchive)
+#if defined(MOD_BALANCE_CORE)
+	, m_iMountainsDoubleMoveCount("CvUnit::m_iMountainsDoubleMoveCount", m_syncArchive)
+#endif
 	, m_iImmuneToFirstStrikesCount("CvUnit::m_iImmuneToFirstStrikesCount", m_syncArchive)
 	, m_iExtraVisibilityRange("CvUnit::m_iExtraVisibilityRange", m_syncArchive)
 	, m_iExtraMoves("CvUnit::m_iExtraMoves", m_syncArchive)
@@ -178,6 +186,8 @@ CvUnit::CvUnit() :
 #if defined(MOD_BALANCE_CORE_JFD)
 	, m_iPlagueChance("CvUnit::m_iPlagueChance", m_syncArchive)
 	, m_iIsPlagued("CvUnit::m_iIsPlagued", m_syncArchive)
+	, m_eUnitContract("CvUnit::m_eUnitContract", m_syncArchive)
+	, m_iNegatorPromotion("CvUnit::m_iNegatorPromotion", m_syncArchive)
 #endif
 	, m_iExtraEnemyHeal("CvUnit::m_iExtraEnemyHeal", m_syncArchive)
 	, m_iExtraNeutralHeal("CvUnit::m_iExtraNeutralHeal", m_syncArchive)
@@ -226,6 +236,9 @@ CvUnit::CvUnit() :
 	, m_eFacingDirection("CvUnit::m_eFacingDirection", m_syncArchive, true)
 	, m_iArmyId("CvUnit::m_iArmyId", m_syncArchive)
 	, m_iIgnoreTerrainCostCount("CvUnit::m_iIgnoreTerrainCostCount", m_syncArchive)
+#if defined(MOD_PROMOTIONS_GG_FROM_BARBARIANS)
+	, m_iGGFromBarbariansCount("CvUnit::m_iGGFromBarbariansCount", m_syncArchive)
+#endif
 	, m_iRoughTerrainEndsTurnCount("CvUnit::m_iRoughTerrainEndsTurnCount", m_syncArchive)
 	, m_iEmbarkAbilityCount("CvUnit::m_iEmbarkAbilityCount", m_syncArchive)
 	, m_iHoveringUnitCount("CvUnit::m_iHoveringUnitCount", m_syncArchive)
@@ -252,6 +265,10 @@ CvUnit::CvUnit() :
 	, m_iAttacksMade("CvUnit::m_iAttacksMade", m_syncArchive)
 	, m_iGreatGeneralCount("CvUnit::m_iGreatGeneralCount", m_syncArchive)
 	, m_iGreatAdmiralCount("CvUnit::m_iGreatAdmiralCount", m_syncArchive)
+#if defined(MOD_PROMOTIONS_AURA_CHANGE)
+	, m_iAuraRangeChange("CvUnit::m_iAuraRangeChange", m_syncArchive)
+	, m_iAuraEffectChange("CvUnit::m_iAuraEffectChange", m_syncArchive)
+#endif
 	, m_iGreatGeneralModifier("CvUnit::m_iGreatGeneralModifier", m_syncArchive)
 	, m_iGreatGeneralReceivesMovementCount("CvUnit::m_iGreatGeneralReceivesMovementCount", m_syncArchive)
 	, m_iGreatGeneralCombatModifier("CvUnit::m_iGreatGeneralCombatModifier", m_syncArchive)
@@ -298,7 +315,7 @@ CvUnit::CvUnit() :
 	, m_eOwner("CvUnit::m_eOwner", m_syncArchive)
 	, m_eOriginalOwner("CvUnit::m_eOriginalOwner", m_syncArchive)
 	, m_eCapturingPlayer("CvUnit::m_eCapturingPlayer", m_syncArchive)
-	, m_bCapturedAsIs("CvUnit::m_eCapturingPlayer", m_syncArchive, false, false)
+	, m_bCapturedAsIs("CvUnit::m_bCapturedAsIs", m_syncArchive, false, false)
 	, m_eUnitType("CvUnit::m_eUnitType", m_syncArchive)
 	, m_eLeaderUnitType("CvUnit::m_eLeaderUnitType", m_syncArchive)
 	, m_eInvisibleType("CvUnit::m_eInvisibleType", m_syncArchive)
@@ -328,13 +345,14 @@ CvUnit::CvUnit() :
 	, m_eActivityType("CvUnit::m_eActivityType", m_syncArchive, true)
 	, m_eAutomateType("CvUnit::m_eAutomateType", m_syncArchive)
 	, m_eUnitAIType("CvUnit::m_eUnitAIType", m_syncArchive)
-	, m_thisHandle(this)
 	, m_bWaitingForMove(false)
 	, m_pReligion(FNEW(CvUnitReligion, c_eCiv5GameplayDLL, 0))
 	, m_iMapLayer("CvUnit::m_iMapLayer", m_syncArchive, DEFAULT_UNIT_MAP_LAYER)
 	, m_iNumGoodyHutsPopped("CvUnit::m_iNumGoodyHutsPopped", m_syncArchive)
 	, m_iLastGameTurnAtFullHealth("CvUnit::m_iLastGameTurnAtFullHealth", m_syncArchive, -1)
+	, m_eCombatType("CvUnit::m_eCombatType", m_syncArchive)
 #if defined(MOD_BALANCE_CORE)
+	, m_iOriginCity("CvUnit::m_iOriginCity", m_syncArchive)
 	, m_iCannotBeCapturedCount("CvUnit::m_iCannotBeCapturedCount", m_syncArchive)
 	, m_iForcedDamage("CvUnit::m_iForcedDamage", m_syncArchive)
 	, m_iChangeDamage("CvUnit::m_iForcedDamage", m_syncArchive)
@@ -344,6 +362,7 @@ CvUnit::CvUnit() :
 	, m_iGainsXPFromScouting("CvUnit::m_iGainsXPFromScouting", m_syncArchive)
 	, m_iBarbCombatBonus("CvUnit::m_iBarbCombatBonus", m_syncArchive)
 	, m_iCanMoraleBreak("CvUnit::m_iCanMoraleBreak", m_syncArchive)
+	, m_iStrongerDamaged("CvUnit::m_iStrongerDamaged", m_syncArchive)
 #endif
 #if defined(MOD_PROMOTIONS_VARIABLE_RECON)
 	, m_iExtraReconRange("CvUnit::m_iExtraReconRange", m_syncArchive)
@@ -361,6 +380,11 @@ CvUnit::CvUnit() :
 	, m_iNearbyImprovementCombatBonus("CvUnit::m_iNearbyImprovementCombatBonus", m_syncArchive)
 	, m_iNearbyImprovementBonusRange("CvUnit::m_iNearbyImprovementBonusRange", m_syncArchive)
 	, m_eCombatBonusImprovement("CvUnit::m_eCombatBonusImprovement", m_syncArchive)
+#endif
+#if defined(MOD_BALANCE_CORE)
+	, m_iCombatBonusFromNearbyUnitClass("CvUnit::m_iCombatBonusFromNearbyUnitClass", m_syncArchive)
+	, m_iNearbyUnitClassBonusRange("CvUnit::m_iNearbyUnitClassBonusRange", m_syncArchive)
+	, m_iNearbyUnitClassBonus("CvUnit::m_iNearbyUnitClassBonus", m_syncArchive)
 #endif
 #if defined(MOD_PROMOTIONS_CROSS_MOUNTAINS)
 	, m_iCanCrossMountainsCount("CvUnit::m_iCanCrossMountainsCount", m_syncArchive)
@@ -398,10 +422,17 @@ CvUnit::CvUnit() :
 #if defined(MOD_BALANCE_CORE)
 	, m_yieldFromScouting("CvUnit::m_yieldFromScouting", m_syncArchive/*, true*/)
 #endif
+#if defined(MOD_CORE_DEBUGGING)
+	, m_iPrevPlotIdx1(0)
+	, m_iPrevPlotIdx2(0)
+#endif
+#if defined(MOD_CIV6_WORKER)
+	, m_iBuilderStrength("CvUnit::m_iBuilderStrength", m_syncArchive)
+#endif
 {
 	initPromotions();
 	OBJECT_ALLOCATED
-	FSerialization::unitsToCheck.insert(this);
+	FSerialization::unitsToCheck.push_back(this);
 	reset(0, NO_UNIT, NO_PLAYER, true);
 }
 
@@ -409,9 +440,12 @@ CvUnit::CvUnit() :
 //	--------------------------------------------------------------------------------
 CvUnit::~CvUnit()
 {
-	m_thisHandle.ignoreDestruction(true);
-	FSerialization::unitsToCheck.erase(this);
-	if(!gDLL->GetDone() && GC.IsGraphicsInitialized())  // don't need to remove entity when the app is shutting down, or crash can occur
+	//really shouldn't happen that it's not present, but there was a crash here
+	std::vector<CvUnit*>::iterator it = std::find( FSerialization::unitsToCheck.begin(), FSerialization::unitsToCheck.end(), this);
+	if (it!=FSerialization::unitsToCheck.end())
+		FSerialization::unitsToCheck.erase(it);
+
+	if(gDLL && !gDLL->GetDone() && GC.IsGraphicsInitialized())  // don't need to remove entity when the app is shutting down, or crash can occur
 	{
 		auto_ptr<ICvUnit1> pDllUnit(new CvDllUnit(this));
 		gDLL->GameplayUnitDestroyed(pDllUnit.get());
@@ -427,9 +461,17 @@ CvUnit::~CvUnit()
 
 
 //	--------------------------------------------------------------------------------
+#if defined(MOD_BALANCE_CORE_JFD)
+void CvUnit::init(int iID, UnitTypes eUnit, UnitAITypes eUnitAI, PlayerTypes eOwner, int iX, int iY, DirectionTypes eFacingDirection, bool bNoMove, bool bSetupGraphical, int iMapLayer /*= DEFAULT_UNIT_MAP_LAYER*/, int iNumGoodyHutsPopped, ContractTypes eContract, bool bHistoric)
+#else
 void CvUnit::init(int iID, UnitTypes eUnit, UnitAITypes eUnitAI, PlayerTypes eOwner, int iX, int iY, DirectionTypes eFacingDirection, bool bNoMove, bool bSetupGraphical, int iMapLayer /*= DEFAULT_UNIT_MAP_LAYER*/, int iNumGoodyHutsPopped)
+#endif
 {
+#if defined(MOD_BALANCE_CORE_JFD)
+	initWithNameOffset(iID, eUnit, -1, eUnitAI, eOwner, iX, iY, eFacingDirection, bNoMove, bSetupGraphical, iMapLayer, iNumGoodyHutsPopped, eContract, bHistoric);
+#else
 	initWithNameOffset(iID, eUnit, -1, eUnitAI, eOwner, iX, iY, eFacingDirection, bNoMove, bSetupGraphical, iMapLayer, iNumGoodyHutsPopped);
+#endif
 #if defined(MOD_BALANCE_CORE)
 	if(GC.getGame().getGameTurn() > 0)
 	{
@@ -494,28 +536,39 @@ void CvUnit::initWithSpecificName(int iID, UnitTypes eUnit, const char* strKey, 
 	plot()->updateCenterUnit();
 
 	SetGreatWork(NO_GREAT_WORK);
-
-
-	if(strKey != NULL)
+#if !defined(MOD_GLOBAL_NO_LOST_GREATWORKS)
+	int iUnitName = GC.getGame().getUnitCreatedCount(getUnitType());
+	int iNumNames = getUnitInfo().GetNumUnitNames();
+	if(iUnitName < iNumNames)
+#endif
 	{
-		CvString strName = strKey;
-		int iNumNames = getUnitInfo().GetNumUnitNames();
-		//Look for units from previous and current eras.
-		for (int iI = 0; iI < iNumNames; iI++)
+		if(strKey != NULL)
 		{
-			CvString strOtherName = getUnitInfo().GetUnitNames(iI);
-			if(strOtherName == strName)
+			CvString strName = strKey;
+			int iNumNames = getUnitInfo().GetNumUnitNames();
+			for (int iI = 0; iI < iNumNames; iI++)
 			{
-				setName(strName);
-				SetGreatWork(getUnitInfo().GetGreatWorks(iI));
-				GC.getGame().addGreatPersonBornName(strName);
-				break;
+				CvString strOtherName = getUnitInfo().GetUnitNames(iI);
+				if(strOtherName == strName)
+				{
+					setName(strName);
+					SetGreatWork(getUnitInfo().GetGreatWorks(iI));
+					GC.getGame().addGreatPersonBornName(strName);
+#if defined(MOD_GLOBAL_NO_LOST_GREATWORKS)
+					if (MOD_GLOBAL_NO_LOST_GREATWORKS)
+					{
+						// setName strips undesirable characters, but we stored those into the list of GPs born, so we need to keep the original name
+						setGreatName(strName);
+					}
+#endif
+					break;
+				}
 			}
 		}
-	}
-	else
-	{
-		return;
+		else
+		{
+			return;
+		}
 	}
 	setGameTurnCreated(GC.getGame().getGameTurn());
 
@@ -532,6 +585,14 @@ void CvUnit::initWithSpecificName(int iID, UnitTypes eUnit, const char* strKey, 
 	{
 		kPlayer.ChangeNumBuilders(1);
 	}
+#if defined(MOD_CIV6_WORKER)
+	//get builder strength
+	if (getUnitInfo().GetBuilderStrength() > 0)
+	{
+		// use speed modifier to increase the work count. *4 because a 25% increase = +1 work = +100 strength
+		setBuilderStrength(getUnitInfo().GetBuilderStrength() + kPlayer.getWorkerSpeedModifier() * 4 + kPlayer.GetPlayerTraits()->GetWorkerSpeedModifier() * 4);
+	}
+#endif
 
 	// Units can add Unhappiness
 	if(GC.getUnitInfo(getUnitType())->GetUnhappiness() != 0)
@@ -549,7 +610,6 @@ void CvUnit::initWithSpecificName(int iID, UnitTypes eUnit, const char* strKey, 
 			kPlayer.changeNumResourceUsed((ResourceTypes) iResourceLoop, GC.getUnitInfo(getUnitType())->GetResourceQuantityRequirement(iResourceLoop));
 		}
 	}
-
 	if(getUnitInfo().GetNukeDamageLevel() != -1)
 	{
 		kPlayer.changeNumNukeUnits(1);
@@ -557,9 +617,48 @@ void CvUnit::initWithSpecificName(int iID, UnitTypes eUnit, const char* strKey, 
 
 	if(getUnitInfo().IsMilitarySupport())
 	{
+#if defined(MOD_BATTLE_ROYALE)
+		kPlayer.changeNumMilitaryUnits(1,(DomainTypes)getUnitInfo().GetDomainType());
+#else
 		kPlayer.changeNumMilitaryUnits(1);
+#endif
 	}
-
+#if defined(MOD_BALANCE_CORE)
+	if (plot() != NULL && plot()->getWorkingCity() != NULL && plot()->getWorkingCity()->getOwner() == getOwner())
+	{
+		setOriginCity(plot()->getWorkingCity()->GetID());
+	}
+	if(isUnitEraUpgrade())
+	{
+		EraTypes eEra;
+		for(int iEraLoop = 0; iEraLoop < GC.getNumEraInfos(); iEraLoop++)
+		{
+			eEra = (EraTypes) iEraLoop;
+			if((m_pUnitInfo->GetEraCombatStrength(eEra) > 0) && (GET_TEAM(kPlayer.getTeam()).GetCurrentEra() >= eEra))
+			{
+				SetBaseCombatStrength(m_pUnitInfo->GetEraCombatStrength(eEra));
+			}
+			UnitCombatTypes eUnitCombatClass;
+			for(int iI = 0; iI < GC.getNumUnitCombatClassInfos(); iI++)
+			{
+				eUnitCombatClass = (UnitCombatTypes) iI;
+				if((m_pUnitInfo->GetUnitNewEraCombatType(eUnitCombatClass, eEra) > 0) && (GET_TEAM(kPlayer.getTeam()).GetCurrentEra() >= eEra))
+				{
+					setUnitCombatType(eUnitCombatClass);
+				}
+			}
+			PromotionTypes ePromotion;
+			for(int iI = 0; iI < GC.getNumPromotionInfos(); iI++)
+			{
+				ePromotion = (PromotionTypes) iI;
+				if((m_pUnitInfo->GetUnitNewEraPromotions(ePromotion, eEra) > 0) && (GET_TEAM(kPlayer.getTeam()).GetCurrentEra() >= eEra))
+				{
+					setHasPromotion(ePromotion, true);
+				}
+			}
+		}
+	}
+#endif
 	// Free Promotions from Unit XML
 	for(int iI = 0; iI < GC.getNumPromotionInfos(); iI++)
 	{
@@ -570,6 +669,10 @@ void CvUnit::initWithSpecificName(int iID, UnitTypes eUnit, const char* strKey, 
 #if defined(MOD_BALANCE_CORE)
 			if(GC.getPromotionInfo(ePromotion)->GetBarbarianCombatBonus() > 0 && isBarbarian())
 				continue;
+
+			PromotionTypes ePromotionRoughTerrain = (PromotionTypes)GC.getInfoTypeForString("PROMOTION_ROUGH_TERRAIN_ENDS_TURN");
+			if(ePromotion == ePromotionRoughTerrain && kPlayer.GetPlayerTraits()->IsConquestOfTheWorld())
+				continue;
 #endif
 
 			if(!GC.getPromotionInfo(ePromotion)->IsHoveringUnit())	// Hovering units handled above
@@ -577,7 +680,7 @@ void CvUnit::initWithSpecificName(int iID, UnitTypes eUnit, const char* strKey, 
 		}
 	}
 
-	const UnitCombatTypes unitCombatType = getUnitCombatType();
+	const UnitCombatTypes unitCombatType = (UnitCombatTypes)getUnitCombatType();
 	if(unitCombatType != NO_UNITCOMBAT)
 	{
 		// Any free Promotions to apply?
@@ -625,541 +728,8 @@ void CvUnit::initWithSpecificName(int iID, UnitTypes eUnit, const char* strKey, 
 		}
 	}
 	
-	// Adjacent terrain/feature that provides free promotions?
-	CvPlot* pAdjacentPlot;
-	for (int iI = 0; iI < NUM_DIRECTION_TYPES; ++iI)
-	{
-		pAdjacentPlot = plotDirection(plot()->getX(), plot()->getY(), ((DirectionTypes)iI));
+	DoLocationPromotions(true);
 
-		if(pAdjacentPlot != NULL)
-		{
-			FeatureTypes eFeature = pAdjacentPlot->getFeatureType();
-			if(eFeature != NO_FEATURE)
-			{
-				PromotionTypes ePromotion = (PromotionTypes)GC.getFeatureInfo(eFeature)->getAdjacentSpawnLocationUnitFreePromotion();
-				if(ePromotion != NO_PROMOTION)
-				{
-					CvPromotionEntry* pkOriginalPromotionInfo = GC.getPromotionInfo(ePromotion);
-					if(pkOriginalPromotionInfo && m_pUnitInfo->GetUnitCombatType() != NO_UNITCOMBAT && (::IsPromotionValidForUnitCombatType(ePromotion, getUnitType())))
-					{
-						bool bNoPromotion = false;
-						// Check for negating promotions
-						if(pkOriginalPromotionInfo->IsBarbarianOnly() && !isBarbarian())
-						{
-							bNoPromotion = true;
-						}
-						if(pkOriginalPromotionInfo->IsCityStateOnly() && !GET_PLAYER(getOwner()).isMinorCiv())
-						{
-							bNoPromotion = true;
-						}
-						if(!bNoPromotion)
-						{
-							for(int iI = 0; iI < GC.getNumPromotionInfos(); iI++)
-							{
-								const PromotionTypes eNegatingPromotion = static_cast<PromotionTypes>(iI);
-								CvPromotionEntry* pkPromotionInfo = GC.getPromotionInfo(eNegatingPromotion);
-								if(pkPromotionInfo)
-								{
-									PromotionTypes eNegatorPromotion = (PromotionTypes)pkPromotionInfo->NegatesPromotion();
-									// Unit has negation promotion
-									if(isHasPromotion(eNegatingPromotion) && ePromotion == eNegatorPromotion)
-									{
-										bNoPromotion = true;
-										break;
-									}
-								}
-							}
-						}
-						if(!bNoPromotion)
-						{
-							setHasPromotion(ePromotion, true);
-						}
-					}
-				}
-			}
-
-			// Starting terrain that provides free promotions?
-			TerrainTypes eAdjacentTerrain = pAdjacentPlot->getTerrainType();
-			if(eAdjacentTerrain != NO_TERRAIN && (eAdjacentTerrain <= TERRAIN_SNOW))
-			{
-				PromotionTypes ePromotion = (PromotionTypes)GC.getTerrainInfo(eAdjacentTerrain)->getAdjacentSpawnLocationUnitFreePromotion();
-				if(ePromotion != NO_PROMOTION)
-				{
-					CvPromotionEntry* pkOriginalPromotionInfo = GC.getPromotionInfo(ePromotion);
-					if(pkOriginalPromotionInfo && m_pUnitInfo->GetUnitCombatType() != NO_UNITCOMBAT && (::IsPromotionValidForUnitCombatType(ePromotion, getUnitType())))
-					{
-						bool bNoPromotion = false;
-						// Check for negating promotions
-						if(pkOriginalPromotionInfo->IsBarbarianOnly() && !isBarbarian())
-						{
-							bNoPromotion = true;
-						}
-						if(pkOriginalPromotionInfo->IsCityStateOnly() && !GET_PLAYER(getOwner()).isMinorCiv())
-						{
-							bNoPromotion = true;
-						}
-						if(!bNoPromotion)
-						{
-							for(int iI = 0; iI < GC.getNumPromotionInfos(); iI++)
-							{
-								const PromotionTypes eNegatingPromotion = static_cast<PromotionTypes>(iI);
-								CvPromotionEntry* pkPromotionInfo = GC.getPromotionInfo(eNegatingPromotion);
-								if(pkPromotionInfo)
-								{
-									PromotionTypes eNegatorPromotion = (PromotionTypes)pkPromotionInfo->NegatesPromotion();
-									// Unit has negation promotion
-									if(isHasPromotion(eNegatingPromotion) && ePromotion == eNegatorPromotion)
-									{
-										bNoPromotion = true;
-										break;
-									}
-								}
-							}
-						}
-						if(!bNoPromotion)
-						{
-							setHasPromotion(ePromotion, true);
-						}
-					}
-				}
-			}
-			// Starting terrain that provides free promotions?
-			if(pAdjacentPlot->isHills())
-			{
-				PromotionTypes ePromotion = (PromotionTypes)GC.getTerrainInfo(TERRAIN_HILL)->getAdjacentSpawnLocationUnitFreePromotion();
-				if(ePromotion != NO_PROMOTION)
-				{
-					CvPromotionEntry* pkOriginalPromotionInfo = GC.getPromotionInfo(ePromotion);
-					if(pkOriginalPromotionInfo && m_pUnitInfo->GetUnitCombatType() != NO_UNITCOMBAT && (::IsPromotionValidForUnitCombatType(ePromotion, getUnitType())))
-					{
-						bool bNoPromotion = false;
-						// Check for negating promotions
-						if(pkOriginalPromotionInfo->IsBarbarianOnly() && !isBarbarian())
-						{
-							bNoPromotion = true;
-						}
-						if(pkOriginalPromotionInfo->IsCityStateOnly() && !GET_PLAYER(getOwner()).isMinorCiv())
-						{
-							bNoPromotion = true;
-						}
-						if(!bNoPromotion)
-						{
-							for(int iI = 0; iI < GC.getNumPromotionInfos(); iI++)
-							{
-								const PromotionTypes eNegatingPromotion = static_cast<PromotionTypes>(iI);
-								CvPromotionEntry* pkPromotionInfo = GC.getPromotionInfo(eNegatingPromotion);
-								if(pkPromotionInfo)
-								{
-									PromotionTypes eNegatorPromotion = (PromotionTypes)pkPromotionInfo->NegatesPromotion();
-									// Unit has negation promotion
-									if(isHasPromotion(eNegatingPromotion) && ePromotion == eNegatorPromotion)
-									{
-										bNoPromotion = true;
-										break;
-									}
-								}
-							}
-						}
-						if(!bNoPromotion)
-						{
-							setHasPromotion(ePromotion, true);
-						}
-					}
-				}
-			}
-			if(pAdjacentPlot->isMountain())
-			{
-				PromotionTypes ePromotion = (PromotionTypes)GC.getTerrainInfo(TERRAIN_MOUNTAIN)->getAdjacentSpawnLocationUnitFreePromotion();
-				if(ePromotion != NO_PROMOTION)
-				{
-					CvPromotionEntry* pkOriginalPromotionInfo = GC.getPromotionInfo(ePromotion);
-					if(pkOriginalPromotionInfo && m_pUnitInfo->GetUnitCombatType() != NO_UNITCOMBAT && (::IsPromotionValidForUnitCombatType(ePromotion, getUnitType())))
-					{
-						bool bNoPromotion = false;
-						// Check for negating promotions
-						if(pkOriginalPromotionInfo->IsBarbarianOnly() && !isBarbarian())
-						{
-							bNoPromotion = true;
-						}
-						if(pkOriginalPromotionInfo->IsCityStateOnly() && !GET_PLAYER(getOwner()).isMinorCiv())
-						{
-							bNoPromotion = true;
-						}
-						if(!bNoPromotion)
-						{
-							for(int iI = 0; iI < GC.getNumPromotionInfos(); iI++)
-							{
-								const PromotionTypes eNegatingPromotion = static_cast<PromotionTypes>(iI);
-								CvPromotionEntry* pkPromotionInfo = GC.getPromotionInfo(eNegatingPromotion);
-								if(pkPromotionInfo)
-								{
-									PromotionTypes eNegatorPromotion = (PromotionTypes)pkPromotionInfo->NegatesPromotion();
-									// Unit has negation promotion
-									if(isHasPromotion(eNegatingPromotion) && ePromotion == eNegatorPromotion)
-									{
-										bNoPromotion = true;
-										break;
-									}
-								}
-							}
-						}
-						if(!bNoPromotion)
-						{
-							setHasPromotion(ePromotion, true);
-						}
-					}
-				}
-			}
-			if(pAdjacentPlot->isShallowWater() && !pAdjacentPlot->isLake())
-			{
-				PromotionTypes ePromotion = (PromotionTypes)GC.getTerrainInfo(TERRAIN_COAST)->getAdjacentSpawnLocationUnitFreePromotion();
-				if(ePromotion != NO_PROMOTION)
-				{
-					CvPromotionEntry* pkOriginalPromotionInfo = GC.getPromotionInfo(ePromotion);
-					if(pkOriginalPromotionInfo && m_pUnitInfo->GetUnitCombatType() != NO_UNITCOMBAT && (::IsPromotionValidForUnitCombatType(ePromotion, getUnitType())))
-					{
-						bool bNoPromotion = false;
-						// Check for negating promotions
-						if(pkOriginalPromotionInfo->IsBarbarianOnly() && !isBarbarian())
-						{
-							bNoPromotion = true;
-						}
-						if(pkOriginalPromotionInfo->IsCityStateOnly() && !GET_PLAYER(getOwner()).isMinorCiv())
-						{
-							bNoPromotion = true;
-						}
-						if(!bNoPromotion)
-						{
-							for(int iI = 0; iI < GC.getNumPromotionInfos(); iI++)
-							{
-								const PromotionTypes eNegatingPromotion = static_cast<PromotionTypes>(iI);
-								CvPromotionEntry* pkPromotionInfo = GC.getPromotionInfo(eNegatingPromotion);
-								if(pkPromotionInfo)
-								{
-									PromotionTypes eNegatorPromotion = (PromotionTypes)pkPromotionInfo->NegatesPromotion();
-									// Unit has negation promotion
-									if(isHasPromotion(eNegatingPromotion) && ePromotion == eNegatorPromotion)
-									{
-										bNoPromotion = true;
-										break;
-									}
-								}
-							}
-						}
-						if(!bNoPromotion)
-						{
-							setHasPromotion(ePromotion, true);
-						}
-					}
-				}
-			}
-			if(!pAdjacentPlot->isShallowWater() && !pAdjacentPlot->isLake() && pAdjacentPlot->isWater())
-			{
-				PromotionTypes ePromotion = (PromotionTypes)GC.getTerrainInfo(TERRAIN_OCEAN)->getAdjacentSpawnLocationUnitFreePromotion();
-				if(ePromotion != NO_PROMOTION)
-				{
-					CvPromotionEntry* pkOriginalPromotionInfo = GC.getPromotionInfo(ePromotion);
-					if(pkOriginalPromotionInfo && m_pUnitInfo->GetUnitCombatType() != NO_UNITCOMBAT && (::IsPromotionValidForUnitCombatType(ePromotion, getUnitType())))
-					{
-						bool bNoPromotion = false;
-						// Check for negating promotions
-						if(pkOriginalPromotionInfo->IsBarbarianOnly() && !isBarbarian())
-						{
-							bNoPromotion = true;
-						}
-						if(pkOriginalPromotionInfo->IsCityStateOnly() && !GET_PLAYER(getOwner()).isMinorCiv())
-						{
-							bNoPromotion = true;
-						}
-						if(!bNoPromotion)
-						{
-							for(int iI = 0; iI < GC.getNumPromotionInfos(); iI++)
-							{
-								const PromotionTypes eNegatingPromotion = static_cast<PromotionTypes>(iI);
-								CvPromotionEntry* pkPromotionInfo = GC.getPromotionInfo(eNegatingPromotion);
-								if(pkPromotionInfo)
-								{
-									PromotionTypes eNegatorPromotion = (PromotionTypes)pkPromotionInfo->NegatesPromotion();
-									// Unit has negation promotion
-									if(isHasPromotion(eNegatingPromotion) && ePromotion == eNegatorPromotion)
-									{
-										bNoPromotion = true;
-										break;
-									}
-								}
-							}
-						}
-						if(!bNoPromotion)
-						{
-							setHasPromotion(ePromotion, true);
-						}
-					}
-				}
-			}
-		}
-	}
-	// Feature that provides free promotions?
-	FeatureTypes eFeature = plot()->getFeatureType();
-	if(eFeature != NO_FEATURE)
-	{
-		PromotionTypes ePromotion = (PromotionTypes)GC.getFeatureInfo(eFeature)->getSpawnLocationUnitFreePromotion();
-		if(ePromotion != NO_PROMOTION)
-		{
-			CvPromotionEntry* pkOriginalPromotionInfo = GC.getPromotionInfo(ePromotion);
-			if(pkOriginalPromotionInfo && m_pUnitInfo->GetUnitCombatType() != NO_UNITCOMBAT && (::IsPromotionValidForUnitCombatType(ePromotion, getUnitType())))
-			{
-				bool bNoPromotion = false;
-				// Check for negating promotions
-				if(pkOriginalPromotionInfo->IsBarbarianOnly() && !isBarbarian())
-				{
-					bNoPromotion = true;
-				}
-				if(pkOriginalPromotionInfo->IsCityStateOnly() && !GET_PLAYER(getOwner()).isMinorCiv())
-				{
-					bNoPromotion = true;
-				}
-				if(!bNoPromotion)
-				{
-					for(int iI = 0; iI < GC.getNumPromotionInfos(); iI++)
-					{
-						const PromotionTypes eNegatingPromotion = static_cast<PromotionTypes>(iI);
-						CvPromotionEntry* pkPromotionInfo = GC.getPromotionInfo(eNegatingPromotion);
-						if(pkPromotionInfo)
-						{
-							PromotionTypes eNegatorPromotion = (PromotionTypes)pkPromotionInfo->NegatesPromotion();
-							// Unit has negation promotion
-							if(isHasPromotion(eNegatingPromotion) && ePromotion == eNegatorPromotion)
-							{
-								bNoPromotion = true;
-								break;
-							}
-						}
-					}
-				}
-				if(!bNoPromotion)
-				{
-					setHasPromotion(ePromotion, true);
-				}
-			}
-		}
-	}
-	// Terrain that provides free promotions?
-	TerrainTypes eTerrain = plot()->getTerrainType();
-	if(eTerrain != NO_TERRAIN && (eTerrain <= TERRAIN_SNOW))
-	{
-		PromotionTypes ePromotion = (PromotionTypes)GC.getTerrainInfo(eTerrain)->getSpawnLocationUnitFreePromotion();
-		if(ePromotion != NO_PROMOTION)
-		{
-			CvPromotionEntry* pkOriginalPromotionInfo = GC.getPromotionInfo(ePromotion);
-			if(pkOriginalPromotionInfo && m_pUnitInfo->GetUnitCombatType() != NO_UNITCOMBAT && (::IsPromotionValidForUnitCombatType(ePromotion, getUnitType())))
-			{
-				bool bNoPromotion = false;
-				// Check for negating promotions
-				if(pkOriginalPromotionInfo->IsBarbarianOnly() && !isBarbarian())
-				{
-					bNoPromotion = true;
-				}
-				if(pkOriginalPromotionInfo->IsCityStateOnly() && !GET_PLAYER(getOwner()).isMinorCiv())
-				{
-					bNoPromotion = true;
-				}
-				if(!bNoPromotion)
-				{
-					for(int iI = 0; iI < GC.getNumPromotionInfos(); iI++)
-					{
-						const PromotionTypes eNegatingPromotion = static_cast<PromotionTypes>(iI);
-						CvPromotionEntry* pkPromotionInfo = GC.getPromotionInfo(eNegatingPromotion);
-						if(pkPromotionInfo)
-						{
-							PromotionTypes eNegatorPromotion = (PromotionTypes)pkPromotionInfo->NegatesPromotion();
-							// Unit has negation promotion
-							if(isHasPromotion(eNegatingPromotion) && ePromotion == eNegatorPromotion)
-							{
-								bNoPromotion = true;
-								break;
-							}
-						}
-					}
-				}
-				if(!bNoPromotion)
-				{
-					setHasPromotion(ePromotion, true);
-				}
-			}
-		}
-	}
-	if(plot()->isHills())
-	{
-		PromotionTypes ePromotion = (PromotionTypes)GC.getTerrainInfo(TERRAIN_HILL)->getSpawnLocationUnitFreePromotion();
-		if(ePromotion != NO_PROMOTION)
-		{
-			CvPromotionEntry* pkOriginalPromotionInfo = GC.getPromotionInfo(ePromotion);
-			if(pkOriginalPromotionInfo && m_pUnitInfo->GetUnitCombatType() != NO_UNITCOMBAT && (::IsPromotionValidForUnitCombatType(ePromotion, getUnitType())))
-			{
-				bool bNoPromotion = false;
-				// Check for negating promotions
-				if(pkOriginalPromotionInfo->IsBarbarianOnly() && !isBarbarian())
-				{
-					bNoPromotion = true;
-				}
-				if(pkOriginalPromotionInfo->IsCityStateOnly() && !GET_PLAYER(getOwner()).isMinorCiv())
-				{
-					bNoPromotion = true;
-				}
-				if(!bNoPromotion)
-				{
-					for(int iI = 0; iI < GC.getNumPromotionInfos(); iI++)
-					{
-						const PromotionTypes eNegatingPromotion = static_cast<PromotionTypes>(iI);
-						CvPromotionEntry* pkPromotionInfo = GC.getPromotionInfo(eNegatingPromotion);
-						if(pkPromotionInfo)
-						{
-							PromotionTypes eNegatorPromotion = (PromotionTypes)pkPromotionInfo->NegatesPromotion();
-							// Unit has negation promotion
-							if(isHasPromotion(eNegatingPromotion) && ePromotion == eNegatorPromotion)
-							{
-								bNoPromotion = true;
-								break;
-							}
-						}
-					}
-				}
-				if(!bNoPromotion)
-				{
-					setHasPromotion(ePromotion, true);
-				}
-			}
-		}
-	}
-	if(plot()->isMountain())
-	{
-		PromotionTypes ePromotion = (PromotionTypes)GC.getTerrainInfo(TERRAIN_MOUNTAIN)->getSpawnLocationUnitFreePromotion();
-		if(ePromotion != NO_PROMOTION)
-		{
-			CvPromotionEntry* pkOriginalPromotionInfo = GC.getPromotionInfo(ePromotion);
-			if(pkOriginalPromotionInfo && m_pUnitInfo->GetUnitCombatType() != NO_UNITCOMBAT && (::IsPromotionValidForUnitCombatType(ePromotion, getUnitType())))
-			{
-				bool bNoPromotion = false;
-				// Check for negating promotions
-				if(pkOriginalPromotionInfo->IsBarbarianOnly() && !isBarbarian())
-				{
-					bNoPromotion = true;
-				}
-				if(pkOriginalPromotionInfo->IsCityStateOnly() && !GET_PLAYER(getOwner()).isMinorCiv())
-				{
-					bNoPromotion = true;
-				}
-				if(!bNoPromotion)
-				{
-					for(int iI = 0; iI < GC.getNumPromotionInfos(); iI++)
-					{
-						const PromotionTypes eNegatingPromotion = static_cast<PromotionTypes>(iI);
-						CvPromotionEntry* pkPromotionInfo = GC.getPromotionInfo(eNegatingPromotion);
-						if(pkPromotionInfo)
-						{
-							PromotionTypes eNegatorPromotion = (PromotionTypes)pkPromotionInfo->NegatesPromotion();
-							// Unit has negation promotion
-							if(isHasPromotion(eNegatingPromotion) && ePromotion == eNegatorPromotion)
-							{
-								bNoPromotion = true;
-								break;
-							}
-						}
-					}
-				}
-				if(!bNoPromotion)
-				{
-					setHasPromotion(ePromotion, true);
-				}
-			}
-		}
-	}
-	if(plot()->isShallowWater() && !plot()->isLake())
-	{
-		PromotionTypes ePromotion = (PromotionTypes)GC.getTerrainInfo(TERRAIN_COAST)->getSpawnLocationUnitFreePromotion();
-		if(ePromotion != NO_PROMOTION)
-		{
-			CvPromotionEntry* pkOriginalPromotionInfo = GC.getPromotionInfo(ePromotion);
-			if(pkOriginalPromotionInfo && m_pUnitInfo->GetUnitCombatType() != NO_UNITCOMBAT && (::IsPromotionValidForUnitCombatType(ePromotion, getUnitType())))
-			{
-				bool bNoPromotion = false;
-				// Check for negating promotions
-				if(pkOriginalPromotionInfo->IsBarbarianOnly() && !isBarbarian())
-				{
-					bNoPromotion = true;
-				}
-				if(pkOriginalPromotionInfo->IsCityStateOnly() && !GET_PLAYER(getOwner()).isMinorCiv())
-				{
-					bNoPromotion = true;
-				}
-				if(!bNoPromotion)
-				{
-					for(int iI = 0; iI < GC.getNumPromotionInfos(); iI++)
-					{
-						const PromotionTypes eNegatingPromotion = static_cast<PromotionTypes>(iI);
-						CvPromotionEntry* pkPromotionInfo = GC.getPromotionInfo(eNegatingPromotion);
-						if(pkPromotionInfo)
-						{
-							PromotionTypes eNegatorPromotion = (PromotionTypes)pkPromotionInfo->NegatesPromotion();
-							// Unit has negation promotion
-							if(isHasPromotion(eNegatingPromotion) && ePromotion == eNegatorPromotion)
-							{
-								bNoPromotion = true;
-								break;
-							}
-						}
-					}
-				}
-				if(!bNoPromotion)
-				{
-					setHasPromotion(ePromotion, true);
-				}
-			}
-		}
-	}
-	if(!plot()->isShallowWater() && !plot()->isLake() && plot()->isWater())
-	{
-		PromotionTypes ePromotion = (PromotionTypes)GC.getTerrainInfo(TERRAIN_OCEAN)->getSpawnLocationUnitFreePromotion();
-		if(ePromotion != NO_PROMOTION)
-		{
-			CvPromotionEntry* pkOriginalPromotionInfo = GC.getPromotionInfo(ePromotion);
-			if(pkOriginalPromotionInfo && m_pUnitInfo->GetUnitCombatType() != NO_UNITCOMBAT && (::IsPromotionValidForUnitCombatType(ePromotion, getUnitType())))
-			{
-				bool bNoPromotion = false;
-				// Check for negating promotions
-				if(pkOriginalPromotionInfo->IsBarbarianOnly() && !isBarbarian())
-				{
-					bNoPromotion = true;
-				}
-				if(pkOriginalPromotionInfo->IsCityStateOnly() && !GET_PLAYER(getOwner()).isMinorCiv())
-				{
-					bNoPromotion = true;
-				}
-				if(!bNoPromotion)
-				{
-					for(int iI = 0; iI < GC.getNumPromotionInfos(); iI++)
-					{
-						const PromotionTypes eNegatingPromotion = static_cast<PromotionTypes>(iI);
-						CvPromotionEntry* pkPromotionInfo = GC.getPromotionInfo(eNegatingPromotion);
-						if(pkPromotionInfo)
-						{
-							PromotionTypes eNegatorPromotion = (PromotionTypes)pkPromotionInfo->NegatesPromotion();
-							// Unit has negation promotion
-							if(isHasPromotion(eNegatingPromotion) && ePromotion == eNegatorPromotion)
-							{
-								bNoPromotion = true;
-								break;
-							}
-						}
-					}
-				}
-				if(!bNoPromotion)
-				{
-					setHasPromotion(ePromotion, true);
-				}
-			}
-		}
-	}
 	// Give embark promotion for free?
 	if(GET_TEAM(getTeam()).canEmbark() || kPlayer.GetPlayerTraits()->IsEmbarkedAllWater())
 	{
@@ -1363,7 +933,7 @@ void CvUnit::initWithSpecificName(int iID, UnitTypes eUnit, const char* strKey, 
 	CvPlot* pUnitPlot = plot();
 	if(pUnitPlot && pUnitPlot->isCity())
 	{
-		pUnitPlot->getPlotCity()->SetGarrison( pUnitPlot->getBestGarrison( getOwner() ).pointer() );
+		pUnitPlot->getPlotCity()->SetGarrison( pUnitPlot->getBestGarrison( getOwner() ) );
 	}
 
 	m_iArmyId = -1;
@@ -1399,7 +969,11 @@ void CvUnit::initWithSpecificName(int iID, UnitTypes eUnit, const char* strKey, 
 }
 #endif
 //	--------------------------------------------------------------------------------
+#if defined(MOD_BALANCE_CORE)
+void CvUnit::initWithNameOffset(int iID, UnitTypes eUnit, int iNameOffset, UnitAITypes eUnitAI, PlayerTypes eOwner, int iX, int iY, DirectionTypes eFacingDirection, bool bNoMove, bool bSetupGraphical, int iMapLayer, int iNumGoodyHutsPopped, ContractTypes eContract, bool bHistoric)
+#else
 void CvUnit::initWithNameOffset(int iID, UnitTypes eUnit, int iNameOffset, UnitAITypes eUnitAI, PlayerTypes eOwner, int iX, int iY, DirectionTypes eFacingDirection, bool bNoMove, bool bSetupGraphical, int iMapLayer, int iNumGoodyHutsPopped)
+#endif
 {
 	VALIDATE_OBJECT
 	CvString strBuffer;
@@ -1410,6 +984,7 @@ void CvUnit::initWithNameOffset(int iID, UnitTypes eUnit, int iNameOffset, UnitA
 
 	initPromotions();
 	m_pReligion->Init();
+
 
 	//--------------------------------
 	// Init saved data
@@ -1445,7 +1020,12 @@ void CvUnit::initWithNameOffset(int iID, UnitTypes eUnit, int iNameOffset, UnitA
 	//--------------------------------
 	// Init pre-setup() data
 	setXY(iX, iY, false, false, false, false, bNoMove);
-
+#if defined(MOD_BALANCE_CORE)
+	if(plot() != NULL && plot()->getWorkingCity() != NULL && plot()->getWorkingCity()->getOwner() == getOwner())
+	{
+		setOriginCity(plot()->getWorkingCity()->GetID());
+	}
+#endif
 	//--------------------------------
 	// Init non-saved data
 
@@ -1459,7 +1039,9 @@ void CvUnit::initWithNameOffset(int iID, UnitTypes eUnit, int iNameOffset, UnitA
 #if defined(MOD_BALANCE_CORE)
 	std::vector<int> vfPossibleUnits;
 #endif
+#if !defined(MOD_GLOBAL_NO_LOST_GREATWORKS)
 	if(iUnitName < iNumNames)
+#endif
 	{
 		if(iNameOffset == -1)
 		{
@@ -1487,6 +1069,13 @@ void CvUnit::initWithNameOffset(int iID, UnitTypes eUnit, int iNameOffset, UnitA
 			setName(strName);
 			SetGreatWork(getUnitInfo().GetGreatWorks(vfPossibleUnits[iRoll]));
 			GC.getGame().addGreatPersonBornName(strName);
+#if defined(MOD_GLOBAL_NO_LOST_GREATWORKS)
+			if (MOD_GLOBAL_NO_LOST_GREATWORKS)
+			{
+				// setName strips undesirable characters, but we stored those into the list of GPs born, so we need to keep the original name
+				setGreatName(strName);
+			}
+#endif
 		}
 		//None? Let's look to the next era.
 		else
@@ -1510,6 +1099,13 @@ void CvUnit::initWithNameOffset(int iID, UnitTypes eUnit, int iNameOffset, UnitA
 				setName(strName);
 				SetGreatWork(getUnitInfo().GetGreatWorks(vfPossibleUnits[iRoll]));
 				GC.getGame().addGreatPersonBornName(strName);
+#if defined(MOD_GLOBAL_NO_LOST_GREATWORKS)
+				if (MOD_GLOBAL_NO_LOST_GREATWORKS)
+				{
+					// setName strips undesirable characters, but we stored those into the list of GPs born, so we need to keep the original name
+					setGreatName(strName);
+				}
+#endif
 			}
 		}
 		//If still no valid GPs, do the old random method.
@@ -1522,8 +1118,10 @@ void CvUnit::initWithNameOffset(int iID, UnitTypes eUnit, int iNameOffset, UnitA
 			CvString strName = getUnitInfo().GetUnitNames(iIndex);
 			
 #if defined(MOD_EVENTS_UNIT_DATA)
-			if (MOD_EVENTS_UNIT_DATA) {
-				if (GAMEEVENTINVOKE_TESTALL(GAMEEVENT_UnitCanHaveName, getOwner(), GetID(), iIndex) == GAMEEVENTRETURN_FALSE) {
+			if (MOD_EVENTS_UNIT_DATA)
+			{
+				if (GAMEEVENTINVOKE_TESTALL(GAMEEVENT_UnitCanHaveName, getOwner(), GetID(), iIndex) == GAMEEVENTRETURN_FALSE)
+				{
 					continue;
 				}
 			}
@@ -1532,8 +1130,10 @@ void CvUnit::initWithNameOffset(int iID, UnitTypes eUnit, int iNameOffset, UnitA
 			if(!GC.getGame().isGreatPersonBorn(strName))
 			{
 #if defined(MOD_EVENTS_UNIT_DATA)
-				if (MOD_EVENTS_UNIT_DATA) {
-					if (GAMEEVENTINVOKE_TESTALL(GAMEEVENT_UnitCanHaveGreatWork, getOwner(), GetID(), getUnitInfo().GetGreatWorks(iIndex)) == GAMEEVENTRETURN_FALSE) {
+				if (MOD_EVENTS_UNIT_DATA)
+				{
+					if (GAMEEVENTINVOKE_TESTALL(GAMEEVENT_UnitCanHaveGreatWork, getOwner(), GetID(), getUnitInfo().GetGreatWorks(iIndex)) == GAMEEVENTRETURN_FALSE)
+					{
 						continue;
 					}
 				}
@@ -1541,6 +1141,13 @@ void CvUnit::initWithNameOffset(int iID, UnitTypes eUnit, int iNameOffset, UnitA
 				setName(strName);
 				SetGreatWork(getUnitInfo().GetGreatWorks(iIndex));
 				GC.getGame().addGreatPersonBornName(strName);
+#if defined(MOD_GLOBAL_NO_LOST_GREATWORKS)
+				if (MOD_GLOBAL_NO_LOST_GREATWORKS)
+				{
+					// setName strips undesirable characters, but we stored those into the list of GPs born, so we need to keep the original name
+					setGreatName(strName);
+				}
+#endif
 				break;
 			}
 		}
@@ -1563,6 +1170,14 @@ void CvUnit::initWithNameOffset(int iID, UnitTypes eUnit, int iNameOffset, UnitA
 	{
 		kPlayer.ChangeNumBuilders(1);
 	}
+#if defined(MOD_CIV6_WORKER)
+	//get builder strength
+	if (getUnitInfo().GetBuilderStrength() > 0)
+	{
+		// use speed modifier to increase the work count. *4 because a 25% increase = +1 work = +100 strength
+		setBuilderStrength(getUnitInfo().GetBuilderStrength() + kPlayer.getWorkerSpeedModifier() * 4 + kPlayer.GetPlayerTraits()->GetWorkerSpeedModifier() * 4);
+	}
+#endif
 #if defined(MOD_BALANCE_CORE_SETTLER_RESET_FOOD)
 	if(MOD_BALANCE_CORE_SETTLER_RESET_FOOD && getUnitInfo().IsFound())
 	{
@@ -1584,6 +1199,27 @@ void CvUnit::initWithNameOffset(int iID, UnitTypes eUnit, int iNameOffset, UnitA
 	kPlayer.changeExtraUnitCost(getUnitInfo().GetExtraMaintenanceCost());
 
 	// Add Resource Quantity to Used
+#if defined(MOD_BALANCE_CORE)
+	if(MOD_BALANCE_CORE_JFD)
+	{
+		if(eContract != NO_CONTRACT)
+		{
+			setContractUnit(eContract);
+		}
+		if(!isContractUnit())
+		{
+			for(int iResourceLoop = 0; iResourceLoop < GC.getNumResourceInfos(); iResourceLoop++)
+			{
+				if(getUnitInfo().GetResourceQuantityRequirement(iResourceLoop) > 0)
+				{
+					kPlayer.changeNumResourceUsed((ResourceTypes) iResourceLoop, GC.getUnitInfo(getUnitType())->GetResourceQuantityRequirement(iResourceLoop));
+				}
+			}
+		}
+	}
+	else
+	{
+#endif
 	for(int iResourceLoop = 0; iResourceLoop < GC.getNumResourceInfos(); iResourceLoop++)
 	{
 		if(getUnitInfo().GetResourceQuantityRequirement(iResourceLoop) > 0)
@@ -1591,7 +1227,9 @@ void CvUnit::initWithNameOffset(int iID, UnitTypes eUnit, int iNameOffset, UnitA
 			kPlayer.changeNumResourceUsed((ResourceTypes) iResourceLoop, GC.getUnitInfo(getUnitType())->GetResourceQuantityRequirement(iResourceLoop));
 		}
 	}
-
+#if defined(MOD_BALANCE_CORE)
+	}
+#endif
 	if(getUnitInfo().GetNukeDamageLevel() != -1)
 	{
 		kPlayer.changeNumNukeUnits(1);
@@ -1599,7 +1237,11 @@ void CvUnit::initWithNameOffset(int iID, UnitTypes eUnit, int iNameOffset, UnitA
 
 	if(getUnitInfo().IsMilitarySupport())
 	{
+#if defined(MOD_BATTLE_ROYALE)
+		kPlayer.changeNumMilitaryUnits(1, (DomainTypes)getUnitInfo().GetDomainType());
+#else
 		kPlayer.changeNumMilitaryUnits(1);
+#endif
 	}
 
 	// Free Promotions from Unit XML
@@ -1609,12 +1251,16 @@ void CvUnit::initWithNameOffset(int iID, UnitTypes eUnit, int iNameOffset, UnitA
 		{
 			ePromotion = (PromotionTypes) iI;
 
+			PromotionTypes ePromotionRoughTerrain = (PromotionTypes)GC.getInfoTypeForString("PROMOTION_ROUGH_TERRAIN_ENDS_TURN");
+			if(ePromotion == ePromotionRoughTerrain && kPlayer.GetPlayerTraits()->IsConquestOfTheWorld())
+				continue;
+
 			if(!GC.getPromotionInfo(ePromotion)->IsHoveringUnit())	// Hovering units handled above
 				setHasPromotion(ePromotion, true);
 		}
 	}
 
-	const UnitCombatTypes unitCombatType = getUnitCombatType();
+	const UnitCombatTypes unitCombatType = (UnitCombatTypes)getUnitCombatType();
 	if(unitCombatType != NO_UNITCOMBAT)
 	{
 		// Any free Promotions to apply?
@@ -1628,6 +1274,40 @@ void CvUnit::initWithNameOffset(int iID, UnitTypes eUnit, int iNameOffset, UnitA
 		}
 	}
 #if defined(MOD_BALANCE_CORE)
+	if(isUnitEraUpgrade())
+	{
+		EraTypes eEra;
+		int iNumEraInfos = GC.getNumEraInfos();
+		for(int iEraLoop = 0; iEraLoop < iNumEraInfos; iEraLoop++)
+		{
+			eEra = (EraTypes) iEraLoop;
+			if((m_pUnitInfo->GetEraCombatStrength(eEra) > 0) && (GET_TEAM(kPlayer.getTeam()).GetCurrentEra() >= eEra))
+			{
+				SetBaseCombatStrength(m_pUnitInfo->GetEraCombatStrength(eEra));
+			}
+			for(int iI = 0; iI < GC.getNumUnitCombatClassInfos(); iI++)
+			{
+				UnitCombatTypes eUnitCombatClass;
+				for(int iI = 0; iI < GC.getNumUnitCombatClassInfos(); iI++)
+				{
+					eUnitCombatClass = (UnitCombatTypes) iI;
+					if((m_pUnitInfo->GetUnitNewEraCombatType(eUnitCombatClass, eEra) > 0) && (GET_TEAM(kPlayer.getTeam()).GetCurrentEra() >= eEra))
+					{
+						setUnitCombatType(eUnitCombatClass);
+					}
+				}
+				PromotionTypes ePromotion;
+				for(int iI = 0; iI < GC.getNumPromotionInfos(); iI++)
+				{
+					ePromotion = (PromotionTypes) iI;
+					if((m_pUnitInfo->GetUnitNewEraPromotions(ePromotion, eEra) > 0) && (GET_TEAM(kPlayer.getTeam()).GetCurrentEra() >= eEra))
+					{
+						setHasPromotion(ePromotion, true);
+					}
+				}
+			}
+		}
+	}
 	const UnitClassTypes unitClassType = getUnitClassType();
 	if(unitClassType != NO_UNITCLASS)
 	{
@@ -1856,7 +1536,22 @@ void CvUnit::initWithNameOffset(int iID, UnitTypes eUnit, int iNameOffset, UnitA
 			}
 		}
 	}
-
+#if defined(MOD_BALANCE_CORE)
+	GreatPersonTypes eGreatPerson = GetGreatPersonFromUnitClass(getUnitClassType());
+	if (eGreatPerson != NO_GREATPERSON && bHistoric)
+	{
+		CvCity* pCity = plot()->getWorkingCity();
+		if (pCity != NULL && pCity->getOwner() == GetID())
+		{
+			GET_PLAYER(getOwner()).doInstantYield(INSTANT_YIELD_TYPE_GP_BORN, false, eGreatPerson, NO_BUILDING, 0, true, NO_PLAYER, NULL, false, pCity);
+		}
+		else if (GET_PLAYER(getOwner()).getCapitalCity() != NULL)
+		{
+			GET_PLAYER(getOwner()).doInstantYield(INSTANT_YIELD_TYPE_GP_BORN, false, eGreatPerson, NO_BUILDING, 0, true, NO_PLAYER, NULL, false, GET_PLAYER(getOwner()).getCapitalCity());
+		}
+		GET_PLAYER(getOwner()).doInstantGWAM(eGreatPerson, getUnitName());
+	}
+#endif
 	// Update UI
 	if(getOwner() == GC.getGame().getActivePlayer())
 	{
@@ -1893,551 +1588,17 @@ void CvUnit::initWithNameOffset(int iID, UnitTypes eUnit, int iNameOffset, UnitA
 	CvPlot* pUnitPlot = plot();
 	if(pUnitPlot && pUnitPlot->isCity())
 	{
-		pUnitPlot->getPlotCity()->SetGarrison( pUnitPlot->getBestGarrison( getOwner() ).pointer() );
+		pUnitPlot->getPlotCity()->SetGarrison( pUnitPlot->getBestGarrison( getOwner() ) );
 	}
 
 #if defined(MOD_BALANCE_CORE)
-	// Adjacent terrain/feature that provides free promotions?
-	CvPlot* pAdjacentPlot;
-	for(iI = 0; iI < NUM_DIRECTION_TYPES; ++iI)
-	{
-		pAdjacentPlot = plotDirection(plot()->getX(), plot()->getY(), ((DirectionTypes)iI));
-
-		if(pAdjacentPlot != NULL)
-		{
-			FeatureTypes eFeature = pAdjacentPlot->getFeatureType();
-			if(eFeature != NO_FEATURE)
-			{
-				PromotionTypes ePromotion = (PromotionTypes)GC.getFeatureInfo(eFeature)->getAdjacentSpawnLocationUnitFreePromotion();
-				if(ePromotion != NO_PROMOTION)
-				{
-					CvPromotionEntry* pkOriginalPromotionInfo = GC.getPromotionInfo(ePromotion);
-					if(pkOriginalPromotionInfo && m_pUnitInfo->GetUnitCombatType() != NO_UNITCOMBAT && (::IsPromotionValidForUnitCombatType(ePromotion, getUnitType())))
-					{
-						bool bNoPromotion = false;
-						// Check for negating promotions
-						if(pkOriginalPromotionInfo->IsBarbarianOnly() && !isBarbarian())
-						{
-							bNoPromotion = true;
-						}
-						if(pkOriginalPromotionInfo->IsCityStateOnly() && !GET_PLAYER(getOwner()).isMinorCiv())
-						{
-							bNoPromotion = true;
-						}
-						if(!bNoPromotion)
-						{
-							for(int iI = 0; iI < GC.getNumPromotionInfos(); iI++)
-							{
-								const PromotionTypes eNegatingPromotion = static_cast<PromotionTypes>(iI);
-								CvPromotionEntry* pkPromotionInfo = GC.getPromotionInfo(eNegatingPromotion);
-								if(pkPromotionInfo)
-								{
-									PromotionTypes eNegatorPromotion = (PromotionTypes)pkPromotionInfo->NegatesPromotion();
-									// Unit has negation promotion
-									if(isHasPromotion(eNegatingPromotion) && ePromotion == eNegatorPromotion)
-									{
-										bNoPromotion = true;
-										break;
-									}
-								}
-							}
-						}
-						if(!bNoPromotion)
-						{
-							setHasPromotion(ePromotion, true);
-						}
-					}
-				}
-			}
-
-			// Starting terrain that provides free promotions?
-			TerrainTypes eAdjacentTerrain = pAdjacentPlot->getTerrainType();
-			if(eAdjacentTerrain != NO_TERRAIN && (eAdjacentTerrain <= TERRAIN_SNOW))
-			{
-				PromotionTypes ePromotion = (PromotionTypes)GC.getTerrainInfo(eAdjacentTerrain)->getAdjacentSpawnLocationUnitFreePromotion();
-				if(ePromotion != NO_PROMOTION)
-				{
-					CvPromotionEntry* pkOriginalPromotionInfo = GC.getPromotionInfo(ePromotion);
-					if(pkOriginalPromotionInfo && m_pUnitInfo->GetUnitCombatType() != NO_UNITCOMBAT && (::IsPromotionValidForUnitCombatType(ePromotion, getUnitType())))
-					{
-						bool bNoPromotion = false;
-						// Check for negating promotions
-						if(pkOriginalPromotionInfo->IsBarbarianOnly() && !isBarbarian())
-						{
-							bNoPromotion = true;
-						}
-						if(pkOriginalPromotionInfo->IsCityStateOnly() && !GET_PLAYER(getOwner()).isMinorCiv())
-						{
-							bNoPromotion = true;
-						}
-						if(!bNoPromotion)
-						{
-							for(int iI = 0; iI < GC.getNumPromotionInfos(); iI++)
-							{
-								const PromotionTypes eNegatingPromotion = static_cast<PromotionTypes>(iI);
-								CvPromotionEntry* pkPromotionInfo = GC.getPromotionInfo(eNegatingPromotion);
-								if(pkPromotionInfo)
-								{
-									PromotionTypes eNegatorPromotion = (PromotionTypes)pkPromotionInfo->NegatesPromotion();
-									// Unit has negation promotion
-									if(isHasPromotion(eNegatingPromotion) && ePromotion == eNegatorPromotion)
-									{
-										bNoPromotion = true;
-										break;
-									}
-								}
-							}
-						}
-						if(!bNoPromotion)
-						{
-							setHasPromotion(ePromotion, true);
-						}
-					}
-				}
-			}
-			// Starting terrain that provides free promotions?
-			if(pAdjacentPlot->isHills())
-			{
-				PromotionTypes ePromotion = (PromotionTypes)GC.getTerrainInfo(TERRAIN_HILL)->getAdjacentSpawnLocationUnitFreePromotion();
-				if(ePromotion != NO_PROMOTION)
-				{
-					CvPromotionEntry* pkOriginalPromotionInfo = GC.getPromotionInfo(ePromotion);
-					if(pkOriginalPromotionInfo && m_pUnitInfo->GetUnitCombatType() != NO_UNITCOMBAT && (::IsPromotionValidForUnitCombatType(ePromotion, getUnitType())))
-					{
-						bool bNoPromotion = false;
-						// Check for negating promotions
-						if(pkOriginalPromotionInfo->IsBarbarianOnly() && !isBarbarian())
-						{
-							bNoPromotion = true;
-						}
-						if(pkOriginalPromotionInfo->IsCityStateOnly() && !GET_PLAYER(getOwner()).isMinorCiv())
-						{
-							bNoPromotion = true;
-						}
-						if(!bNoPromotion)
-						{
-							for(int iI = 0; iI < GC.getNumPromotionInfos(); iI++)
-							{
-								const PromotionTypes eNegatingPromotion = static_cast<PromotionTypes>(iI);
-								CvPromotionEntry* pkPromotionInfo = GC.getPromotionInfo(eNegatingPromotion);
-								if(pkPromotionInfo)
-								{
-									PromotionTypes eNegatorPromotion = (PromotionTypes)pkPromotionInfo->NegatesPromotion();
-									// Unit has negation promotion
-									if(isHasPromotion(eNegatingPromotion) && ePromotion == eNegatorPromotion)
-									{
-										bNoPromotion = true;
-										break;
-									}
-								}
-							}
-						}
-						if(!bNoPromotion)
-						{
-							setHasPromotion(ePromotion, true);
-						}
-					}
-				}
-			}
-			if(pAdjacentPlot->isMountain())
-			{
-				PromotionTypes ePromotion = (PromotionTypes)GC.getTerrainInfo(TERRAIN_MOUNTAIN)->getAdjacentSpawnLocationUnitFreePromotion();
-				if(ePromotion != NO_PROMOTION)
-				{
-					CvPromotionEntry* pkOriginalPromotionInfo = GC.getPromotionInfo(ePromotion);
-					if(pkOriginalPromotionInfo && m_pUnitInfo->GetUnitCombatType() != NO_UNITCOMBAT && (::IsPromotionValidForUnitCombatType(ePromotion, getUnitType())))
-					{
-						bool bNoPromotion = false;
-						// Check for negating promotions
-						if(pkOriginalPromotionInfo->IsBarbarianOnly() && !isBarbarian())
-						{
-							bNoPromotion = true;
-						}
-						if(pkOriginalPromotionInfo->IsCityStateOnly() && !GET_PLAYER(getOwner()).isMinorCiv())
-						{
-							bNoPromotion = true;
-						}
-						if(!bNoPromotion)
-						{
-							for(int iI = 0; iI < GC.getNumPromotionInfos(); iI++)
-							{
-								const PromotionTypes eNegatingPromotion = static_cast<PromotionTypes>(iI);
-								CvPromotionEntry* pkPromotionInfo = GC.getPromotionInfo(eNegatingPromotion);
-								if(pkPromotionInfo)
-								{
-									PromotionTypes eNegatorPromotion = (PromotionTypes)pkPromotionInfo->NegatesPromotion();
-									// Unit has negation promotion
-									if(isHasPromotion(eNegatingPromotion) && ePromotion == eNegatorPromotion)
-									{
-										bNoPromotion = true;
-										break;
-									}
-								}
-							}
-						}
-						if(!bNoPromotion)
-						{
-							setHasPromotion(ePromotion, true);
-						}
-					}
-				}
-			}
-			if(pAdjacentPlot->isShallowWater() && !pAdjacentPlot->isLake())
-			{
-				PromotionTypes ePromotion = (PromotionTypes)GC.getTerrainInfo(TERRAIN_COAST)->getAdjacentSpawnLocationUnitFreePromotion();
-				if(ePromotion != NO_PROMOTION)
-				{
-					CvPromotionEntry* pkOriginalPromotionInfo = GC.getPromotionInfo(ePromotion);
-					if(pkOriginalPromotionInfo && m_pUnitInfo->GetUnitCombatType() != NO_UNITCOMBAT && (::IsPromotionValidForUnitCombatType(ePromotion, getUnitType())))
-					{
-						bool bNoPromotion = false;
-						// Check for negating promotions
-						if(pkOriginalPromotionInfo->IsBarbarianOnly() && !isBarbarian())
-						{
-							bNoPromotion = true;
-						}
-						if(pkOriginalPromotionInfo->IsCityStateOnly() && !GET_PLAYER(getOwner()).isMinorCiv())
-						{
-							bNoPromotion = true;
-						}
-						if(!bNoPromotion)
-						{
-							for(int iI = 0; iI < GC.getNumPromotionInfos(); iI++)
-							{
-								const PromotionTypes eNegatingPromotion = static_cast<PromotionTypes>(iI);
-								CvPromotionEntry* pkPromotionInfo = GC.getPromotionInfo(eNegatingPromotion);
-								if(pkPromotionInfo)
-								{
-									PromotionTypes eNegatorPromotion = (PromotionTypes)pkPromotionInfo->NegatesPromotion();
-									// Unit has negation promotion
-									if(isHasPromotion(eNegatingPromotion) && ePromotion == eNegatorPromotion)
-									{
-										bNoPromotion = true;
-										break;
-									}
-								}
-							}
-						}
-						if(!bNoPromotion)
-						{
-							setHasPromotion(ePromotion, true);
-						}
-					}
-				}
-			}
-			if(!pAdjacentPlot->isShallowWater() && !pAdjacentPlot->isLake() && pAdjacentPlot->isWater())
-			{
-				PromotionTypes ePromotion = (PromotionTypes)GC.getTerrainInfo(TERRAIN_OCEAN)->getAdjacentSpawnLocationUnitFreePromotion();
-				if(ePromotion != NO_PROMOTION)
-				{
-					CvPromotionEntry* pkOriginalPromotionInfo = GC.getPromotionInfo(ePromotion);
-					if(pkOriginalPromotionInfo && m_pUnitInfo->GetUnitCombatType() != NO_UNITCOMBAT && (::IsPromotionValidForUnitCombatType(ePromotion, getUnitType())))
-					{
-						bool bNoPromotion = false;
-						// Check for negating promotions
-						if(pkOriginalPromotionInfo->IsBarbarianOnly() && !isBarbarian())
-						{
-							bNoPromotion = true;
-						}
-						if(pkOriginalPromotionInfo->IsCityStateOnly() && !GET_PLAYER(getOwner()).isMinorCiv())
-						{
-							bNoPromotion = true;
-						}
-						if(!bNoPromotion)
-						{
-							for(int iI = 0; iI < GC.getNumPromotionInfos(); iI++)
-							{
-								const PromotionTypes eNegatingPromotion = static_cast<PromotionTypes>(iI);
-								CvPromotionEntry* pkPromotionInfo = GC.getPromotionInfo(eNegatingPromotion);
-								if(pkPromotionInfo)
-								{
-									PromotionTypes eNegatorPromotion = (PromotionTypes)pkPromotionInfo->NegatesPromotion();
-									// Unit has negation promotion
-									if(isHasPromotion(eNegatingPromotion) && ePromotion == eNegatorPromotion)
-									{
-										bNoPromotion = true;
-										break;
-									}
-								}
-							}
-						}
-						if(!bNoPromotion)
-						{
-							setHasPromotion(ePromotion, true);
-						}
-					}
-				}
-			}
-		}
-	}
-	// Feature that provides free promotions?
-	FeatureTypes eFeature = plot()->getFeatureType();
-	if(eFeature != NO_FEATURE)
-	{
-		PromotionTypes ePromotion = (PromotionTypes)GC.getFeatureInfo(eFeature)->getSpawnLocationUnitFreePromotion();
-		if(ePromotion != NO_PROMOTION)
-		{
-			CvPromotionEntry* pkOriginalPromotionInfo = GC.getPromotionInfo(ePromotion);
-			if(pkOriginalPromotionInfo && m_pUnitInfo->GetUnitCombatType() != NO_UNITCOMBAT && (::IsPromotionValidForUnitCombatType(ePromotion, getUnitType())))
-			{
-				bool bNoPromotion = false;
-				// Check for negating promotions
-				if(pkOriginalPromotionInfo->IsBarbarianOnly() && !isBarbarian())
-				{
-					bNoPromotion = true;
-				}
-				if(pkOriginalPromotionInfo->IsCityStateOnly() && !GET_PLAYER(getOwner()).isMinorCiv())
-				{
-					bNoPromotion = true;
-				}
-				if(!bNoPromotion)
-				{
-					for(int iI = 0; iI < GC.getNumPromotionInfos(); iI++)
-					{
-						const PromotionTypes eNegatingPromotion = static_cast<PromotionTypes>(iI);
-						CvPromotionEntry* pkPromotionInfo = GC.getPromotionInfo(eNegatingPromotion);
-						if(pkPromotionInfo)
-						{
-							PromotionTypes eNegatorPromotion = (PromotionTypes)pkPromotionInfo->NegatesPromotion();
-							// Unit has negation promotion
-							if(isHasPromotion(eNegatingPromotion) && ePromotion == eNegatorPromotion)
-							{
-								bNoPromotion = true;
-								break;
-							}
-						}
-					}
-				}
-				if(!bNoPromotion)
-				{
-					setHasPromotion(ePromotion, true);
-				}
-			}
-		}
-	}
-	// Terrain that provides free promotions?
-	TerrainTypes eTerrain = plot()->getTerrainType();
-	if(eTerrain != NO_TERRAIN && (eTerrain <= TERRAIN_SNOW))
-	{
-		PromotionTypes ePromotion = (PromotionTypes)GC.getTerrainInfo(eTerrain)->getSpawnLocationUnitFreePromotion();
-		if(ePromotion != NO_PROMOTION)
-		{
-			CvPromotionEntry* pkOriginalPromotionInfo = GC.getPromotionInfo(ePromotion);
-			if(pkOriginalPromotionInfo && m_pUnitInfo->GetUnitCombatType() != NO_UNITCOMBAT && (::IsPromotionValidForUnitCombatType(ePromotion, getUnitType())))
-			{
-				bool bNoPromotion = false;
-				// Check for negating promotions
-				if(pkOriginalPromotionInfo->IsBarbarianOnly() && !isBarbarian())
-				{
-					bNoPromotion = true;
-				}
-				if(pkOriginalPromotionInfo->IsCityStateOnly() && !GET_PLAYER(getOwner()).isMinorCiv())
-				{
-					bNoPromotion = true;
-				}
-				if(!bNoPromotion)
-				{
-					for(int iI = 0; iI < GC.getNumPromotionInfos(); iI++)
-					{
-						const PromotionTypes eNegatingPromotion = static_cast<PromotionTypes>(iI);
-						CvPromotionEntry* pkPromotionInfo = GC.getPromotionInfo(eNegatingPromotion);
-						if(pkPromotionInfo)
-						{
-							PromotionTypes eNegatorPromotion = (PromotionTypes)pkPromotionInfo->NegatesPromotion();
-							// Unit has negation promotion
-							if(isHasPromotion(eNegatingPromotion) && ePromotion == eNegatorPromotion)
-							{
-								bNoPromotion = true;
-								break;
-							}
-						}
-					}
-				}
-				if(!bNoPromotion)
-				{
-					setHasPromotion(ePromotion, true);
-				}
-			}
-		}
-	}
-	if(plot()->isHills())
-	{
-		PromotionTypes ePromotion = (PromotionTypes)GC.getTerrainInfo(TERRAIN_HILL)->getSpawnLocationUnitFreePromotion();
-		if(ePromotion != NO_PROMOTION)
-		{
-			CvPromotionEntry* pkOriginalPromotionInfo = GC.getPromotionInfo(ePromotion);
-			if(pkOriginalPromotionInfo && m_pUnitInfo->GetUnitCombatType() != NO_UNITCOMBAT && (::IsPromotionValidForUnitCombatType(ePromotion, getUnitType())))
-			{
-				bool bNoPromotion = false;
-				// Check for negating promotions
-				if(pkOriginalPromotionInfo->IsBarbarianOnly() && !isBarbarian())
-				{
-					bNoPromotion = true;
-				}
-				if(pkOriginalPromotionInfo->IsCityStateOnly() && !GET_PLAYER(getOwner()).isMinorCiv())
-				{
-					bNoPromotion = true;
-				}
-				if(!bNoPromotion)
-				{
-					for(int iI = 0; iI < GC.getNumPromotionInfos(); iI++)
-					{
-						const PromotionTypes eNegatingPromotion = static_cast<PromotionTypes>(iI);
-						CvPromotionEntry* pkPromotionInfo = GC.getPromotionInfo(eNegatingPromotion);
-						if(pkPromotionInfo)
-						{
-							PromotionTypes eNegatorPromotion = (PromotionTypes)pkPromotionInfo->NegatesPromotion();
-							// Unit has negation promotion
-							if(isHasPromotion(eNegatingPromotion) && ePromotion == eNegatorPromotion)
-							{
-								bNoPromotion = true;
-								break;
-							}
-						}
-					}
-				}
-				if(!bNoPromotion)
-				{
-					setHasPromotion(ePromotion, true);
-				}
-			}
-		}
-	}
-	if(plot()->isMountain())
-	{
-		PromotionTypes ePromotion = (PromotionTypes)GC.getTerrainInfo(TERRAIN_MOUNTAIN)->getSpawnLocationUnitFreePromotion();
-		if(ePromotion != NO_PROMOTION)
-		{
-			CvPromotionEntry* pkOriginalPromotionInfo = GC.getPromotionInfo(ePromotion);
-			if(pkOriginalPromotionInfo && m_pUnitInfo->GetUnitCombatType() != NO_UNITCOMBAT && (::IsPromotionValidForUnitCombatType(ePromotion, getUnitType())))
-			{
-				bool bNoPromotion = false;
-				// Check for negating promotions
-				if(pkOriginalPromotionInfo->IsBarbarianOnly() && !isBarbarian())
-				{
-					bNoPromotion = true;
-				}
-				if(pkOriginalPromotionInfo->IsCityStateOnly() && !GET_PLAYER(getOwner()).isMinorCiv())
-				{
-					bNoPromotion = true;
-				}
-				if(!bNoPromotion)
-				{
-					for(int iI = 0; iI < GC.getNumPromotionInfos(); iI++)
-					{
-						const PromotionTypes eNegatingPromotion = static_cast<PromotionTypes>(iI);
-						CvPromotionEntry* pkPromotionInfo = GC.getPromotionInfo(eNegatingPromotion);
-						if(pkPromotionInfo)
-						{
-							PromotionTypes eNegatorPromotion = (PromotionTypes)pkPromotionInfo->NegatesPromotion();
-							// Unit has negation promotion
-							if(isHasPromotion(eNegatingPromotion) && ePromotion == eNegatorPromotion)
-							{
-								bNoPromotion = true;
-								break;
-							}
-						}
-					}
-				}
-				if(!bNoPromotion)
-				{
-					setHasPromotion(ePromotion, true);
-				}
-			}
-		}
-	}
-	if(plot()->isShallowWater() && !plot()->isLake())
-	{
-		PromotionTypes ePromotion = (PromotionTypes)GC.getTerrainInfo(TERRAIN_COAST)->getSpawnLocationUnitFreePromotion();
-		if(ePromotion != NO_PROMOTION)
-		{
-			CvPromotionEntry* pkOriginalPromotionInfo = GC.getPromotionInfo(ePromotion);
-			if(pkOriginalPromotionInfo && m_pUnitInfo->GetUnitCombatType() != NO_UNITCOMBAT && (::IsPromotionValidForUnitCombatType(ePromotion, getUnitType())))
-			{
-				bool bNoPromotion = false;
-				// Check for negating promotions
-				if(pkOriginalPromotionInfo->IsBarbarianOnly() && !isBarbarian())
-				{
-					bNoPromotion = true;
-				}
-				if(pkOriginalPromotionInfo->IsCityStateOnly() && !GET_PLAYER(getOwner()).isMinorCiv())
-				{
-					bNoPromotion = true;
-				}
-				if(!bNoPromotion)
-				{
-					for(int iI = 0; iI < GC.getNumPromotionInfos(); iI++)
-					{
-						const PromotionTypes eNegatingPromotion = static_cast<PromotionTypes>(iI);
-						CvPromotionEntry* pkPromotionInfo = GC.getPromotionInfo(eNegatingPromotion);
-						if(pkPromotionInfo)
-						{
-							PromotionTypes eNegatorPromotion = (PromotionTypes)pkPromotionInfo->NegatesPromotion();
-							// Unit has negation promotion
-							if(isHasPromotion(eNegatingPromotion) && ePromotion == eNegatorPromotion)
-							{
-								bNoPromotion = true;
-								break;
-							}
-						}
-					}
-				}
-				if(!bNoPromotion)
-				{
-					setHasPromotion(ePromotion, true);
-				}
-			}
-		}
-	}
-	if(!plot()->isShallowWater() && !plot()->isLake() && plot()->isWater())
-	{
-		PromotionTypes ePromotion = (PromotionTypes)GC.getTerrainInfo(TERRAIN_OCEAN)->getSpawnLocationUnitFreePromotion();
-		if(ePromotion != NO_PROMOTION)
-		{
-			CvPromotionEntry* pkOriginalPromotionInfo = GC.getPromotionInfo(ePromotion);
-			if(pkOriginalPromotionInfo && m_pUnitInfo->GetUnitCombatType() != NO_UNITCOMBAT && (::IsPromotionValidForUnitCombatType(ePromotion, getUnitType())))
-			{
-				bool bNoPromotion = false;
-				// Check for negating promotions
-				if(pkOriginalPromotionInfo->IsBarbarianOnly() && !isBarbarian())
-				{
-					bNoPromotion = true;
-				}
-				if(pkOriginalPromotionInfo->IsCityStateOnly() && !GET_PLAYER(getOwner()).isMinorCiv())
-				{
-					bNoPromotion = true;
-				}
-				if(!bNoPromotion)
-				{
-					for(int iI = 0; iI < GC.getNumPromotionInfos(); iI++)
-					{
-						const PromotionTypes eNegatingPromotion = static_cast<PromotionTypes>(iI);
-						CvPromotionEntry* pkPromotionInfo = GC.getPromotionInfo(eNegatingPromotion);
-						if(pkPromotionInfo)
-						{
-							PromotionTypes eNegatorPromotion = (PromotionTypes)pkPromotionInfo->NegatesPromotion();
-							// Unit has negation promotion
-							if(isHasPromotion(eNegatingPromotion) && ePromotion == eNegatorPromotion)
-							{
-								bNoPromotion = true;
-								break;
-							}
-						}
-					}
-				}
-				if(!bNoPromotion)
-				{
-					setHasPromotion(ePromotion, true);
-				}
-			}
-		}
-	}
+	DoLocationPromotions(true);
 #endif
 	m_iArmyId = -1;
 
 	m_eUnitAIType = eUnitAI;
 #if defined(MOD_BALANCE_CORE)
-	if(IsGreatPerson())
+	if(IsGreatPerson() && bHistoric)
 	{
 		int iTourism = kPlayer.GetEventTourism();
 		kPlayer.ChangeNumHistoricEvents(1);
@@ -2494,7 +1655,7 @@ void CvUnit::initWithNameOffset(int iID, UnitTypes eUnit, int iNameOffset, UnitA
 		else
 			OutputDebugString("warning: putting un-embarkable unit on water plot!\n");
 	}
-
+	
 	if(bSetupGraphical)
 		setupGraphical();
 		
@@ -2567,11 +1728,12 @@ void CvUnit::reset(int iID, UnitTypes eUnit, PlayerTypes eOwner, bool bConstruct
 	m_iRiverCrossingNoPenaltyCount = 0;
 	m_iEnemyRouteCount = 0;
 	m_iRivalTerritoryCount = 0;
-	m_iMustSetUpToRangedAttackCount = 0;
+	m_iIsSlowInEnemyLandCount = 0;
 	m_iRangeAttackIgnoreLOSCount = 0;
 	m_iCityAttackOnlyCount = 0;
 	m_iCaptureDefeatedEnemyCount = 0;
 #if defined(MOD_BALANCE_CORE)
+	m_iOriginCity = -1;
 	m_iCannotBeCapturedCount = 0;
 	m_iForcedDamage = 0;
 	m_iChangeDamage = 0;
@@ -2580,6 +1742,9 @@ void CvUnit::reset(int iID, UnitTypes eUnit, PlayerTypes eOwner, bool bConstruct
 	m_iAlwaysHealCount = 0;
 	m_iHealOutsideFriendlyCount = 0;
 	m_iHillsDoubleMoveCount = 0;
+#if defined(MOD_BALANCE_CORE)
+	m_iMountainsDoubleMoveCount = 0;
+#endif
 	m_iImmuneToFirstStrikesCount = 0;
 	m_iExtraVisibilityRange = 0;
 #if defined(MOD_PROMOTIONS_VARIABLE_RECON)
@@ -2596,6 +1761,8 @@ void CvUnit::reset(int iID, UnitTypes eUnit, PlayerTypes eOwner, bool bConstruct
 #if defined(MOD_BALANCE_CORE_JFD)
 	m_iPlagueChance = 0;
 	m_iIsPlagued = 0;
+	m_eUnitContract = NO_CONTRACT;
+	m_iNegatorPromotion = -1;
 #endif
 	m_iExtraEnemyHeal = 0;
 	m_iExtraNeutralHeal = 0;
@@ -2650,6 +1817,11 @@ void CvUnit::reset(int iID, UnitTypes eUnit, PlayerTypes eOwner, bool bConstruct
 	m_iNearbyImprovementBonusRange = 0;
 	m_eCombatBonusImprovement = NO_IMPROVEMENT;
 #endif
+#if defined(MOD_BALANCE_CORE)
+	m_iNearbyUnitClassBonus = 0;
+	m_iNearbyUnitClassBonusRange = 0;
+	m_iCombatBonusFromNearbyUnitClass = NO_UNITCLASS;
+#endif
 #if defined(MOD_PROMOTIONS_CROSS_MOUNTAINS)
 	m_iCanCrossMountainsCount = 0;
 #endif
@@ -2664,6 +1836,10 @@ void CvUnit::reset(int iID, UnitTypes eUnit, PlayerTypes eOwner, bool bConstruct
 	m_iGainsXPFromScouting = 0;
 	m_iBarbCombatBonus = 0;
 	m_iCanMoraleBreak = 0;
+	m_iStrongerDamaged = 0;
+#endif
+#if defined(MOD_PROMOTIONS_GG_FROM_BARBARIANS)
+	m_iGGFromBarbariansCount = 0;
 #endif
 	m_iRoughTerrainEndsTurnCount = 0;
 	m_iEmbarkAbilityCount = 0;
@@ -2688,11 +1864,15 @@ void CvUnit::reset(int iID, UnitTypes eUnit, PlayerTypes eOwner, bool bConstruct
 	m_iNumExoticGoods = 0;
 	m_iTacticalAIPlotX = INVALID_PLOT_COORD;
 	m_iTacticalAIPlotY = INVALID_PLOT_COORD;
-	m_iGarrisonCityID = -1;
+	m_iGarrisonCityID = -1;   // unused
 	m_iNumAttacks = 1;
 	m_iAttacksMade = 0;
 	m_iGreatGeneralCount = 0;
 	m_iGreatAdmiralCount = 0;
+#if defined(MOD_PROMOTIONS_AURA_CHANGE)
+	m_iAuraRangeChange = 0;
+	m_iAuraEffectChange = 0;
+#endif
 	m_iGreatGeneralModifier = 0;
 	m_iGreatGeneralReceivesMovementCount = 0;
 	m_iGreatGeneralCombatModifier = 0;
@@ -2710,6 +1890,10 @@ void CvUnit::reset(int iID, UnitTypes eUnit, PlayerTypes eOwner, bool bConstruct
 	m_iEmbarkedAllWaterCount = 0;
 #if defined(MOD_PROMOTIONS_DEEP_WATER_EMBARKATION)
 	m_iEmbarkedDeepWaterCount = 0;
+#endif
+#if defined(MOD_CORE_PER_TURN_DAMAGE)
+	m_iDamageTakenThisTurn = 0;
+	m_iDamageTakenLastTurn = 0;
 #endif
 	m_iEmbarkExtraVisibility = 0;
 	m_iEmbarkDefensiveModifier = 0;
@@ -2745,6 +1929,7 @@ void CvUnit::reset(int iID, UnitTypes eUnit, PlayerTypes eOwner, bool bConstruct
 	m_eUnitType = eUnit;
 	m_pUnitInfo = (NO_UNIT != m_eUnitType) ? GC.getUnitInfo(m_eUnitType) : NULL;
 	m_iBaseCombat = (NO_UNIT != m_eUnitType) ? m_pUnitInfo->GetCombat() : 0;
+	m_eCombatType = (NO_UNIT != m_eUnitType) ? (UnitCombatTypes)m_pUnitInfo->GetUnitCombatType() : NO_UNITCOMBAT;
 #if defined(MOD_API_EXTENSIONS)
 	m_iBaseRangedCombat = (NO_UNIT != m_eUnitType) ? m_pUnitInfo->GetRangedCombat() : 0;
 #endif
@@ -2761,7 +1946,6 @@ void CvUnit::reset(int iID, UnitTypes eUnit, PlayerTypes eOwner, bool bConstruct
 
 	m_combatUnit.reset();
 	m_transportUnit.reset();
-
 	m_extraDomainModifiers.clear();
 
 	for(iI = 0; iI < NUM_DOMAIN_TYPES; iI++)
@@ -2773,6 +1957,9 @@ void CvUnit::reset(int iID, UnitTypes eUnit, PlayerTypes eOwner, bool bConstruct
 	m_strUnitName = "";
 #endif
 	m_strName = "";
+#if defined(MOD_GLOBAL_NO_LOST_GREATWORKS)
+	m_strGreatName = "";
+#endif
 	m_eGreatWork = NO_GREAT_WORK;
 	m_iTourismBlastStrength = 0;
 	m_strNameIAmNotSupposedToBeUsedAnyMoreBecauseThisShouldNotBeCheckedAndWeNeedToPreserveSaveGameCompatibility = "";
@@ -2788,10 +1975,7 @@ void CvUnit::reset(int iID, UnitTypes eUnit, PlayerTypes eOwner, bool bConstruct
 	m_eActivityType = ACTIVITY_AWAKE;
 	m_eAutomateType = NO_AUTOMATE;
 
-	m_kLastPath.clear();
-	m_uiLastPathCacheDest = 0xFFFFFFFF;
-	m_uiLastPathFlags = 0xFFFFFFFF;
-	m_uiLastPathTurn = 0xFFFFFFFF;
+	ClearPathCache();
 
 #if defined(MOD_BALANCE_CORE)
 	m_iScienceBlastStrength = 0;
@@ -3002,7 +2186,6 @@ void CvUnit::convert(CvUnit* pUnit, bool bIsUpgrade)
 	pPlot = plot();
 #if defined(MOD_BALANCE_CORE)
 	int iLostPromotions = 0;
-	bool bFree = false;
 #endif
 	// Transfer Promotions over
 	for(int iI = 0; iI < GC.getNumPromotionInfos(); iI++)
@@ -3019,6 +2202,21 @@ void CvUnit::convert(CvUnit* pUnit, bool bIsUpgrade)
 				continue;
 			}
 #endif
+#if defined(MOD_BALANCE_CORE)
+			bool bFree = false;
+			if(ePromotion == (PromotionTypes)GC.getPROMOTION_OCEAN_IMPASSABLE() || ePromotion == (PromotionTypes)GC.getPROMOTION_OCEAN_IMPASSABLE_UNTIL_ASTRONOMY())
+			{
+				//Can't embark yet, or the unit should auto get it?
+				if(pUnit->isHasPromotion(ePromotion))
+				{
+					if(!GET_PLAYER(getOwner()).GetPlayerTraits()->IsEmbarkedAllWater() && !GET_TEAM(GET_PLAYER(getOwner()).getTeam()).canEmbarkAllWaterPassage() && getUnitInfo().GetFreePromotions(ePromotion))
+					{
+						bGivePromotion = true;
+					}
+				}
+			}
+			else
+#endif
 			// Old unit has the promotion
 			if(pUnit->isHasPromotion(ePromotion) && !pkPromotionInfo->IsLostWithUpgrade())
 			{
@@ -3028,38 +2226,38 @@ void CvUnit::convert(CvUnit* pUnit, bool bIsUpgrade)
 			// New unit gets promotion for free (as per XML)
 			else if(getUnitInfo().GetFreePromotions(ePromotion) && (!bIsUpgrade || !pkPromotionInfo->IsNotWithUpgrade()))
 			{
-				bGivePromotion = true;
 #if defined(MOD_BALANCE_CORE)
 				bFree = true;
-				if((ePromotion == (PromotionTypes)GC.getPROMOTION_OCEAN_IMPASSABLE() || ePromotion == (PromotionTypes)GC.getPROMOTION_OCEAN_IMPASSABLE_UNTIL_ASTRONOMY()) && (GET_PLAYER(getOwner()).GetPlayerTraits()->IsEmbarkedAllWater() || GET_TEAM(GET_PLAYER(getOwner()).getTeam()).canEmbarkAllWaterPassage()))
-				{
-					bGivePromotion = false;
-					bFree = false;
-				}
 #endif
+				bGivePromotion = true;
 			}
 
 			// if we get this due to a policy or wonder
 			else if(GET_PLAYER(getOwner()).IsFreePromotion(ePromotion) && (
-						::IsPromotionValidForUnitCombatType(ePromotion, getUnitType()) || ::IsPromotionValidForCivilianUnitType(ePromotion, getUnitType())))
+			            ::IsPromotionValidForUnitCombatType(ePromotion, getUnitType()) || ::IsPromotionValidForCivilianUnitType(ePromotion, getUnitType())))
 			{
-				bGivePromotion = true;
 #if defined(MOD_BALANCE_CORE)
 				bFree = true;
-				if((ePromotion == (PromotionTypes)GC.getPROMOTION_OCEAN_IMPASSABLE() || ePromotion == (PromotionTypes)GC.getPROMOTION_OCEAN_IMPASSABLE_UNTIL_ASTRONOMY()) && (GET_PLAYER(getOwner()).GetPlayerTraits()->IsEmbarkedAllWater() || GET_TEAM(GET_PLAYER(getOwner()).getTeam()).canEmbarkAllWaterPassage()))
-				{
-					bGivePromotion = false;
-					bFree = false;
-				}
 #endif
+				bGivePromotion = true;
 			}
 #if defined(MOD_BALANCE_CORE)
 			if(pUnit->getUnitCombatType() != getUnitCombatType())
 			{
+				bool bMelee = false;
 				bool bRanged = false;
 				if((pkPromotionInfo->GetRangedAttackModifier() > 0) || (pkPromotionInfo->GetRangeChange() > 0) || (pkPromotionInfo->GetRangedAttackModifier() > 0) || (pkPromotionInfo->IsRangeAttackIgnoreLOS()) || (pkPromotionInfo->GetOpenRangedAttackMod() > 0) || (pkPromotionInfo->GetRoughRangedAttackMod() > 0) || (pkPromotionInfo->GetExtraAttacks() > 0))
 				{
 					bRanged = true;
+				}
+				// Note: might be more Promotions than this for melee but these are the essentials of Drill and Shock. Things like Attack wounded, etc. can apply to ranged units on conversion from melee.
+				if((pkPromotionInfo->GetRoughAttackPercent() > 0) || (pkPromotionInfo->GetRoughDefensePercent() > 0) || (pkPromotionInfo->GetOpenAttackPercent() > 0) || (pkPromotionInfo->GetOpenDefensePercent()))
+				{
+					bMelee = true;
+				}
+				if ((pkPromotionInfo->GetCityAttackPlunderModifier() > 0) || (pkPromotionInfo->GetHPHealedIfDefeatEnemy() > 0))
+				{
+					bMelee = true;
 				}
 				//If we're losing standard promotions because of a combatclass change, let's replace with some experience.
 				if(!isRanged() && pUnit->HasPromotion(ePromotion) && pUnit->isRanged() && bRanged && !bFree)
@@ -3069,6 +2267,12 @@ void CvUnit::convert(CvUnit* pUnit, bool bIsUpgrade)
 				}
 				//Naval Misfire Promotion Catch (sorry for hardcode)
 				else if(!isRanged() && pUnit->HasPromotion(ePromotion) && pUnit->isRanged() && (pkPromotionInfo->GetDomainModifierPercent(DOMAIN_SEA) < 0) && (getDomainType() == DOMAIN_LAND))
+				{
+					iLostPromotions++;
+					bGivePromotion = false;
+				}
+				// Siege Tower / Battering Ram Upgrade? Now becomes a UNITCOMBAT_SIEGE and a ranged unit
+				else if(isRanged() && !pUnit->isRanged() && pUnit->HasPromotion(ePromotion) && bMelee && !bFree)
 				{
 					iLostPromotions++;
 					bGivePromotion = false;
@@ -3391,34 +2595,60 @@ void CvUnit::kill(bool bDelay, PlayerTypes ePlayer /*= NO_PLAYER*/)
 	}
 	
 #if defined(MOD_EVENTS_UNIT_PREKILL)
-	if (MOD_EVENTS_UNIT_PREKILL) {
-		GAMEEVENTINVOKE_HOOK(GAMEEVENT_UnitPrekill, getOwner(), GetID(), getUnitType(), getX(), getY(), bDelay, ePlayer);
-	} else {
-#endif
-	if (pkScriptSystem) 
+	if (MOD_EVENTS_UNIT_PREKILL)
 	{
-		CvLuaArgsHandle args;
-		args->Push(((int)getOwner()));
-		args->Push(GetID());
-		args->Push(getUnitType());
-		args->Push(getX());
-		args->Push(getY());
-		args->Push(bDelay);
-		args->Push(ePlayer);
-
-		bool bResult;
-		LuaSupport::CallHook(pkScriptSystem, "UnitPrekill", args.get(), bResult);
+		GAMEEVENTINVOKE_HOOK(GAMEEVENT_UnitPrekill, getOwner(), GetID(), getUnitType(), getX(), getY(), bDelay, ePlayer);
 	}
+	else
+	{
+#endif
+		if (pkScriptSystem) 
+		{
+			CvLuaArgsHandle args;
+			args->Push(((int)getOwner()));
+			args->Push(GetID());
+			args->Push(getUnitType());
+			args->Push(getX());
+			args->Push(getY());
+			args->Push(bDelay);
+			args->Push(ePlayer);
+
+			bool bResult;
+			LuaSupport::CallHook(pkScriptSystem, "UnitPrekill", args.get(), bResult);
+		}
 #if defined(MOD_EVENTS_UNIT_PREKILL)
 	}
 #endif
 
 	if(bDelay)
 	{
+#if defined(MOD_BALANCE_CORE)
+		if(isCultureFromExperienceDisbandUpgrade())
+		{
+			if(ePlayer == -1)
+			{
+				int iExperience = getExperienceTimes100() / 100;
+				if(iExperience > 0)
+				{
+					GET_PLAYER(getOwner()).changeJONSCulture(iExperience);
+				}
+			}
+		}
+#endif
 		startDelayedDeath();
 		return;
 	}
 
+#if defined(MOD_GLOBAL_NO_LOST_GREATWORKS)
+	if(MOD_GLOBAL_NO_LOST_GREATWORKS && !bDelay)
+	{
+		if (HasUnusedGreatWork())
+		{
+			CUSTOMLOG("Killing a Great Writer, Artist or Musician who didn't create their Great Work!");
+			GC.getGame().removeGreatPersonBornName(getGreatName());
+		}
+	}
+#endif
 
 	///////////////////////////////////////////////////////////////////////////////////////////////
 	// EVERYTHING AFTER THIS LINE OCCURS UPON THE ACTUAL DELETION OF THE UNIT AND NOT WITH A DELAYED DEATH
@@ -3490,7 +2720,11 @@ void CvUnit::kill(bool bDelay, PlayerTypes ePlayer /*= NO_PLAYER*/)
 
 	if(getUnitInfo().IsMilitarySupport())
 	{
+#if defined(MOD_BATTLE_ROYALE)
+		GET_PLAYER(getOwner()).changeNumMilitaryUnits(-1, (DomainTypes)getUnitInfo().GetDomainType());
+#else
 		GET_PLAYER(getOwner()).changeNumMilitaryUnits(-1);
+#endif
 	}
 
 	// A unit dying reduces the Great General meter
@@ -3547,7 +2781,12 @@ void CvUnit::kill(bool bDelay, PlayerTypes ePlayer /*= NO_PLAYER*/)
 			GET_PLAYER(getOwner()).changeNumResourceUsed((ResourceTypes) iResourceLoop, -getUnitInfo().GetResourceQuantityRequirement(iResourceLoop));
 		}
 	}
-
+#if defined(MOD_BALANCE_CORE)
+	if (isTrade() || IsCivilianUnit() || isNoSupply() || isContractUnit())
+	{
+		GET_PLAYER(getOwner()).changeNumFreeUnits(-1);
+	}
+#endif
 	//////////////////////////////////////////////////////////////////////////
 	// WARNING: This next statement will delete 'this'
 	// ANYTHING BELOW HERE MUST NOT REFERENCE THE UNIT!
@@ -3696,6 +2935,14 @@ bool CvUnit::getCaptureDefinition(CvUnitCaptureDefinition* pkCaptureDef, PlayerT
 							pkCapturedUnit->kill(false);
 							pkCapturedUnit = NULL;
 						}
+						if (pkCapturedUnit != NULL && pkCapturedUnit->IsCombatUnit())
+						{
+							if(!pkCapturedUnit->jumpToNearestValidPlot())
+							{
+								pkCapturedUnit->kill(true);
+								pkCapturedUnit = NULL;
+							}
+						}
 					}
 
 					// Captured civilian who could be returned?
@@ -3749,7 +2996,7 @@ bool CvUnit::getCaptureDefinition(CvUnitCaptureDefinition* pkCaptureDef, PlayerT
 							if(kCaptureDef.eCapturingPlayer != kCaptureDef.eOriginalOwner)
 							{
 #if defined(MOD_BALANCE_CORE)
-								if(kCaptureDef.eOriginalOwner != NO_PLAYER && !GET_PLAYER(kCaptureDef.eCapturingPlayer).isHuman() && !GET_PLAYER(kCaptureDef.eCapturingPlayer).IsAtWarWith(kCaptureDef.eOriginalOwner))
+								if (kCaptureDef.eOriginalOwner != NO_PLAYER && GET_PLAYER(kCaptureDef.eOriginalOwner).isAlive() && !GET_PLAYER(kCaptureDef.eCapturingPlayer).isHuman() && !GET_PLAYER(kCaptureDef.eCapturingPlayer).IsAtWarWith(kCaptureDef.eOriginalOwner))
 								{
 									MajorCivOpinionTypes eMajorOpinion = NO_MAJOR_CIV_OPINION_TYPE;
 									MinorCivApproachTypes eMinorOpinion = NO_MINOR_CIV_APPROACH;
@@ -3964,8 +3211,15 @@ void CvUnit::doTurn()
 		}
 	}				
 #endif
-
 	doDelayedDeath();
+#if defined(MOD_BALANCE_CORE)
+	DoImprovementExperience(plot());
+	DoStackedGreatGeneralExperience(plot());
+	DoConvertOnDamageThreshold(plot());
+	DoNearbyUnitPromotion(this, plot());
+	DoConvertEnemyUnitToBarbarian(plot());
+	DoConvertReligiousUnitsToMilitary(plot());
+#endif
 }
 //	--------------------------------------------------------------------------------
 bool CvUnit::isActionRecommended(int iAction)
@@ -4044,7 +3298,1018 @@ bool CvUnit::isActionRecommended(int iAction)
 	return false;
 }
 
+#if defined(MOD_BALANCE_CORE)
+void CvUnit::DoLocationPromotions(bool bSpawn, CvPlot* pOldPlot, CvPlot* pNewPlot)
+{
+	// Adjacent terrain/feature that provides free promotions?
+	int iI;
+	if(pNewPlot == NULL)
+	{
+		pNewPlot = plot();
+	}
+	if(bSpawn && pNewPlot != NULL)
+	{
+		CvPlot* pAdjacentPlot;
+		for(iI = 0; iI < NUM_DIRECTION_TYPES; ++iI)
+		{
+			pAdjacentPlot = plotDirection(pNewPlot->getX(), pNewPlot->getY(), ((DirectionTypes)iI));
 
+			if(pAdjacentPlot != NULL)
+			{
+				FeatureTypes eFeature = pAdjacentPlot->getFeatureType();
+				if(eFeature != NO_FEATURE)
+				{
+					PromotionTypes ePromotion = (PromotionTypes)GC.getFeatureInfo(eFeature)->getAdjacentSpawnLocationUnitFreePromotion();
+					if(ePromotion != NO_PROMOTION)
+					{
+						CvPromotionEntry* pkOriginalPromotionInfo = GC.getPromotionInfo(ePromotion);
+						if(pkOriginalPromotionInfo && m_pUnitInfo->GetUnitCombatType() != NO_UNITCOMBAT && (::IsPromotionValidForUnitCombatType(ePromotion, getUnitType())))
+						{
+							bool bNoPromotion = false;
+							// Check for negating promotions
+							if(pkOriginalPromotionInfo->IsBarbarianOnly() && !isBarbarian())
+							{
+								bNoPromotion = true;
+							}
+							if(pkOriginalPromotionInfo->IsCityStateOnly() && !GET_PLAYER(getOwner()).isMinorCiv())
+							{
+								bNoPromotion = true;
+							}
+							if(!bNoPromotion)
+							{				
+								PromotionTypes eNegatorPromotion = (PromotionTypes)getNegatorPromotion();
+								// Unit has negation promotion
+								if(eNegatorPromotion != NO_PROMOTION && ePromotion == eNegatorPromotion)
+								{
+									bNoPromotion = true;
+								}
+							}
+							if(!bNoPromotion)
+							{
+								setHasPromotion(ePromotion, true);
+							}
+						}
+					}
+				}
+
+				// Starting terrain that provides free promotions?
+				TerrainTypes eAdjacentTerrain = pAdjacentPlot->getTerrainType();
+				if(eAdjacentTerrain != NO_TERRAIN && (eAdjacentTerrain <= TERRAIN_SNOW))
+				{
+					PromotionTypes ePromotion = (PromotionTypes)GC.getTerrainInfo(eAdjacentTerrain)->getAdjacentSpawnLocationUnitFreePromotion();
+					if(ePromotion != NO_PROMOTION)
+					{
+						CvPromotionEntry* pkOriginalPromotionInfo = GC.getPromotionInfo(ePromotion);
+						if(pkOriginalPromotionInfo && m_pUnitInfo->GetUnitCombatType() != NO_UNITCOMBAT && (::IsPromotionValidForUnitCombatType(ePromotion, getUnitType())))
+						{
+							bool bNoPromotion = false;
+							// Check for negating promotions
+							if(pkOriginalPromotionInfo->IsBarbarianOnly() && !isBarbarian())
+							{
+								bNoPromotion = true;
+							}
+							if(pkOriginalPromotionInfo->IsCityStateOnly() && !GET_PLAYER(getOwner()).isMinorCiv())
+							{
+								bNoPromotion = true;
+							}
+							if(!bNoPromotion)
+							{
+								PromotionTypes eNegatorPromotion = (PromotionTypes)getNegatorPromotion();
+								// Unit has negation promotion
+								if(eNegatorPromotion != NO_PROMOTION && ePromotion == eNegatorPromotion)
+								{
+									bNoPromotion = true;
+								}
+							}
+							if(!bNoPromotion)
+							{
+								setHasPromotion(ePromotion, true);
+							}
+						}
+					}
+				}
+				// Starting terrain that provides free promotions?
+				if(pAdjacentPlot->isHills())
+				{
+					PromotionTypes ePromotion = (PromotionTypes)GC.getTerrainInfo(TERRAIN_HILL)->getAdjacentSpawnLocationUnitFreePromotion();
+					if(ePromotion != NO_PROMOTION)
+					{
+						CvPromotionEntry* pkOriginalPromotionInfo = GC.getPromotionInfo(ePromotion);
+						if(pkOriginalPromotionInfo && m_pUnitInfo->GetUnitCombatType() != NO_UNITCOMBAT && (::IsPromotionValidForUnitCombatType(ePromotion, getUnitType())))
+						{
+							bool bNoPromotion = false;
+							// Check for negating promotions
+							if(pkOriginalPromotionInfo->IsBarbarianOnly() && !isBarbarian())
+							{
+								bNoPromotion = true;
+							}
+							if(pkOriginalPromotionInfo->IsCityStateOnly() && !GET_PLAYER(getOwner()).isMinorCiv())
+							{
+								bNoPromotion = true;
+							}
+							if(!bNoPromotion)
+							{
+								PromotionTypes eNegatorPromotion = (PromotionTypes)getNegatorPromotion();
+								// Unit has negation promotion
+								if(eNegatorPromotion != NO_PROMOTION && ePromotion == eNegatorPromotion)
+								{
+									bNoPromotion = true;
+								}
+							}
+							if(!bNoPromotion)
+							{
+								setHasPromotion(ePromotion, true);
+							}
+						}
+					}
+				}
+				if(pAdjacentPlot->isMountain())
+				{
+					PromotionTypes ePromotion = (PromotionTypes)GC.getTerrainInfo(TERRAIN_MOUNTAIN)->getAdjacentSpawnLocationUnitFreePromotion();
+					if(ePromotion != NO_PROMOTION)
+					{
+						CvPromotionEntry* pkOriginalPromotionInfo = GC.getPromotionInfo(ePromotion);
+						if(pkOriginalPromotionInfo && m_pUnitInfo->GetUnitCombatType() != NO_UNITCOMBAT && (::IsPromotionValidForUnitCombatType(ePromotion, getUnitType())))
+						{
+							bool bNoPromotion = false;
+							// Check for negating promotions
+							if(pkOriginalPromotionInfo->IsBarbarianOnly() && !isBarbarian())
+							{
+								bNoPromotion = true;
+							}
+							if(pkOriginalPromotionInfo->IsCityStateOnly() && !GET_PLAYER(getOwner()).isMinorCiv())
+							{
+								bNoPromotion = true;
+							}
+							if(!bNoPromotion)
+							{
+								PromotionTypes eNegatorPromotion = (PromotionTypes)getNegatorPromotion();
+								// Unit has negation promotion
+								if(eNegatorPromotion != NO_PROMOTION && ePromotion == eNegatorPromotion)
+								{
+									bNoPromotion = true;
+								}
+							}
+							if(!bNoPromotion)
+							{
+								setHasPromotion(ePromotion, true);
+							}
+						}
+					}
+				}
+				if(pAdjacentPlot->isShallowWater() && !pAdjacentPlot->isLake())
+				{
+					PromotionTypes ePromotion = (PromotionTypes)GC.getTerrainInfo(TERRAIN_COAST)->getAdjacentSpawnLocationUnitFreePromotion();
+					if(ePromotion != NO_PROMOTION)
+					{
+						CvPromotionEntry* pkOriginalPromotionInfo = GC.getPromotionInfo(ePromotion);
+						if(pkOriginalPromotionInfo && m_pUnitInfo->GetUnitCombatType() != NO_UNITCOMBAT && (::IsPromotionValidForUnitCombatType(ePromotion, getUnitType())))
+						{
+							bool bNoPromotion = false;
+							// Check for negating promotions
+							if(pkOriginalPromotionInfo->IsBarbarianOnly() && !isBarbarian())
+							{
+								bNoPromotion = true;
+							}
+							if(pkOriginalPromotionInfo->IsCityStateOnly() && !GET_PLAYER(getOwner()).isMinorCiv())
+							{
+								bNoPromotion = true;
+							}
+							if(!bNoPromotion)
+							{
+								PromotionTypes eNegatorPromotion = (PromotionTypes)getNegatorPromotion();
+								// Unit has negation promotion
+								if(eNegatorPromotion != NO_PROMOTION && ePromotion == eNegatorPromotion)
+								{
+									bNoPromotion = true;
+								}
+							}
+							if(!bNoPromotion)
+							{
+								setHasPromotion(ePromotion, true);
+							}
+						}
+					}
+				}
+				if(!pAdjacentPlot->isShallowWater() && !pAdjacentPlot->isLake() && pAdjacentPlot->isWater())
+				{
+					PromotionTypes ePromotion = (PromotionTypes)GC.getTerrainInfo(TERRAIN_OCEAN)->getAdjacentSpawnLocationUnitFreePromotion();
+					if(ePromotion != NO_PROMOTION)
+					{
+						CvPromotionEntry* pkOriginalPromotionInfo = GC.getPromotionInfo(ePromotion);
+						if(pkOriginalPromotionInfo && m_pUnitInfo->GetUnitCombatType() != NO_UNITCOMBAT && (::IsPromotionValidForUnitCombatType(ePromotion, getUnitType())))
+						{
+							bool bNoPromotion = false;
+							// Check for negating promotions
+							if(pkOriginalPromotionInfo->IsBarbarianOnly() && !isBarbarian())
+							{
+								bNoPromotion = true;
+							}
+							if(pkOriginalPromotionInfo->IsCityStateOnly() && !GET_PLAYER(getOwner()).isMinorCiv())
+							{
+								bNoPromotion = true;
+							}
+							if(!bNoPromotion)
+							{
+								PromotionTypes eNegatorPromotion = (PromotionTypes)getNegatorPromotion();
+								// Unit has negation promotion
+								if(eNegatorPromotion != NO_PROMOTION && ePromotion == eNegatorPromotion)
+								{
+									bNoPromotion = true;
+								}
+							}
+							if(!bNoPromotion)
+							{
+								setHasPromotion(ePromotion, true);
+							}
+						}
+					}
+				}
+			}
+		}
+		// Feature that provides free promotions?
+		FeatureTypes eFeature = pNewPlot->getFeatureType();
+		if(eFeature != NO_FEATURE)
+		{
+			PromotionTypes ePromotion = (PromotionTypes)GC.getFeatureInfo(eFeature)->getSpawnLocationUnitFreePromotion();
+			if(ePromotion != NO_PROMOTION)
+			{
+				CvPromotionEntry* pkOriginalPromotionInfo = GC.getPromotionInfo(ePromotion);
+				if(pkOriginalPromotionInfo && m_pUnitInfo->GetUnitCombatType() != NO_UNITCOMBAT && (::IsPromotionValidForUnitCombatType(ePromotion, getUnitType())))
+				{
+					bool bNoPromotion = false;
+					// Check for negating promotions
+					if(pkOriginalPromotionInfo->IsBarbarianOnly() && !isBarbarian())
+					{
+						bNoPromotion = true;
+					}
+					if(pkOriginalPromotionInfo->IsCityStateOnly() && !GET_PLAYER(getOwner()).isMinorCiv())
+					{
+						bNoPromotion = true;
+					}
+					if(!bNoPromotion)
+					{
+						PromotionTypes eNegatorPromotion = (PromotionTypes)getNegatorPromotion();
+						// Unit has negation promotion
+						if(eNegatorPromotion != NO_PROMOTION && ePromotion == eNegatorPromotion)
+						{
+							bNoPromotion = true;
+						}
+					}
+					if(!bNoPromotion)
+					{
+						setHasPromotion(ePromotion, true);
+					}
+				}
+			}
+		}
+		// Terrain that provides free promotions?
+		TerrainTypes eTerrain = pNewPlot->getTerrainType();
+		if(eTerrain != NO_TERRAIN && (eTerrain <= TERRAIN_SNOW))
+		{
+			PromotionTypes ePromotion = (PromotionTypes)GC.getTerrainInfo(eTerrain)->getSpawnLocationUnitFreePromotion();
+			if(ePromotion != NO_PROMOTION)
+			{
+				CvPromotionEntry* pkOriginalPromotionInfo = GC.getPromotionInfo(ePromotion);
+				if(pkOriginalPromotionInfo && m_pUnitInfo->GetUnitCombatType() != NO_UNITCOMBAT && (::IsPromotionValidForUnitCombatType(ePromotion, getUnitType())))
+				{
+					bool bNoPromotion = false;
+					// Check for negating promotions
+					if(pkOriginalPromotionInfo->IsBarbarianOnly() && !isBarbarian())
+					{
+						bNoPromotion = true;
+					}
+					if(pkOriginalPromotionInfo->IsCityStateOnly() && !GET_PLAYER(getOwner()).isMinorCiv())
+					{
+						bNoPromotion = true;
+					}
+					if(!bNoPromotion)
+					{
+						PromotionTypes eNegatorPromotion = (PromotionTypes)getNegatorPromotion();
+						// Unit has negation promotion
+						if(eNegatorPromotion != NO_PROMOTION && ePromotion == eNegatorPromotion)
+						{
+							bNoPromotion = true;
+						}
+					}
+					if(!bNoPromotion)
+					{
+						setHasPromotion(ePromotion, true);
+					}
+				}
+			}
+		}
+		if(pNewPlot->isHills())
+		{
+			PromotionTypes ePromotion = (PromotionTypes)GC.getTerrainInfo(TERRAIN_HILL)->getSpawnLocationUnitFreePromotion();
+			if(ePromotion != NO_PROMOTION)
+			{
+				CvPromotionEntry* pkOriginalPromotionInfo = GC.getPromotionInfo(ePromotion);
+				if(pkOriginalPromotionInfo && m_pUnitInfo->GetUnitCombatType() != NO_UNITCOMBAT && (::IsPromotionValidForUnitCombatType(ePromotion, getUnitType())))
+				{
+					bool bNoPromotion = false;
+					// Check for negating promotions
+					if(pkOriginalPromotionInfo->IsBarbarianOnly() && !isBarbarian())
+					{
+						bNoPromotion = true;
+					}
+					if(pkOriginalPromotionInfo->IsCityStateOnly() && !GET_PLAYER(getOwner()).isMinorCiv())
+					{
+						bNoPromotion = true;
+					}
+					if(!bNoPromotion)
+					{
+						PromotionTypes eNegatorPromotion = (PromotionTypes)getNegatorPromotion();
+						// Unit has negation promotion
+						if(eNegatorPromotion != NO_PROMOTION && ePromotion == eNegatorPromotion)
+						{
+							bNoPromotion = true;
+						}
+					}
+					if(!bNoPromotion)
+					{
+						setHasPromotion(ePromotion, true);
+					}
+				}
+			}
+		}
+		if(pNewPlot->isMountain())
+		{
+			PromotionTypes ePromotion = (PromotionTypes)GC.getTerrainInfo(TERRAIN_MOUNTAIN)->getSpawnLocationUnitFreePromotion();
+			if(ePromotion != NO_PROMOTION)
+			{
+				CvPromotionEntry* pkOriginalPromotionInfo = GC.getPromotionInfo(ePromotion);
+				if(pkOriginalPromotionInfo && m_pUnitInfo->GetUnitCombatType() != NO_UNITCOMBAT && (::IsPromotionValidForUnitCombatType(ePromotion, getUnitType())))
+				{
+					bool bNoPromotion = false;
+					// Check for negating promotions
+					if(pkOriginalPromotionInfo->IsBarbarianOnly() && !isBarbarian())
+					{
+						bNoPromotion = true;
+					}
+					if(pkOriginalPromotionInfo->IsCityStateOnly() && !GET_PLAYER(getOwner()).isMinorCiv())
+					{
+						bNoPromotion = true;
+					}
+					if(!bNoPromotion)
+					{
+						PromotionTypes eNegatorPromotion = (PromotionTypes)getNegatorPromotion();
+						// Unit has negation promotion
+						if(eNegatorPromotion != NO_PROMOTION && ePromotion == eNegatorPromotion)
+						{
+							bNoPromotion = true;
+						}
+					}
+					if(!bNoPromotion)
+					{
+						setHasPromotion(ePromotion, true);
+					}
+				}
+			}
+		}
+		if(pNewPlot->isShallowWater() && !pNewPlot->isLake())
+		{
+			PromotionTypes ePromotion = (PromotionTypes)GC.getTerrainInfo(TERRAIN_COAST)->getSpawnLocationUnitFreePromotion();
+			if(ePromotion != NO_PROMOTION)
+			{
+				CvPromotionEntry* pkOriginalPromotionInfo = GC.getPromotionInfo(ePromotion);
+				if(pkOriginalPromotionInfo && m_pUnitInfo->GetUnitCombatType() != NO_UNITCOMBAT && (::IsPromotionValidForUnitCombatType(ePromotion, getUnitType())))
+				{
+					bool bNoPromotion = false;
+					// Check for negating promotions
+					if(pkOriginalPromotionInfo->IsBarbarianOnly() && !isBarbarian())
+					{
+						bNoPromotion = true;
+					}
+					if(pkOriginalPromotionInfo->IsCityStateOnly() && !GET_PLAYER(getOwner()).isMinorCiv())
+					{
+						bNoPromotion = true;
+					}
+					if(!bNoPromotion)
+					{
+						PromotionTypes eNegatorPromotion = (PromotionTypes)getNegatorPromotion();
+						// Unit has negation promotion
+						if(eNegatorPromotion != NO_PROMOTION && ePromotion == eNegatorPromotion)
+						{
+							bNoPromotion = true;
+						}
+					}
+					if(!bNoPromotion)
+					{
+						setHasPromotion(ePromotion, true);
+					}
+				}
+			}
+		}
+		if(!pNewPlot->isShallowWater() && !pNewPlot->isLake() && pNewPlot->isWater())
+		{
+			PromotionTypes ePromotion = (PromotionTypes)GC.getTerrainInfo(TERRAIN_OCEAN)->getSpawnLocationUnitFreePromotion();
+			if(ePromotion != NO_PROMOTION)
+			{
+				CvPromotionEntry* pkOriginalPromotionInfo = GC.getPromotionInfo(ePromotion);
+				if(pkOriginalPromotionInfo && m_pUnitInfo->GetUnitCombatType() != NO_UNITCOMBAT && (::IsPromotionValidForUnitCombatType(ePromotion, getUnitType())))
+				{
+					bool bNoPromotion = false;
+					// Check for negating promotions
+					if(pkOriginalPromotionInfo->IsBarbarianOnly() && !isBarbarian())
+					{
+						bNoPromotion = true;
+					}
+					if(pkOriginalPromotionInfo->IsCityStateOnly() && !GET_PLAYER(getOwner()).isMinorCiv())
+					{
+						bNoPromotion = true;
+					}
+					if(!bNoPromotion)
+					{
+						PromotionTypes eNegatorPromotion = (PromotionTypes)getNegatorPromotion();
+						// Unit has negation promotion
+						if(eNegatorPromotion != NO_PROMOTION && ePromotion == eNegatorPromotion)
+						{
+							bNoPromotion = true;
+						}
+					}
+					if(!bNoPromotion)
+					{
+						setHasPromotion(ePromotion, true);
+					}
+				}
+			}
+		}
+	}
+	if(pNewPlot != NULL)
+	{
+		// Feature that provides free promotions?
+		FeatureTypes eFeature = pNewPlot->getFeatureType();
+		if(eFeature != NO_FEATURE)
+		{
+			PromotionTypes ePromotion = (PromotionTypes)GC.getFeatureInfo(eFeature)->getLocationUnitFreePromotion();
+			if(ePromotion != NO_PROMOTION)
+			{
+				CvPromotionEntry* pkOriginalPromotionInfo = GC.getPromotionInfo(ePromotion);
+				if(pkOriginalPromotionInfo && m_pUnitInfo->GetUnitCombatType() != NO_UNITCOMBAT && (::IsPromotionValidForUnitCombatType(ePromotion, getUnitType())))
+				{
+					bool bNoPromotion = false;
+					// Check for negating promotions
+					if(pkOriginalPromotionInfo->IsBarbarianOnly() && !isBarbarian())
+					{
+						bNoPromotion = true;
+					}
+					if(pkOriginalPromotionInfo->IsCityStateOnly() && !GET_PLAYER(getOwner()).isMinorCiv())
+					{
+						bNoPromotion = true;
+					}
+					if(!bNoPromotion)
+					{
+						PromotionTypes eNegatorPromotion = (PromotionTypes)getNegatorPromotion();
+						// Unit has negation promotion
+						if(eNegatorPromotion != NO_PROMOTION && ePromotion == eNegatorPromotion)
+						{
+							bNoPromotion = true;
+						}
+					}
+					if(!bNoPromotion)
+					{
+						setHasPromotion(ePromotion, true);
+					}
+				}
+			}
+		}
+		//Improvement that provides free promotion? Only if player owns them.
+		ImprovementTypes eNeededImprovement = pNewPlot->getImprovementType();
+		if(eNeededImprovement != NO_IMPROVEMENT)
+		{
+			if(pNewPlot->getOwner() == getOwner())
+			{
+				PromotionTypes ePromotion = (PromotionTypes)GC.getImprovementInfo(eNeededImprovement)->GetUnitFreePromotion();
+				if(ePromotion != NO_PROMOTION)
+				{
+					CvPromotionEntry* pkOriginalPromotionInfo = GC.getPromotionInfo(ePromotion);
+					if(pkOriginalPromotionInfo && m_pUnitInfo->GetUnitCombatType() != NO_UNITCOMBAT && (::IsPromotionValidForUnitCombatType(ePromotion, getUnitType())))
+					{
+						bool bNoPromotion = false;
+						// Check for negating promotions
+						if(pkOriginalPromotionInfo->IsBarbarianOnly() && !isBarbarian())
+						{
+							bNoPromotion = true;
+						}
+						if(pkOriginalPromotionInfo->IsCityStateOnly() && !GET_PLAYER(getOwner()).isMinorCiv())
+						{
+							bNoPromotion = true;
+						}
+						if(!bNoPromotion)
+						{
+							PromotionTypes eNegatorPromotion = (PromotionTypes)getNegatorPromotion();
+							// Unit has negation promotion
+							if(eNegatorPromotion != NO_PROMOTION && ePromotion == eNegatorPromotion)
+							{
+								bNoPromotion = true;
+							}
+						}
+						if(!bNoPromotion)
+						{
+							setHasPromotion(ePromotion, true);
+						}
+					}
+				}
+			}
+		}
+		// Terrain that provides free promotions?
+		TerrainTypes eTerrain = pNewPlot->getTerrainType();
+		if(eTerrain != NO_TERRAIN && (eTerrain <= TERRAIN_SNOW))
+		{
+			PromotionTypes ePromotion = (PromotionTypes)GC.getTerrainInfo(eTerrain)->getLocationUnitFreePromotion();
+			if(ePromotion != NO_PROMOTION)
+			{
+				CvPromotionEntry* pkOriginalPromotionInfo = GC.getPromotionInfo(ePromotion);
+				if(pkOriginalPromotionInfo && m_pUnitInfo->GetUnitCombatType() != NO_UNITCOMBAT && (::IsPromotionValidForUnitCombatType(ePromotion, getUnitType())))
+				{
+					bool bNoPromotion = false;
+					// Check for negating promotions
+					if(pkOriginalPromotionInfo->IsBarbarianOnly() && !isBarbarian())
+					{
+						bNoPromotion = true;
+					}
+					if(pkOriginalPromotionInfo->IsCityStateOnly() && !GET_PLAYER(getOwner()).isMinorCiv())
+					{
+						bNoPromotion = true;
+					}
+					if(!bNoPromotion)
+					{
+						PromotionTypes eNegatorPromotion = (PromotionTypes)getNegatorPromotion();
+						// Unit has negation promotion
+						if(eNegatorPromotion != NO_PROMOTION && ePromotion == eNegatorPromotion)
+						{
+							bNoPromotion = true;
+						}
+					}
+					if(!bNoPromotion)
+					{
+						setHasPromotion(ePromotion, true);
+					}
+				}
+			}
+		}
+		if(pNewPlot->isHills())
+		{
+			PromotionTypes ePromotion = (PromotionTypes)GC.getTerrainInfo(TERRAIN_HILL)->getLocationUnitFreePromotion();
+			if(ePromotion != NO_PROMOTION)
+			{
+				CvPromotionEntry* pkOriginalPromotionInfo = GC.getPromotionInfo(ePromotion);
+				if(pkOriginalPromotionInfo && m_pUnitInfo->GetUnitCombatType() != NO_UNITCOMBAT && (::IsPromotionValidForUnitCombatType(ePromotion, getUnitType())))
+				{
+					bool bNoPromotion = false;
+					// Check for negating promotions
+					if(pkOriginalPromotionInfo->IsBarbarianOnly() && !isBarbarian())
+					{
+						bNoPromotion = true;
+					}
+					if(pkOriginalPromotionInfo->IsCityStateOnly() && !GET_PLAYER(getOwner()).isMinorCiv())
+					{
+						bNoPromotion = true;
+					}
+					if(!bNoPromotion)
+					{
+						PromotionTypes eNegatorPromotion = (PromotionTypes)getNegatorPromotion();
+						// Unit has negation promotion
+						if(eNegatorPromotion != NO_PROMOTION && ePromotion == eNegatorPromotion)
+						{
+							bNoPromotion = true;
+						}
+					}
+					if(!bNoPromotion)
+					{
+						setHasPromotion(ePromotion, true);
+					}
+				}
+			}
+		}
+		if(pNewPlot->isMountain())
+		{
+			PromotionTypes ePromotion = (PromotionTypes)GC.getTerrainInfo(TERRAIN_MOUNTAIN)->getLocationUnitFreePromotion();
+			if(ePromotion != NO_PROMOTION)
+			{
+				CvPromotionEntry* pkOriginalPromotionInfo = GC.getPromotionInfo(ePromotion);
+				if(pkOriginalPromotionInfo && m_pUnitInfo->GetUnitCombatType() != NO_UNITCOMBAT && (::IsPromotionValidForUnitCombatType(ePromotion, getUnitType())))
+				{
+					bool bNoPromotion = false;
+					// Check for negating promotions
+					if(pkOriginalPromotionInfo->IsBarbarianOnly() && !isBarbarian())
+					{
+						bNoPromotion = true;
+					}
+					if(pkOriginalPromotionInfo->IsCityStateOnly() && !GET_PLAYER(getOwner()).isMinorCiv())
+					{
+						bNoPromotion = true;
+					}
+					if(!bNoPromotion)
+					{
+						PromotionTypes eNegatorPromotion = (PromotionTypes)getNegatorPromotion();
+						// Unit has negation promotion
+						if(eNegatorPromotion != NO_PROMOTION && ePromotion == eNegatorPromotion)
+						{
+							bNoPromotion = true;
+						}
+					}
+					if(!bNoPromotion)
+					{
+						setHasPromotion(ePromotion, true);
+					}
+				}
+			}
+		}
+		if(pNewPlot->isShallowWater() && !pNewPlot->isLake())
+		{
+			PromotionTypes ePromotion = (PromotionTypes)GC.getTerrainInfo(TERRAIN_COAST)->getLocationUnitFreePromotion();
+			if(ePromotion != NO_PROMOTION)
+			{
+				CvPromotionEntry* pkOriginalPromotionInfo = GC.getPromotionInfo(ePromotion);
+				if(pkOriginalPromotionInfo && m_pUnitInfo->GetUnitCombatType() != NO_UNITCOMBAT && (::IsPromotionValidForUnitCombatType(ePromotion, getUnitType())))
+				{
+					bool bNoPromotion = false;
+					// Check for negating promotions
+					if(pkOriginalPromotionInfo->IsBarbarianOnly() && !isBarbarian())
+					{
+						bNoPromotion = true;
+					}
+					if(pkOriginalPromotionInfo->IsCityStateOnly() && !GET_PLAYER(getOwner()).isMinorCiv())
+					{
+						bNoPromotion = true;
+					}
+					if(!bNoPromotion)
+					{
+						PromotionTypes eNegatorPromotion = (PromotionTypes)getNegatorPromotion();
+						// Unit has negation promotion
+						if(eNegatorPromotion != NO_PROMOTION && ePromotion == eNegatorPromotion)
+						{
+							bNoPromotion = true;
+						}
+					}
+					if(!bNoPromotion)
+					{
+						setHasPromotion(ePromotion, true);
+					}
+				}
+			}
+		}
+		if(!pNewPlot->isShallowWater() && !pNewPlot->isLake() && pNewPlot->isWater())
+		{
+			PromotionTypes ePromotion = (PromotionTypes)GC.getTerrainInfo(TERRAIN_OCEAN)->getLocationUnitFreePromotion();
+			if(ePromotion != NO_PROMOTION)
+			{
+				CvPromotionEntry* pkOriginalPromotionInfo = GC.getPromotionInfo(ePromotion);
+				if(pkOriginalPromotionInfo && m_pUnitInfo->GetUnitCombatType() != NO_UNITCOMBAT && (::IsPromotionValidForUnitCombatType(ePromotion, getUnitType())))
+				{
+					bool bNoPromotion = false;
+					// Check for negating promotions
+					if(pkOriginalPromotionInfo->IsBarbarianOnly() && !isBarbarian())
+					{
+						bNoPromotion = true;
+					}
+					if(pkOriginalPromotionInfo->IsCityStateOnly() && !GET_PLAYER(getOwner()).isMinorCiv())
+					{
+						bNoPromotion = true;
+					}
+					if(!bNoPromotion)
+					{
+						PromotionTypes eNegatorPromotion = (PromotionTypes)getNegatorPromotion();
+						// Unit has negation promotion
+						if(eNegatorPromotion != NO_PROMOTION && ePromotion == eNegatorPromotion)
+						{
+							bNoPromotion = true;
+						}
+					}
+					if(!bNoPromotion)
+					{
+						setHasPromotion(ePromotion, true);
+					}
+				}
+			}
+		}
+		CvPlot* pAdjacentPlot;
+		for(iI = 0; iI < NUM_DIRECTION_TYPES; ++iI)
+		{
+			pAdjacentPlot = plotDirection(plot()->getX(), plot()->getY(), ((DirectionTypes)iI));
+
+			if(pAdjacentPlot == NULL)
+				continue;
+
+			// Feature that provides free promotions?
+			FeatureTypes eFeature = pAdjacentPlot->getFeatureType();
+			if(eFeature != NO_FEATURE)
+			{
+				PromotionTypes ePromotion = (PromotionTypes)GC.getFeatureInfo(eFeature)->getAdjacentUnitFreePromotion();
+				if(ePromotion != NO_PROMOTION)
+				{
+					CvPromotionEntry* pkOriginalPromotionInfo = GC.getPromotionInfo(ePromotion);
+					if(pkOriginalPromotionInfo && m_pUnitInfo->GetUnitCombatType() != NO_UNITCOMBAT && (::IsPromotionValidForUnitCombatType(ePromotion, getUnitType())))
+					{
+						bool bNoPromotion = false;
+						// Check for negating promotions
+						if(pkOriginalPromotionInfo->IsBarbarianOnly() && !isBarbarian())
+						{
+							bNoPromotion = true;
+						}
+						if(pkOriginalPromotionInfo->IsCityStateOnly() && !GET_PLAYER(getOwner()).isMinorCiv())
+						{
+							bNoPromotion = true;
+						}
+						if(!bNoPromotion)
+						{
+							PromotionTypes eNegatorPromotion = (PromotionTypes)getNegatorPromotion();
+							// Unit has negation promotion
+							if(eNegatorPromotion != NO_PROMOTION && ePromotion == eNegatorPromotion)
+							{
+								bNoPromotion = true;
+							}
+						}
+						if(!bNoPromotion)
+						{
+							setHasPromotion(ePromotion, true);
+						}
+					}
+				}
+			}
+			// Adjacent terrain that provides free promotions?
+			TerrainTypes eTerrain = pAdjacentPlot->getTerrainType();
+			if(eTerrain != NO_TERRAIN && (eTerrain <= TERRAIN_SNOW))
+			{
+				PromotionTypes ePromotion = (PromotionTypes)GC.getTerrainInfo(eTerrain)->getAdjacentUnitFreePromotion();
+				if(ePromotion != NO_PROMOTION)
+				{
+					CvPromotionEntry* pkOriginalPromotionInfo = GC.getPromotionInfo(ePromotion);
+					if(pkOriginalPromotionInfo && m_pUnitInfo->GetUnitCombatType() != NO_UNITCOMBAT && (::IsPromotionValidForUnitCombatType(ePromotion, getUnitType())))
+					{
+						bool bNoPromotion = false;
+						// Check for negating promotions
+						if(pkOriginalPromotionInfo->IsBarbarianOnly() && !isBarbarian())
+						{
+							bNoPromotion = true;
+						}
+						if(pkOriginalPromotionInfo->IsCityStateOnly() && !GET_PLAYER(getOwner()).isMinorCiv())
+						{
+							bNoPromotion = true;
+						}
+						if(!bNoPromotion)
+						{
+							PromotionTypes eNegatorPromotion = (PromotionTypes)getNegatorPromotion();
+							// Unit has negation promotion
+							if(eNegatorPromotion != NO_PROMOTION && ePromotion == eNegatorPromotion)
+							{
+								bNoPromotion = true;
+							}
+						}
+						if(!bNoPromotion)
+						{
+							setHasPromotion(ePromotion, true);
+						}
+					}
+				}
+			}
+			// Adjacent terrain that provides free promotions?
+			if(pAdjacentPlot->isHills())
+			{
+				PromotionTypes ePromotion = (PromotionTypes)GC.getTerrainInfo(TERRAIN_HILL)->getAdjacentUnitFreePromotion();
+				if(ePromotion != NO_PROMOTION)
+				{
+					CvPromotionEntry* pkOriginalPromotionInfo = GC.getPromotionInfo(ePromotion);
+					if(pkOriginalPromotionInfo && m_pUnitInfo->GetUnitCombatType() != NO_UNITCOMBAT && (::IsPromotionValidForUnitCombatType(ePromotion, getUnitType())))
+					{
+						bool bNoPromotion = false;
+						// Check for negating promotions
+						if(pkOriginalPromotionInfo->IsBarbarianOnly() && !isBarbarian())
+						{
+							bNoPromotion = true;
+						}
+						if(pkOriginalPromotionInfo->IsCityStateOnly() && !GET_PLAYER(getOwner()).isMinorCiv())
+						{
+							bNoPromotion = true;
+						}
+						if(!bNoPromotion)
+						{
+							PromotionTypes eNegatorPromotion = (PromotionTypes)getNegatorPromotion();
+							// Unit has negation promotion
+							if(eNegatorPromotion != NO_PROMOTION && ePromotion == eNegatorPromotion)
+							{
+								bNoPromotion = true;
+							}
+						}
+						if(!bNoPromotion)
+						{
+							setHasPromotion(ePromotion, true);
+						}
+					}
+				}
+			}
+			// Adjacent terrain that provides free promotions?
+			if(pAdjacentPlot->isMountain())
+			{
+				PromotionTypes ePromotion = (PromotionTypes)GC.getTerrainInfo(TERRAIN_MOUNTAIN)->getAdjacentUnitFreePromotion();
+				if(ePromotion != NO_PROMOTION)
+				{
+					CvPromotionEntry* pkOriginalPromotionInfo = GC.getPromotionInfo(ePromotion);
+					if(pkOriginalPromotionInfo && m_pUnitInfo->GetUnitCombatType() != NO_UNITCOMBAT && (::IsPromotionValidForUnitCombatType(ePromotion, getUnitType())))
+					{
+						bool bNoPromotion = false;
+						// Check for negating promotions
+						if(pkOriginalPromotionInfo->IsBarbarianOnly() && !isBarbarian())
+						{
+							bNoPromotion = true;
+						}
+						if(pkOriginalPromotionInfo->IsCityStateOnly() && !GET_PLAYER(getOwner()).isMinorCiv())
+						{
+							bNoPromotion = true;
+						}
+						if(!bNoPromotion)
+						{
+							PromotionTypes eNegatorPromotion = (PromotionTypes)getNegatorPromotion();
+							// Unit has negation promotion
+							if(eNegatorPromotion != NO_PROMOTION && ePromotion == eNegatorPromotion)
+							{
+								bNoPromotion = true;
+							}
+						}
+						if(!bNoPromotion)
+						{
+							setHasPromotion(ePromotion, true);
+						}
+					}
+				}
+			}
+			if(pAdjacentPlot->isShallowWater() && !pAdjacentPlot->isLake())
+			{
+				PromotionTypes ePromotion = (PromotionTypes)GC.getTerrainInfo(TERRAIN_COAST)->getAdjacentUnitFreePromotion();
+				if(ePromotion != NO_PROMOTION)
+				{
+					CvPromotionEntry* pkOriginalPromotionInfo = GC.getPromotionInfo(ePromotion);
+					if(pkOriginalPromotionInfo && m_pUnitInfo->GetUnitCombatType() != NO_UNITCOMBAT && (::IsPromotionValidForUnitCombatType(ePromotion, getUnitType())))
+					{
+						bool bNoPromotion = false;
+						// Check for negating promotions
+						if(pkOriginalPromotionInfo->IsBarbarianOnly() && !isBarbarian())
+						{
+							bNoPromotion = true;
+						}
+						if(pkOriginalPromotionInfo->IsCityStateOnly() && !GET_PLAYER(getOwner()).isMinorCiv())
+						{
+							bNoPromotion = true;
+						}
+						if(!bNoPromotion)
+						{
+							PromotionTypes eNegatorPromotion = (PromotionTypes)getNegatorPromotion();
+							// Unit has negation promotion
+							if(eNegatorPromotion != NO_PROMOTION && ePromotion == eNegatorPromotion)
+							{
+								bNoPromotion = true;
+							}
+						}
+						if(!bNoPromotion)
+						{
+							setHasPromotion(ePromotion, true);
+						}
+					}
+				}
+			}
+			if(!pAdjacentPlot->isShallowWater() && !pAdjacentPlot->isLake() && pAdjacentPlot->isWater())
+			{
+				PromotionTypes ePromotion = (PromotionTypes)GC.getTerrainInfo(TERRAIN_OCEAN)->getAdjacentUnitFreePromotion();
+				if(ePromotion != NO_PROMOTION)
+				{
+					CvPromotionEntry* pkOriginalPromotionInfo = GC.getPromotionInfo(ePromotion);
+					if(pkOriginalPromotionInfo && m_pUnitInfo->GetUnitCombatType() != NO_UNITCOMBAT && (::IsPromotionValidForUnitCombatType(ePromotion, getUnitType())))
+					{
+						bool bNoPromotion = false;
+						// Check for negating promotions
+						if(pkOriginalPromotionInfo->IsBarbarianOnly() && !isBarbarian())
+						{
+							bNoPromotion = true;
+						}
+						if(pkOriginalPromotionInfo->IsCityStateOnly() && !GET_PLAYER(getOwner()).isMinorCiv())
+						{
+							bNoPromotion = true;
+						}
+						if(!bNoPromotion)
+						{
+							PromotionTypes eNegatorPromotion = (PromotionTypes)getNegatorPromotion();
+							// Unit has negation promotion
+							if(eNegatorPromotion != NO_PROMOTION && ePromotion == eNegatorPromotion)
+							{
+								bNoPromotion = true;
+							}
+						}
+						if(!bNoPromotion)
+						{
+							setHasPromotion(ePromotion, true);
+						}
+					}
+				}
+			}
+		}
+		if(pOldPlot != NULL)
+		{
+			// No longer on terrain that provides free promotions?
+			if(pOldPlot->getTerrainType() != pNewPlot->getTerrainType())
+			{
+				const TerrainTypes eNeededTerrain = pOldPlot->getTerrainType();
+				if(eNeededTerrain != NO_TERRAIN)
+				{
+					if(pOldPlot->isHills() && eNeededTerrain == TERRAIN_HILL)
+					{
+						PromotionTypes ePromotion = (PromotionTypes)GC.getTerrainInfo(TERRAIN_HILL)->getLocationUnitFreePromotion();
+						if(ePromotion != NO_PROMOTION && isHasPromotion(ePromotion))
+						{
+							CvPromotionEntry* pkPromotionInfo = GC.getPromotionInfo(ePromotion);
+							if(pkPromotionInfo && pkPromotionInfo->IsLostOnMove())
+							{
+								setHasPromotion(ePromotion, false);
+							}
+						}
+					}
+					else if(pOldPlot->isMountain() && eNeededTerrain == TERRAIN_MOUNTAIN)
+					{
+						PromotionTypes ePromotion = (PromotionTypes)GC.getTerrainInfo(TERRAIN_MOUNTAIN)->getLocationUnitFreePromotion();
+						if(ePromotion != NO_PROMOTION && isHasPromotion(ePromotion))
+						{
+							CvPromotionEntry* pkPromotionInfo = GC.getPromotionInfo(ePromotion);
+							if(pkPromotionInfo && pkPromotionInfo->IsLostOnMove())
+							{
+								setHasPromotion(ePromotion, false);
+							}
+						}
+					}
+					else if((pOldPlot->isWater() && pOldPlot->isShallowWater() && !pOldPlot->isLake()) && eNeededTerrain == TERRAIN_COAST)
+					{
+						PromotionTypes ePromotion = (PromotionTypes)GC.getTerrainInfo(TERRAIN_COAST)->getLocationUnitFreePromotion();
+						if(ePromotion != NO_PROMOTION && isHasPromotion(ePromotion))
+						{
+							CvPromotionEntry* pkPromotionInfo = GC.getPromotionInfo(ePromotion);
+							if(pkPromotionInfo && pkPromotionInfo->IsLostOnMove())
+							{
+								setHasPromotion(ePromotion, false);
+							}
+						}
+					}
+					else if((pOldPlot->isWater() && !pOldPlot->isShallowWater() && !pOldPlot->isLake()) && eNeededTerrain == TERRAIN_OCEAN)
+					{
+						PromotionTypes ePromotion = (PromotionTypes)GC.getTerrainInfo(TERRAIN_OCEAN)->getLocationUnitFreePromotion();
+						if(ePromotion != NO_PROMOTION && isHasPromotion(ePromotion))
+						{
+							CvPromotionEntry* pkPromotionInfo = GC.getPromotionInfo(ePromotion);
+							if(pkPromotionInfo && pkPromotionInfo->IsLostOnMove())
+							{
+								setHasPromotion(ePromotion, false);
+							}
+						}
+					}
+					else if(eNeededTerrain <= TERRAIN_SNOW)
+					{
+						PromotionTypes ePromotion = (PromotionTypes)GC.getTerrainInfo(eNeededTerrain)->getLocationUnitFreePromotion();
+						if(ePromotion != NO_PROMOTION && isHasPromotion(ePromotion))
+						{
+							CvPromotionEntry* pkPromotionInfo = GC.getPromotionInfo(ePromotion);
+							if(pkPromotionInfo && pkPromotionInfo->IsLostOnMove())
+							{
+								setHasPromotion(ePromotion, false);
+							}
+						}
+					}
+				}
+			}
+			if(pOldPlot->getFeatureType() != pNewPlot->getFeatureType())
+			{
+				FeatureTypes eNeededFeature = pOldPlot->getFeatureType();
+				if(eNeededFeature != NO_FEATURE)
+				{
+					PromotionTypes ePromotion = (PromotionTypes)GC.getFeatureInfo(eNeededFeature)->getLocationUnitFreePromotion();
+					if(ePromotion != NO_PROMOTION && isHasPromotion(ePromotion))
+					{
+						CvPromotionEntry* pkPromotionInfo = GC.getPromotionInfo(ePromotion);
+						if(pkPromotionInfo && pkPromotionInfo->IsLostOnMove())
+						{
+							setHasPromotion(ePromotion, false);
+						}
+					}
+				}
+			}
+			if(pOldPlot->getImprovementType() != pNewPlot->getImprovementType())
+			{
+				ImprovementTypes eNeededImprovement = pOldPlot->getImprovementType();
+				if(eNeededImprovement != NO_IMPROVEMENT)
+				{
+					PromotionTypes ePromotion = (PromotionTypes)GC.getImprovementInfo(eNeededImprovement)->GetUnitFreePromotion();
+					if(ePromotion != NO_PROMOTION && isHasPromotion(ePromotion))
+					{
+						CvPromotionEntry* pkPromotionInfo = GC.getPromotionInfo(ePromotion);
+						if(pkPromotionInfo && pkPromotionInfo->IsLostOnMove())
+						{
+							setHasPromotion(ePromotion, false);
+						}
+					}
+				}
+			}
+		}
+	}
+}
+#endif
 //	--------------------------------------------------------------------------------
 bool CvUnit::isBetterDefenderThan(const CvUnit* pDefender, const CvUnit* pAttacker) const
 {
@@ -4415,8 +4680,6 @@ bool CvUnit::canEnterTerritory(TeamTypes eTeam, bool bIgnoreRightOfPassage) cons
 				{
 					return true;
 				}
-
-				kTheirTeam = GET_TEAM(GET_PLAYER(eMinorAlly).getTeam());
 			} 
 			else 
 #endif
@@ -4471,9 +4734,29 @@ bool CvUnit::canEnterTerrain(const CvPlot& enterPlot, int iMoveFlags) const
 	// also allow forts and cities if adjacent to real water
 	if (eDomain==DOMAIN_SEA)
 	{
+#if defined(MOD_BALANCE_CORE)
+		if(!isConvertUnit())
+		{
+			bool bNoEnemy = IsCombatUnit() && !(iMoveFlags & MOVEFLAG_ATTACK);
+			if (!enterPlot.isWater() && !(enterPlot.isCityOrPassableImprovement(getOwner(), bNoEnemy) && enterPlot.isAdjacentToShallowWater()))
+				return false;
+#else
 		bool bNoEnemy = IsCombatUnit() && !(iMoveFlags & MOVEFLAG_ATTACK);
 		if (!enterPlot.isWater() && !(enterPlot.isCityOrPassableImprovement(getOwner(), bNoEnemy) && enterPlot.isAdjacentToShallowWater()))
 			return false;
+#endif
+#if defined(MOD_BALANCE_CORE)
+		}
+		else
+		{
+			if(isConvertUnit())
+			{
+				bool bNoEnemy = !(iMoveFlags & MOVEFLAG_DECLARE_WAR);
+				if (!enterPlot.isWater() && !(enterPlot.isCityOrPassableImprovement(getOwner(), bNoEnemy)) && !enterPlot.isAdjacentToShallowWater())
+					return false;
+			}
+		}
+#endif
 	}
 
 	// Land units and hover units may go anywhere in principle (with embarkation)
@@ -4503,7 +4786,7 @@ bool CvUnit::canEnterTerrain(const CvPlot& enterPlot, int iMoveFlags) const
 		{
 			if(eDomain == DOMAIN_SEA)
 			{
-				return canCrossOceans() || kPlayer.CanCrossOcean();
+				return ((iMoveFlags&CvUnit::MOVEFLAG_DESTINATION)==0) || canCrossOceans() || kPlayer.CanCrossOcean();
 			}
 			else if(eDomain == DOMAIN_LAND)
 			{
@@ -4541,27 +4824,31 @@ bool CvUnit::canEnterTerrain(const CvPlot& enterPlot, int iMoveFlags) const
 	}
 	else //passable. need to check for negative promotions / traits and their exceptions
 	{
+		//special handling for ocean
 		if (enterPlot.isDeepWater() && enterPlot.getFeatureType()==NO_FEATURE)
 		{
-			PromotionTypes ePromotionOceanImpassable = (PromotionTypes)GC.getPROMOTION_OCEAN_IMPASSABLE();
-			bool bOceanImpassable =  isHasPromotion(ePromotionOceanImpassable);
-			if(bOceanImpassable)
+			//true naval units can enter ocean plots if they don't stay there. embarked units need the tech in any case
+			if ( (iMoveFlags&CvUnit::MOVEFLAG_DESTINATION) || enterPlot.needsEmbarkation(this))
 			{
-				return false;
+				PromotionTypes ePromotionOceanImpassable = (PromotionTypes)GC.getPROMOTION_OCEAN_IMPASSABLE();
+				bool bOceanImpassable = isHasPromotion(ePromotionOceanImpassable);
+				if(bOceanImpassable)
+				{
+					return false;
+				}
+
+				PromotionTypes ePromotionOceanImpassableUntilAstronomy = (PromotionTypes)GC.getPROMOTION_OCEAN_IMPASSABLE_UNTIL_ASTRONOMY();
+				bool bOceanImpassableUntilAstronomy = isHasPromotion(ePromotionOceanImpassableUntilAstronomy) || 
+					(eDomain==DOMAIN_LAND && !IsEmbarkDeepWater() && !IsEmbarkAllWater() && !kPlayer.CanCrossOcean());
+
+				if(bOceanImpassableUntilAstronomy )
+				{
+					CvTeam& kTeam = GET_TEAM(getTeam());
+					return kTeam.GetTeamTechs()->HasTech( GC.getGame().getOceanPassableTech() );
+				}
 			}
-
-			PromotionTypes ePromotionOceanImpassableUntilAstronomy = (PromotionTypes)GC.getPROMOTION_OCEAN_IMPASSABLE_UNTIL_ASTRONOMY();
-			bool bOceanImpassableUntilAstronomy = isHasPromotion(ePromotionOceanImpassableUntilAstronomy) || 
-				(eDomain==DOMAIN_LAND && !IsEmbarkDeepWater() && !IsEmbarkAllWater() && !kPlayer.CanCrossOcean());
-
-			if(bOceanImpassableUntilAstronomy )
-			{
-				CvTeam& kTeam = GET_TEAM(getTeam());
-				return kTeam.GetTeamTechs()->HasTech( GC.getGame().getOceanPassableTech() );
-			}	
 		}
-
-		if(enterPlot.getFeatureType() != NO_FEATURE && isFeatureImpassable(enterPlot.getFeatureType()))
+		else if(enterPlot.getFeatureType() != NO_FEATURE && isFeatureImpassable(enterPlot.getFeatureType()))
 		{
 			return false;
 		}
@@ -4580,7 +4867,6 @@ bool CvUnit::canEnterTerrain(const CvPlot& enterPlot, int iMoveFlags) const
 TeamTypes CvUnit::GetDeclareWarMove(const CvPlot& plot) const
 {
 	VALIDATE_OBJECT
-	const CvUnit* pUnit;
 	TeamTypes eRevealedTeam;
 
 	CvAssert(isHuman());
@@ -4616,8 +4902,8 @@ TeamTypes CvUnit::GetDeclareWarMove(const CvPlot& plot) const
 		if(MOD_GLOBAL_BREAK_CIVILIAN_RESTRICTIONS && plot.getNumUnits() > 0)
 		{
 			int iPeaceUnits = 0;
-			pUnit = NULL;
 			bool bWarCity = false;
+			bool bWarUnit = false;
 			if(plot.isCity() && GET_TEAM(GET_PLAYER(plot.getOwner()).getTeam()).isAtWar(getTeam()))
 			{
 				bWarCity = true;
@@ -4625,30 +4911,18 @@ TeamTypes CvUnit::GetDeclareWarMove(const CvPlot& plot) const
 			for(int iUnitLoop = 0; iUnitLoop < plot.getNumUnits(); iUnitLoop++)
 			{
 				CvUnit* loopUnit = plot.getUnitByIndex(iUnitLoop);
-
-				//If we're at war with a civ, and they've got a unit here, let's return that unit instead of the civilian unit on this space.
 				if(loopUnit != NULL)
 				{
-					if(loopUnit->IsCombatUnit())
+					if(loopUnit->IsCombatUnit() && !loopUnit->isEmbarked())
 					{
 						if(GET_TEAM(getTeam()).isAtWar(loopUnit->getTeam()))
 						{
-							//There can be only one military unit on a tile, so one check is good enough.
-							pUnit = plot.getUnitByIndex(iUnitLoop);
+							bWarUnit = true;
 						}
 					}
-					//Exception for embarked units in water, civilian or not, as boats can move onto them as a stack (military units are pseudo-units)
-					else if(!bWarCity && loopUnit->isEmbarked() && getDomainType() == DOMAIN_SEA)
+					//embarked units count as civilians
+					else if(loopUnit->isEmbarked() || loopUnit->IsCivilianUnit())
 					{
-						pUnit = plot.getUnitByIndex(iUnitLoop);
-						if(!GET_TEAM(getTeam()).isAtWar(loopUnit->getTeam()))
-						{
-							iPeaceUnits++;
-						}
-					}
-					else if(loopUnit->IsCivilianUnit())
-					{
-						//Only need one to trigger.
 						if(!GET_TEAM(getTeam()).isAtWar(loopUnit->getTeam()))
 						{
 							iPeaceUnits++;
@@ -4656,8 +4930,15 @@ TeamTypes CvUnit::GetDeclareWarMove(const CvPlot& plot) const
 					}
 				}
 			}
-			//If there is a civlian and an enemy unit here (or this is an enemy city), but we're at peace with that civilian, return NO_TEAM.
-			if((iPeaceUnits > 0) && (bWarCity || (pUnit != NULL)))
+			//If there is a civlian and an enemy unit here (or this is an enemy city), but we're at peace with that civilian
+			//return NO_TEAM (don't need to declare war again!)
+			if((iPeaceUnits > 0) && (bWarCity || bWarUnit))
+			{
+				return NO_TEAM;
+			}
+
+			//If there are only civilians here, don't require a declaration of war (can do so manually if intended)
+			if (iPeaceUnits==plot.getNumUnits())
 			{
 				return NO_TEAM;
 			}
@@ -4668,7 +4949,7 @@ TeamTypes CvUnit::GetDeclareWarMove(const CvPlot& plot) const
 		{
 			if(canMoveInto(plot, MOVEFLAG_ATTACK | MOVEFLAG_DECLARE_WAR))
 			{
-				pUnit = plot.plotCheck(PUF_canDeclareWar, getOwner(), isAlwaysHostile(plot), NO_PLAYER, NO_TEAM, PUF_isVisible, getOwner());
+				const CvUnit* pUnit = plot.plotCheck(PUF_canDeclareWar, getOwner(), isAlwaysHostile(plot), NO_PLAYER, NO_TEAM, PUF_isVisible, getOwner());
 
 				if(pUnit != NULL)
 				{
@@ -4891,7 +5172,7 @@ bool CvUnit::canMoveInto(const CvPlot& plot, int iMoveFlags) const
 #if defined(MOD_GLOBAL_CAPTURE_AFTER_ATTACKING)
 			// If there are only enemy civilians in the plot, then we don't need remaining attacks to capture them
 			// eg a worker in a barbarian camp where we just killed the defender
-			if (plot.getBestDefender(NO_PLAYER) != ((UnitHandle) NULL))
+			if (plot.getBestDefender(NO_PLAYER) != NULL)
 			{
 				return false;
 			}
@@ -4922,6 +5203,15 @@ bool CvUnit::canMoveInto(const CvPlot& plot, int iMoveFlags) const
 				return false;	// Can't advance into an enemy city
 		}
 	}
+#if defined(MOD_BALANCE_CORE)
+	else
+	{
+		if (!IsCivilianUnit() && plot.isCity() && plot.getOwner() != getOwner())
+		{
+			return false;
+		}
+	}
+#endif
 
 	if(getDomainType() == DOMAIN_AIR)
 	{
@@ -5030,7 +5320,7 @@ bool CvUnit::canMoveInto(const CvPlot& plot, int iMoveFlags) const
 				{
 					CvUnit* loopUnit = plot.getUnitByIndex(iUnitLoop);
 
-					if(loopUnit && GET_TEAM(getTeam()).isAtWar(plot.getUnitByIndex(iUnitLoop)->getTeam()))
+					if(loopUnit && !loopUnit->isDelayedDeath() && GET_TEAM(getTeam()).isAtWar(loopUnit->getTeam()))
 					{
 						bEnemyUnitPresent = true;
 						if(!loopUnit->IsDead() && loopUnit->isInCombat())
@@ -5162,6 +5452,12 @@ int CvUnit::getCombatDamage(int iStrength, int iOpponentStrength, int iCurrentDa
 	{
 		// Mod (Policies, etc.)
 		iWoundedDamageMultiplier += GET_PLAYER(getOwner()).GetWoundedUnitDamageMod();
+#if defined(MOD_BALANCE_CORE)
+		if (IsStrongerDamaged() && iWoundedDamageMultiplier != 0)
+		{
+			iWoundedDamageMultiplier += GC.getTRAIT_WOUNDED_DAMAGE_MOD();
+		}
+#endif
 
 #if defined(MOD_UNITS_MAX_HP)
 		iDamageRatio = GetMaxHitPoints() - (iCurrentDamage * iWoundedDamageMultiplier / 100);
@@ -5182,7 +5478,14 @@ int CvUnit::getCombatDamage(int iStrength, int iOpponentStrength, int iCurrentDa
 	int iRoll = 0;
 	if(bIncludeRand)
 	{
-		iRoll = /*400*/ GC.getGame().getJonRandNum(GC.getATTACK_SAME_STRENGTH_POSSIBLE_EXTRA_DAMAGE(), "Unit Combat Damage");
+		if (isBarbarian())
+		{
+			iRoll = /*1200*/ (GC.getGame().getSmallFakeRandNum(10, GetID()) * 120);
+		}
+		else
+		{
+			iRoll = /*1200*/ GC.getGame().getJonRandNum(GC.getATTACK_SAME_STRENGTH_POSSIBLE_EXTRA_DAMAGE(), "Unit Combat Damage");
+		}
 		iRoll *= iDamageRatio;
 #if defined(MOD_UNITS_MAX_HP)
 		iRoll /= GetMaxHitPoints();
@@ -5279,15 +5582,15 @@ void CvUnit::move(CvPlot& targetPlot, bool bShow)
 	{
 		if(isEmbarked() && !targetPlot.needsEmbarkation(this)) // moving from water to the land
 		{
-			if (m_unitMoveLocs.size())	// If we have some queued moves, execute them now, so that the disembark is done at the proper location visually
-				PublishQueuedVisualizationMoves();
+			// If we have some queued moves, execute them now, so that the disembark is done at the proper location visually
+			PublishQueuedVisualizationMoves();
 
 			disembark(pOldPlot);
 		}
 		else if(!isEmbarked() && targetPlot.needsEmbarkation(this))  // moving from land to the water
 		{
-			if (m_unitMoveLocs.size())	// If we have some queued moves, execute them now, so that the embark is done at the proper location visually
-				PublishQueuedVisualizationMoves();
+			// If we have some queued moves, execute them now, so that the embark is done at the proper location visually
+			PublishQueuedVisualizationMoves();
 
 			embark(pOldPlot);
 		}
@@ -5316,38 +5619,26 @@ bool CvUnit::jumpToNearestValidPlot()
 
 		if(pLoopPlot && pLoopPlot->isValidDomainForLocation(*this) && isMatchingDomain(pLoopPlot))
 		{
-			if(canMoveInto(*pLoopPlot))
+			//need to check for invisible units as well ...
+			if(canMoveInto(*pLoopPlot, CvUnit::MOVEFLAG_DESTINATION) && pLoopPlot->getNumUnits()==0 )
 			{
-#if defined(MOD_GLOBAL_STACKING_RULES)
-				if(pLoopPlot->getMaxFriendlyUnitsOfType(this) < pLoopPlot->getUnitLimit())
-#else
-				if(pLoopPlot->getMaxFriendlyUnitsOfType(this) < GC.getPLOT_UNIT_LIMIT())
-#endif
+				if((getDomainType() != DOMAIN_AIR) || pLoopPlot->isFriendlyCity(*this, true))
 				{
-					// Can only jump to a plot if we can enter the territory, and it's NOT enemy territory OR we're a barb
-					if(canEnterTerritory(pLoopPlot->getTeam()) && (isBarbarian() || !isEnemy(pLoopPlot->getTeam(), pLoopPlot)) && !pLoopPlot->isMountain())
+					if(getDomainType() != DOMAIN_SEA || (pLoopPlot->isFriendlyCity(*this, true) && pLoopPlot->isCoastalLand()) || (pLoopPlot->isWater() && !pLoopPlot->isLake()))
 					{
-						CvAssertMsg(!atPlot(*pLoopPlot), "atPlot(pLoopPlot) did not return false as expected");
-
-						if((getDomainType() != DOMAIN_AIR) || pLoopPlot->isFriendlyCity(*this, true))
+						if(pLoopPlot->isRevealed(getTeam()))
 						{
-							if(getDomainType() != DOMAIN_SEA || (pLoopPlot->isFriendlyCity(*this, true) && pLoopPlot->isCoastalLand()) || (pLoopPlot->isWater() && !pLoopPlot->isLake()))
+							int iValue = (plotDistance(getX(), getY(), pLoopPlot->getX(), pLoopPlot->getY()) * 2);
+
+							if(pNearestCity != NULL)
 							{
-								if(pLoopPlot->isRevealed(getTeam()))
-								{
-									int iValue = (plotDistance(getX(), getY(), pLoopPlot->getX(), pLoopPlot->getY()) * 2);
+								iValue += plotDistance(pLoopPlot->getX(), pLoopPlot->getY(), pNearestCity->getX(), pNearestCity->getY());
+							}
 
-									if(pNearestCity != NULL)
-									{
-										iValue += plotDistance(pLoopPlot->getX(), pLoopPlot->getY(), pNearestCity->getX(), pNearestCity->getY());
-									}
-
-									if(iValue < iBestValue || (iValue == iBestValue && GC.getGame().getJonRandNum(3,"jump to plot")<2) )
-									{
-										iBestValue = iValue;
-										pBestPlot = pLoopPlot;
-									}
-								}
+							if (iValue < iBestValue || (iValue == iBestValue && GC.getGame().getSmallFakeRandNum(3, *pLoopPlot)<2))
+							{
+								iBestValue = iValue;
+								pBestPlot = pLoopPlot;
 							}
 						}
 					}
@@ -5367,24 +5658,21 @@ bool CvUnit::jumpToNearestValidPlot()
 		}
 		else
 		{
-			strLogString.Format("Can't find a valid plot within range. %s deleted, X: %d, Y: %d", getName().GetCString(), getX(), getY());
+			strLogString.Format("Can't find a valid plot for %s at, X: %d, Y: %d", getName().GetCString(), getX(), getY());
 			GET_PLAYER(m_eOwner).GetHomelandAI()->LogHomelandMessage(strLogString);
 		}
 	}
 
 	if(pBestPlot != NULL)
 	{
-		setXY(pBestPlot->getX(), pBestPlot->getY());
-		ClearMissionQueue();
-		SetActivityType(ACTIVITY_AWAKE);
+		ClearMissionQueue(); //do this before changing the position in case we have queued moves
+		setXY(pBestPlot->getX(), pBestPlot->getY(), false, false);
+		return true;
 	}
 	else
 	{
-		CUSTOMLOG("jumpToNearestValidPlot failed for unit %s at plot (%i, %i)", getName().GetCString(), getX(), getY());
 		return false;
 	}
-
-	return true;
 }
 
 
@@ -5392,59 +5680,36 @@ bool CvUnit::jumpToNearestValidPlot()
 bool CvUnit::jumpToNearestValidPlotWithinRange(int iRange)
 {
 	VALIDATE_OBJECT
-	CvPlot* pLoopPlot;
-	CvPlot* pBestPlot;
-	int iValue;
-	int iBestValue;
-
+	CvPlot* pBestPlot = NULL;
+	int iBestValue = INT_MAX;
 	CvAssertMsg(!isAttacking(), "isAttacking did not return false as expected");
 	CvAssertMsg(!isFighting(), "isFighting did not return false as expected");
 
-	iBestValue = INT_MAX;
-	pBestPlot = NULL;
-
-	for(int iDX = -iRange; iDX <= iRange; iDX++)
+	iRange = min(max(1,iRange),5);
+	for(int i=1; i<RING_PLOTS[iRange]; i++)
 	{
-		for(int iDY = -iRange; iDY <= iRange; iDY++)
+		CvPlot* pLoopPlot = iterateRingPlots( plot(), i );
+
+		if(pLoopPlot && pLoopPlot->isValidDomainForLocation(*this) && isMatchingDomain(pLoopPlot))
 		{
-			pLoopPlot	= plotXYWithRangeCheck(getX(), getY(), iDX, iDY, iRange);
-
-			if(pLoopPlot != NULL)
+			//need to check for invisible units as well ...
+			if(canMoveInto(*pLoopPlot, CvUnit::MOVEFLAG_DESTINATION) && pLoopPlot->getNumUnits()==0 )
 			{
-				if(pLoopPlot->isValidDomainForLocation(*this) && isMatchingDomain(pLoopPlot))
+				if((getDomainType() != DOMAIN_AIR) || pLoopPlot->isFriendlyCity(*this, true))
 				{
-					if(canMoveInto(*pLoopPlot))
+					if(pLoopPlot->isRevealed(getTeam()))
 					{
-#if defined(MOD_GLOBAL_STACKING_RULES)
-						if(pLoopPlot->getMaxFriendlyUnitsOfType(this) < pLoopPlot->getUnitLimit())
-#else
-						if(pLoopPlot->getMaxFriendlyUnitsOfType(this) < GC.getPLOT_UNIT_LIMIT())
-#endif
+						int iValue = (plotDistance(getX(), getY(), pLoopPlot->getX(), pLoopPlot->getY()) * 2);
+
+						if(pLoopPlot->area() != area())
 						{
-							// Can only jump to a plot if we can enter the territory, and it's NOT enemy territory OR we're a barb
-							if(canEnterTerritory(pLoopPlot->getTeam()) && (isBarbarian() || !isEnemy(pLoopPlot->getTeam(), pLoopPlot)))
-							{
-								CvAssertMsg(!atPlot(*pLoopPlot), "atPlot(pLoopPlot) did not return false as expected");
+							iValue *= 3;
+						}
 
-								if((getDomainType() != DOMAIN_AIR) || pLoopPlot->isFriendlyCity(*this, true))
-								{
-									if(pLoopPlot->isRevealed(getTeam()))
-									{
-										iValue = (plotDistance(getX(), getY(), pLoopPlot->getX(), pLoopPlot->getY()) * 2);
-
-										if(pLoopPlot->area() != area())
-										{
-											iValue *= 3;
-										}
-
-										if(iValue < iBestValue || (iValue == iBestValue && GC.getGame().getJonRandNum(3,"jump to plot")<2) )
-										{
-											iBestValue = iValue;
-											pBestPlot = pLoopPlot;
-										}
-									}
-								}
-							}
+						if (iValue < iBestValue || (iValue == iBestValue && GC.getGame().getSmallFakeRandNum(3, *pLoopPlot)<2))
+						{
+							iBestValue = iValue;
+							pBestPlot = pLoopPlot;
 						}
 					}
 				}
@@ -5461,7 +5726,8 @@ bool CvUnit::jumpToNearestValidPlotWithinRange(int iRange)
 								pBestPlot->getX(), pBestPlot->getY(), getX(), getY());
 			GET_PLAYER(m_eOwner).GetHomelandAI()->LogHomelandMessage(strLogString);
 		}
-		setXY(pBestPlot->getX(), pBestPlot->getY(), false, true, pBestPlot->isVisibleToWatchingHuman(), false);
+		ClearMissionQueue(); //do this before changing the position in case we have queued moves
+		setXY(pBestPlot->getX(), pBestPlot->getY(), false, false);
 	}
 	else
 	{
@@ -5477,7 +5743,6 @@ bool CvUnit::jumpToNearestValidPlotWithinRange(int iRange)
 
 	return true;
 }
-
 
 //	--------------------------------------------------------------------------------
 bool CvUnit::CanAutomate(AutomateTypes eAutomate, bool bTestVisibility) const
@@ -5501,7 +5766,7 @@ bool CvUnit::CanAutomate(AutomateTypes eAutomate, bool bTestVisibility) const
 
 		if (!bTestVisibility)
 		{
-			UnitHandle pUnit = GET_PLAYER(m_eOwner).getUnit(GetID());
+			CvUnit* pUnit = GET_PLAYER(m_eOwner).getUnit(GetID());
 			if(pUnit)
 			{
 				CvCity* pTarget = GET_PLAYER(m_eOwner).GetReligionAI()->ChooseMissionaryTargetCity(pUnit);
@@ -5574,7 +5839,7 @@ bool CvUnit::CanAutomate(AutomateTypes eAutomate, bool bTestVisibility) const
 
 		if (!bTestVisibility)
 		{
-			UnitHandle pUnit = GET_PLAYER(m_eOwner).getUnit(GetID());
+			CvUnit* pUnit = GET_PLAYER(m_eOwner).getUnit(GetID());
 			if(pUnit)
 			{
 				CvPlot* pTarget = GET_PLAYER(m_eOwner).ChooseMessengerTargetPlot(pUnit);
@@ -5740,6 +6005,14 @@ int CvUnit::GetScrapGold() const
 	iNumGold *= GC.getGame().getGameSpeedInfo().getTrainPercent();
 	iNumGold /= 100;
 
+#if defined(MOD_CIV6_WORKER)
+	//if we are a builder (something with builderstrength), our value decrease with our build strength
+	if (getBuilderStrength() > 0)
+	{
+		iNumGold *= getUnitInfo().GetBuilderStrength() - getBuilderStrength();
+		iNumGold /= getUnitInfo().GetBuilderStrength();
+	}
+#endif
 
 	// Check to see if we are transporting other units and add in their scrap value as well.
 	CvPlot* pPlot = plot();
@@ -5779,6 +6052,9 @@ bool CvUnit::canGift(bool bTestVisible, bool bTestTransport) const
 	{
 		return false;
 	}
+
+	if (GET_PLAYER(pPlot->getOwner()).GetIncomingUnitCountdown(m_eOwner) != -1)
+		return false;
 
 	if(pPlot->getOwner() == getOwner())
 	{
@@ -5824,6 +6100,15 @@ bool CvUnit::canGift(bool bTestVisible, bool bTestTransport) const
 			}
 		}
 	}
+#if defined(MOD_NO_MAJORCIV_GIFTING)
+	else
+	{
+		if(MOD_NO_MAJORCIV_GIFTING)
+		{
+			return false;
+		}
+	}
+#endif
 
 	// No for religious units
 	if (getUnitInfo().IsSpreadReligion() || getUnitInfo().IsRemoveHeresy())
@@ -6602,54 +6887,38 @@ int CvUnit::getTurnPromotionGained(PromotionTypes eIndex)
 	else
 		return 0;
 }
+
+void CvUnit::SetNegatorPromotion(int iValue)
+{
+	if(iValue != m_iNegatorPromotion)
+	{
+		m_iNegatorPromotion = iValue;
+	}
+}
+
+int CvUnit::getNegatorPromotion()
+{
+	return m_iNegatorPromotion;
+}
 #endif
+
 //	--------------------------------------------------------------------------------
 bool CvUnit::canSetUpForRangedAttack(const CvPlot* /*pPlot*/) const
 {
-	VALIDATE_OBJECT
-	if(!isMustSetUpToRangedAttack())
-	{
-		return false;
-	}
-
-	if(isSetUpForRangedAttack())
-	{
-		return false;
-	}
-
-	if(isEmbarked())
-		return false;
-
-	if(movesLeft() <= 0)
-	{
-		return false;
-	}
-
-	return true;
+	return false; //no longer used
 }
 
 //	--------------------------------------------------------------------------------
 bool CvUnit::isSetUpForRangedAttack() const
 {
-	VALIDATE_OBJECT
-	return m_bSetUpForRangedAttack;
+	return true; //no longer used
 }
 
 //	--------------------------------------------------------------------------------
-void CvUnit::setSetUpForRangedAttack(bool bValue)
+void CvUnit::setSetUpForRangedAttack(bool /*bValue*/)
 {
-	VALIDATE_OBJECT
-	if(isSetUpForRangedAttack() != bValue)
-	{
-		m_bSetUpForRangedAttack = bValue;
-
-		if(bValue)
-		{
-			changeMoves(-GC.getMOVE_DENOMINATOR());
-		}
-	}
+	return; //no longer used
 }
-
 
 //	--------------------------------------------------------------------------------
 bool CvUnit::canEmbarkAtPlot(const CvPlot* pPlot) const
@@ -6690,7 +6959,7 @@ bool CvUnit::canEmbarkAtPlot(const CvPlot* pPlot) const
 	}
 
 	// search the water plots around this plot to see if any are vacant
-	CvPlot** aNeighbors = GC.getMap().getNeighborsUnchecked(pPlot);
+	CvPlot** aNeighbors = GC.getMap().getNeighborsShuffled(pPlot);
 	for(size_t i=0; i<NUM_DIRECTION_TYPES; i++)
 	{
 		CvPlot* pEvalPlot = aNeighbors[i];
@@ -6720,7 +6989,7 @@ bool CvUnit::canDisembarkAtPlot(const CvPlot* pPlot) const
 	}
 
 	// search the water plots around this plot to see if any are vacant
-	CvPlot** aNeighbors = GC.getMap().getNeighborsUnchecked(pPlot);
+	CvPlot** aNeighbors = GC.getMap().getNeighborsShuffled(pPlot);
 	for(size_t i=0; i<NUM_DIRECTION_TYPES; i++)
 	{
 		CvPlot* pEvalPlot = aNeighbors[i];
@@ -7379,11 +7648,14 @@ bool CvUnit::canHeal(const CvPlot* pPlot, bool bTestVisible, bool bCheckMovement
 		}
 	}
 #endif
-
-	//no healing on mountains outside of cities (inca)
-	if (pPlot->isMountain() && !pPlot->isCity())
-		return false;
-	
+#if defined(MOD_NO_HEALING_ON_MOUNTAINS)
+	if(MOD_NO_HEALING_ON_MOUNTAINS)
+	{
+		//no healing on mountains outside of cities (inca)
+		if (pPlot->isMountain() && !pPlot->isCity())
+			return false;
+	}
+#endif
 	// Unit now has to be able to Fortify to Heal (since they're very similar states, and Heal gives a defense bonus)
 	if(!bTestVisible)
 	{
@@ -7403,11 +7675,13 @@ bool CvUnit::canHeal(const CvPlot* pPlot, bool bTestVisible, bool bCheckMovement
 		}
 	}
 
-
 	if(healRate(pPlot) <= 0)
-	{
 		return false;
-	}
+
+	//can't heal in a blockaded city
+	CvCity* pCity = pPlot->getPlotCity();
+	if (pCity && pCity->IsBlockadedWaterAndLand())
+		return false;
 
 	return true;
 }
@@ -7772,7 +8046,7 @@ void CvUnit::doHeal()
 		if(IsCombatUnit())
 		{
 			ImprovementTypes eCamp = (ImprovementTypes)GC.getBARBARIAN_CAMP_IMPROVEMENT();
-			if( IsHurt() && !hasMoved() && plot()->getImprovementType()==eCamp )
+			if( IsHurt() && !hasMoved() && (plot()->getImprovementType()==eCamp || plot()->getOwner()==BARBARIAN_PLAYER) )
 			{
 				changeDamage( -GC.getBALANCE_BARBARIAN_HEAL_RATE() );
 			}
@@ -7822,20 +8096,30 @@ void CvUnit::DoAttrition()
 	}
 
 #if defined(MOD_API_PLOT_BASED_DAMAGE)
-	if (MOD_API_PLOT_BASED_DAMAGE) {
+	if (MOD_API_PLOT_BASED_DAMAGE)
+	// Do not change - no damage for cargo units or Domain Sea
+	{
 		int iDamage = plot()->getTurnDamage(ignoreTerrainDamage(), ignoreFeatureDamage(), extraTerrainDamage(), extraFeatureDamage());
-
-		if (0 != iDamage) {
-			if (iDamage > 0) {
-				// CUSTOMLOG("Applying terrain/feature damage (of %i) for player/unit %i/%i at (%i, %i)", iDamage, getOwner(), GetID(), plot()->getX(), plot()->getY());
-				CvString strAppendText =  GetLocalizedText("TXT_KEY_MISC_YOU_UNIT_WAS_DAMAGED_ATTRITION");
-				changeDamage(iDamage, NO_PLAYER, 0.0, &strAppendText);
-			} else {
-				// CUSTOMLOG("Applying terrain/feature healing (of %i) for player/unit %i/%i at (%i, %i)", iDamage, getOwner(), GetID(), plot()->getX(), plot()->getY());
-				changeDamage(iDamage, NO_PLAYER);
+		if(!isCargo() && getDomainType() != DOMAIN_SEA)
+		{
+			if (0 != iDamage)
+			{
+				if (iDamage > 0)
+				{
+					// CUSTOMLOG("Applying terrain/feature damage (of %i) for player/unit %i/%i at (%i, %i)", iDamage, getOwner(), GetID(), plot()->getX(), plot()->getY());
+					CvString strAppendText =  GetLocalizedText("TXT_KEY_MISC_YOU_UNIT_WAS_DAMAGED_ATTRITION");
+					changeDamage(iDamage, NO_PLAYER, 0.0, &strAppendText);
+				}
+				else
+				{
+					// CUSTOMLOG("Applying terrain/feature healing (of %i) for player/unit %i/%i at (%i, %i)", iDamage, getOwner(), GetID(), plot()->getX(), plot()->getY());
+					changeDamage(iDamage, NO_PLAYER);
+				}
 			}
 		}
-	} else {
+	}
+	else
+	{
 #endif
 		// slewis - helicopters take attrition when ending their turn over mountains.
 		if(getDomainType() == DOMAIN_LAND && pPlot->isMountain() && !canMoveAllTerrain())
@@ -8197,7 +8481,7 @@ bool CvUnit::canAirliftAt(const CvPlot* pPlot, int iX, int iY) const
 		pAdjacentPlot = plotDirection(iX, iY, ((DirectionTypes)iI));
 		if(pAdjacentPlot != NULL)
 		{
-			UnitHandle pDefender = pAdjacentPlot->getBestDefender(NO_PLAYER, getOwner(), NULL, true);
+			CvUnit* pDefender = pAdjacentPlot->getBestDefender(NO_PLAYER, getOwner(), NULL, true);
 			if (pDefender)
 			{
 				return false;
@@ -8579,6 +8863,11 @@ bool CvUnit::canMakeTradeRoute(const CvPlot* pPlot) const
 		return false;
 	}
 
+	if (isDelayedDeath())
+	{
+		return false;
+	}
+
 	if (pPlot == NULL)
 	{
 		return false;
@@ -8944,9 +9233,14 @@ bool CvUnit::canPlunderTradeRoute(const CvPlot* pPlot, bool bOnlyTestVisibility)
 					// invalid TradeUnit
 					continue;
 				}
-				if(GET_PLAYER(eTradeUnitOwner).AreTradeRoutesInvulnerable())
+				CorporationTypes eCorporation = GET_PLAYER(eTradeUnitOwner).GetCorporations()->GetFoundedCorporation();
+				if (eCorporation != NO_CORPORATION)
 				{
-					continue;
+					CvCorporationEntry* pkCorporation = GC.getCorporationInfo(eCorporation);
+					if (pkCorporation && pkCorporation->IsTradeRoutesInvulnerable())
+					{
+						continue;
+					}
 				}
 				TeamTypes eTeam = GET_PLAYER(eTradeUnitOwner).getTeam();
 				if (GET_TEAM(GET_PLAYER(m_eOwner).getTeam()).isAtWar(eTeam))
@@ -8972,9 +9266,14 @@ bool CvUnit::canPlunderTradeRoute(const CvPlot* pPlot, bool bOnlyTestVisibility)
 				return false;
 			}
 #if defined(MOD_BALANCE_CORE)
-			if(GET_PLAYER(eTradeUnitOwner).AreTradeRoutesInvulnerable())
+			CorporationTypes eCorporation = GET_PLAYER(eTradeUnitOwner).GetCorporations()->GetFoundedCorporation();
+			if (eCorporation != NO_CORPORATION)
 			{
-				return false;
+				CvCorporationEntry* pkCorporation = GC.getCorporationInfo(eCorporation);
+				if (pkCorporation && pkCorporation->IsTradeRoutesInvulnerable())
+				{
+					return false;
+				}
 			}
 #endif
 #endif
@@ -9018,9 +9317,14 @@ bool CvUnit::plunderTradeRoute()
 			// invalid TradeUnit
 			continue;
 		}
-		if(GET_PLAYER(eTradeUnitOwner).AreTradeRoutesInvulnerable())
+		CorporationTypes eCorporation = GET_PLAYER(eTradeUnitOwner).GetCorporations()->GetFoundedCorporation();
+		if (eCorporation != NO_CORPORATION)
 		{
-			continue;
+			CvCorporationEntry* pkCorporation = GC.getCorporationInfo(eCorporation);
+			if (pkCorporation && pkCorporation->IsTradeRoutesInvulnerable())
+			{
+				continue;
+			}
 		}
 		TeamTypes eTeam = GET_PLAYER(eTradeUnitOwner).getTeam();
 		if (GET_TEAM(GET_PLAYER(m_eOwner).getTeam()).isAtWar(eTeam))
@@ -9498,7 +9802,11 @@ bool CvUnit::sellExoticGoods()
 					{
 						
 						CvPlot* pLoopPlot = pCity->GetCityCitizens()->GetCityPlotFromIndex(iCityPlotLoop);
+#if defined(MOD_PSEUDO_NATURAL_WONDER)
+						if(pLoopPlot != NULL && (pLoopPlot->getOwner() == ePlotOwner) && !pLoopPlot->isCity() && !pLoopPlot->isWater() && !pLoopPlot->isImpassable(getTeam()) && !pLoopPlot->IsNaturalWonder(true) && pLoopPlot->isCoastalLand() && (pLoopPlot->getResourceType() == NO_RESOURCE))
+#else
 						if(pLoopPlot != NULL && (pLoopPlot->getOwner() == ePlotOwner) && !pLoopPlot->isCity() && !pLoopPlot->isWater() && !pLoopPlot->isImpassable(getTeam()) && !pLoopPlot->IsNaturalWonder() && pLoopPlot->isCoastalLand() && (pLoopPlot->getResourceType() == NO_RESOURCE))
+#endif
 						{
 							if(pLoopPlot->getImprovementType() != NO_IMPROVEMENT)
 							{
@@ -9516,7 +9824,11 @@ bool CvUnit::sellExoticGoods()
 						for (int iCityPlotLoop = 0; iCityPlotLoop < pCity->GetNumWorkablePlots(); iCityPlotLoop++)
 						{
 							CvPlot* pLoopPlot = pCity->GetCityCitizens()->GetCityPlotFromIndex(iCityPlotLoop);
+#if defined(MOD_PSEUDO_NATURAL_WONDER)
+							if(pLoopPlot != NULL && (pLoopPlot->getOwner() == ePlotOwner) && !pLoopPlot->isCity() && !pLoopPlot->isWater() && !pLoopPlot->isImpassable(getTeam()) && !pLoopPlot->IsNaturalWonder(true) && pLoopPlot->isCoastalLand() && (pLoopPlot->getResourceType() == NO_RESOURCE))
+#else
 							if(pLoopPlot != NULL && (pLoopPlot->getOwner() == ePlotOwner) && !pLoopPlot->isCity() && !pLoopPlot->isWater() && !pLoopPlot->isImpassable(getTeam()) && !pLoopPlot->IsNaturalWonder() && pLoopPlot->isCoastalLand() && (pLoopPlot->getResourceType() == NO_RESOURCE))
+#endif
 							{
 								//If we can build on an empty spot, do so.
 								if(pLoopPlot->getImprovementType() == NO_IMPROVEMENT)
@@ -9540,6 +9852,19 @@ bool CvUnit::sellExoticGoods()
 					{
 						pBestPlot->setImprovementType(NO_IMPROVEMENT);
 						pBestPlot->setImprovementType(eFeitoria, getOwner());
+						
+						IDInfo* pUnitNode;
+						CvUnit* pLoopUnit;
+						pUnitNode = pBestPlot->headUnitNode();
+						while (pUnitNode != NULL)
+						{
+							pLoopUnit = ::getUnit(*pUnitNode);
+							pUnitNode = pBestPlot->nextUnitNode(pUnitNode);
+							if (pLoopUnit != NULL && pLoopUnit->GetMissionAIType() == MISSIONAI_BUILD && pLoopUnit->GetMissionAIPlot() == pBestPlot)
+							{
+								pLoopUnit->ClearMissionQueue();
+							}
+						}
 					}
 				}
 			}
@@ -9878,7 +10203,16 @@ bool CvUnit::canPillage(const CvPlot* pPlot) const
 		CvImprovementEntry* pImprovementInfo = GC.getImprovementInfo(pPlot->getImprovementType());
 		if(pImprovementInfo->IsPermanent())
 		{
+#if defined(MOD_PILLAGE_PERMANENT_IMPROVEMENTS)
+			if(MOD_PILLAGE_PERMANENT_IMPROVEMENTS)
+			{
+				return true;
+			}
+			else
+				return false;
+#else
 			return false;
+#endif
 		}
 		else if(pImprovementInfo->IsGoody())
 		{
@@ -9931,6 +10265,14 @@ bool CvUnit::canPillage(const CvPlot* pPlot) const
 	{
 		return false;
 	}
+	
+#if defined(MOD_EVENTS_UNIT_ACTIONS)
+	if (MOD_EVENTS_UNIT_ACTIONS) {
+		if (GAMEEVENTINVOKE_TESTALL(GAMEEVENT_UnitCanPillage, getOwner(), GetID(), eImprovementType, pPlot->getRouteType()) == GAMEEVENTRETURN_FALSE) {
+			return false;
+		}
+	}
+#endif
 
 	return true;
 }
@@ -10026,12 +10368,25 @@ bool CvUnit::pillage()
 				int iPillageGold = 0;
 
 				// TODO: add scripting support for "doPillageGold"
+#if defined(MOD_EVENTS_UNIT_ACTIONS)
+				if (MOD_EVENTS_UNIT_ACTIONS) {
+					int iValue = 0;
+					if (GAMEEVENTINVOKE_VALUE(iValue, GAMEEVENT_UnitPillageGold, getOwner(), GetID(), eTempImprovement, pkImprovement->GetPillageGold()) == GAMEEVENTRETURN_VALUE) {
+						iPillageGold = iValue;
+						CUSTOMLOG("Pillage gold is %i", iPillageGold);
+					}
+				}
+#endif
 				iPillageGold = GC.getGame().getJonRandNum(pkImprovement->GetPillageGold(), "Pillage Gold 1");
 				iPillageGold += GC.getGame().getJonRandNum(pkImprovement->GetPillageGold(), "Pillage Gold 2");
 				iPillageGold += (getPillageChange() * iPillageGold) / 100;
 
 				if(iPillageGold > 0)
 				{
+#if defined(MOD_BALANCE_CORE)
+					iPillageGold *= GC.getGame().getGameSpeedInfo().getTrainPercent();
+					iPillageGold /= 100;
+#endif
 					GET_PLAYER(getOwner()).GetTreasury()->ChangeGold(iPillageGold);
 
 					if(getOwner() == GC.getGame().getActivePlayer())
@@ -10215,6 +10570,10 @@ bool CvUnit::found()
 	}
 
 #if defined(MOD_BALANCE_CORE_SETTLER_ADVANCED)
+	if(MOD_BALANCE_CORE_SETTLER_ADVANCED && m_pUnitInfo->IsFound())
+	{
+		kPlayer.cityBoost(getX(), getY(), m_pUnitInfo, 0, 1, 1);
+	}
 	if(MOD_BALANCE_CORE_SETTLER_ADVANCED && m_pUnitInfo->IsFoundMid())
 	{
 		kPlayer.cityBoost(getX(), getY(), m_pUnitInfo, GC.getPIONEER_EXTRA_PLOTS(), GC.getPIONEER_POPULATION_CHANGE(), GC.getPIONEER_FOOD_PERCENT());
@@ -11619,7 +11978,7 @@ bool CvUnit::trade()
 
 	CvPlot* pPlot = plot();
 
-	if(!canTrade(pPlot))
+	if(!pPlot || !canTrade(pPlot))
 		return false;
 
 	int iTradeGold = getTradeGold(pPlot);
@@ -11719,7 +12078,8 @@ bool CvUnit::trade()
 		DLLUI->AddUnitMessage(0, GetIDInfo(), getOwner(), true, GC.getEVENT_MESSAGE_TIME(), GetLocalizedText("TXT_KEY_MERCHANT_RESULT", iTradeGold, iFriendship));
 	}
 
-	if(pPlot->isActiveVisible(false))
+	//there was a strange crash here where the unit suddenly was at an invalid plot
+	if(pPlot->isActiveVisible(false) && plot()==pPlot)
 	{
 		auto_ptr<ICvUnit1> pDllUnit(new CvDllUnit(this));
 		gDLL->GameplayUnitActivate(pDllUnit.get());
@@ -12570,211 +12930,51 @@ bool CvUnit::blastTourism()
 	{
 		return false;
 	}
+
+	int iTourismBlast = getBlastTourism();
+
 #if defined(MOD_BALANCE_CORE_NEW_GP_ATTRIBUTES)
 	//Let's make the GM a little more flexible.
 	if(MOD_BALANCE_CORE_NEW_GP_ATTRIBUTES)
 	{
-		CvPlayer &kUnitOwner = GET_PLAYER(getOwner());
 		PlayerTypes eOwner = pPlot->getOwner();
-		InfluenceLevelTypes eLevel = kUnitOwner.GetCulture()->GetInfluenceLevel(eOwner);
 
-		if (eLevel <= INFLUENCE_LEVEL_EXOTIC)
+		int iCap = 3;
+
+		if(GET_PLAYER(getOwner()).getCapitalCity() != NULL)
 		{
-			int iTourismNeededForFamiliar = GC.getCULTURE_LEVEL_FAMILIAR() + 1;
-			int iInfluenceOn = kUnitOwner.GetCulture()->GetInfluenceOn(eOwner);
-			int iLifetimeCulture = GET_PLAYER(eOwner).GetJONSCultureEverGenerated();
-			int iTourismDifference = 0;
-
-			//Get % needed for Familiarity
-			if (iTourismNeededForFamiliar > 0)
-			{
-				iTourismDifference = (iLifetimeCulture * iTourismNeededForFamiliar) / 100;
-			}
-			//Subtract existing %
-			iTourismDifference -= iInfluenceOn;
-
-			kUnitOwner.GetCulture()->ChangeInfluenceOn(eOwner, iTourismDifference);
-
-			int iHappiness = 2;
-			if(kUnitOwner.getCapitalCity() != NULL)
-			{
-				kUnitOwner.getCapitalCity()->ChangeUnmoddedHappinessFromBuildings(iHappiness);
-			}
-
-			CvNotifications* pNotifications = GET_PLAYER(getOwner()).GetNotifications();
-			if (pNotifications) 
-			{
-				Localization::String localizedText = Localization::Lookup("TXT_KEY_NOTIFICATION_GREAT_MUSICIAN_UNKNOWN_TOUR");
-				localizedText << GET_PLAYER(eOwner).getCivilizationAdjectiveKey();
-				localizedText << iHappiness;
-				Localization::String localizedSummary = Localization::Lookup("TXT_KEY_NOTIFICATION_GREAT_MUSICIAN_UNKNOWN_TOUR_S");
-				localizedSummary << GET_PLAYER(eOwner).getCivilizationShortDescriptionKey();
-				pNotifications->Add(NOTIFICATION_GREAT_PERSON_ACTIVE_PLAYER, localizedText.toUTF8(), localizedSummary.toUTF8(), getX(), getY(), getUnitType());
-			}
-			CvNotifications* pNotifications2 = GET_PLAYER(eOwner).GetNotifications();
-			if (pNotifications2) 
-			{
-				Localization::String localizedText = Localization::Lookup("TXT_KEY_NOTIFICATION_GREAT_MUSICIAN_UNKNOWN_TOUR_TARGET");
-				localizedText << GET_PLAYER(getOwner()).getCivilizationAdjectiveKey();
-				Localization::String localizedSummary = Localization::Lookup("TXT_KEY_NOTIFICATION_GREAT_MUSICIAN_UNKNOWN_TOUR_TARGET_S");
-				localizedSummary << GET_PLAYER(getOwner()).getCivilizationShortDescriptionKey();
-				pNotifications2->Add(NOTIFICATION_CULTURE_VICTORY_SOMEONE_INFLUENTIAL, localizedText.toUTF8(), localizedSummary.toUTF8(), getX(), getY(), eOwner);
-			}
-			if(GC.getLogging() && GC.getAILogging())
-			{
-				CvString strLogString;
-				strLogString.Format("Foreign Tour, less than Familiar. Influence gained: %d, GAP: %d", iTourismDifference, (iTourismDifference * 10));
-				GET_PLAYER(getOwner()).GetHomelandAI()->LogHomelandMessage(strLogString);
-			}
-			//And kill it.
-			if(pPlot->isActiveVisible(false))
-			{
-				auto_ptr<ICvUnit1> pDllUnit(new CvDllUnit(this));
-				gDLL->GameplayUnitActivate(pDllUnit.get());
-			}
-
-			if(IsGreatPerson())
-			{
-#if defined(MOD_EVENTS_GREAT_PEOPLE)
-				kUnitOwner.DoGreatPersonExpended(getUnitType(), this);
-#else
-				kUnitOwner.DoGreatPersonExpended(getUnitType());
-#endif
-			}
-
-			kill(true);
-
-			return true;
+			GET_PLAYER(getOwner()).getCapitalCity()->ChangeBaseHappinessFromBuildings(iCap);
 		}
-		else if (eLevel == INFLUENCE_LEVEL_FAMILIAR)
+
+		CvNotifications* pNotifications = GET_PLAYER(getOwner()).GetNotifications();
+		if (pNotifications) 
 		{
-			int iTourismBlast = getBlastTourism();
-			int iEra = GET_PLAYER(getOwner()).GetCurrentEra();
-			if(iEra < 2)
-			{
-				iEra = 2;
-			}
-			if(iEra > 6)
-			{
-				iEra = 6;
-			}
-
-			int iCap = 5;
-			iCap *= GC.getGame().getGameSpeedInfo().getTrainPercent();
-			iCap /= 100;
-			CvCity* pLoopCity;
-			int iCityLoop;
-
-			// Loop through owner's cities.
-			for(pLoopCity = GET_PLAYER(eOwner).firstCity(&iCityLoop); pLoopCity != NULL; pLoopCity = GET_PLAYER(eOwner).nextCity(&iCityLoop))
-			{
-				if(pLoopCity != NULL)
-				{
-					pLoopCity->ChangeWeLoveTheKingDayCounter(iCap);
-				}
-			}
-
-			if(kUnitOwner.getCapitalCity() != NULL)
-			{
-				kUnitOwner.getCapitalCity()->ChangeUnmoddedHappinessFromBuildings(iEra);
-			}
-
-			CvNotifications* pNotifications = GET_PLAYER(getOwner()).GetNotifications();
-			if (pNotifications) 
-			{
-				Localization::String localizedText = Localization::Lookup("TXT_KEY_NOTIFICATION_GREAT_MUSICIAN_FAMILIAR_TOUR");
-				localizedText << GET_PLAYER(eOwner).getCivilizationAdjectiveKey();
-				localizedText << iTourismBlast;
-				localizedText << iEra;
-				localizedText << iCap;
-				Localization::String localizedSummary = Localization::Lookup("TXT_KEY_NOTIFICATION_GREAT_MUSICIAN_FAMILIAR_TOUR_S");
-				localizedSummary << GET_PLAYER(eOwner).getCivilizationAdjectiveKey();
-				pNotifications->Add(NOTIFICATION_GREAT_PERSON_ACTIVE_PLAYER, localizedText.toUTF8(), localizedSummary.toUTF8(), getX(), getY(), getUnitType());
-			}
-			CvNotifications* pNotifications2 = GET_PLAYER(eOwner).GetNotifications();
-			if (pNotifications2) 
-			{
-				Localization::String localizedText = Localization::Lookup("TXT_KEY_NOTIFICATION_GREAT_MUSICIAN_FAMILIAR_TOUR_TARGET");
-				localizedText << GET_PLAYER(getOwner()).getCivilizationAdjectiveKey();
-				localizedText << iTourismBlast;
-				localizedText << iCap;
-				Localization::String localizedSummary = Localization::Lookup("TXT_KEY_NOTIFICATION_GREAT_MUSICIAN_FAMILIAR_TOUR_TARGET_S");
-				localizedSummary << GET_PLAYER(getOwner()).getCivilizationAdjectiveKey();
-				pNotifications2->Add(NOTIFICATION_CULTURE_VICTORY_SOMEONE_INFLUENTIAL, localizedText.toUTF8(), localizedSummary.toUTF8(), getX(), getY(), eOwner);
-			}
-			if(GC.getLogging() && GC.getAILogging())
-			{
-				CvString strLogString;
-				strLogString.Format("Foreign Tour, Familiar. Tourism gained: %d. Happiness gained: %d", iTourismBlast, iEra);
-				GET_PLAYER(getOwner()).GetHomelandAI()->LogHomelandMessage(strLogString);
-			}
+			Localization::String localizedText = Localization::Lookup("TXT_KEY_NOTIFICATION_GREAT_MUSICIAN_FAMILIAR_TOUR");
+			localizedText << GET_PLAYER(eOwner).getCivilizationAdjectiveKey();
+			localizedText << iTourismBlast;
+			localizedText << iCap;
+			Localization::String localizedSummary = Localization::Lookup("TXT_KEY_NOTIFICATION_GREAT_MUSICIAN_FAMILIAR_TOUR_S");
+			localizedSummary << GET_PLAYER(eOwner).getCivilizationAdjectiveKey();
+			pNotifications->Add(NOTIFICATION_GREAT_PERSON_ACTIVE_PLAYER, localizedText.toUTF8(), localizedSummary.toUTF8(), getX(), getY(), getUnitType());
 		}
-		else if (eLevel == INFLUENCE_LEVEL_POPULAR)
+		CvNotifications* pNotifications2 = GET_PLAYER(eOwner).GetNotifications();
+		if (pNotifications2) 
 		{
-			int iTourismBlast = getBlastTourism();
-			int iEra = GET_PLAYER(getOwner()).GetCurrentEra();
-			if(iEra < 2)
-			{
-				iEra = 2;
-			}
-			if(iEra > 6)
-			{
-				iEra = 6;
-			}
-
-			int iCap = 10;
-			iCap *= GC.getGame().getGameSpeedInfo().getTrainPercent();
-			iCap /= 100;
-			CvCity* pLoopCity;
-			int iCityLoop;
-
-			// Loop through owner's cities.
-			for(pLoopCity = GET_PLAYER(eOwner).firstCity(&iCityLoop); pLoopCity != NULL; pLoopCity = GET_PLAYER(eOwner).nextCity(&iCityLoop))
-			{
-				if(pLoopCity != NULL)
-				{
-					pLoopCity->ChangeWeLoveTheKingDayCounter(iCap);
-				}
-			}
-
-			if(kUnitOwner.getCapitalCity() != NULL)
-			{
-				kUnitOwner.getCapitalCity()->ChangeUnmoddedHappinessFromBuildings(iEra);
-			}
-
-			CvNotifications* pNotifications = GET_PLAYER(getOwner()).GetNotifications();
-			if (pNotifications) 
-			{
-				Localization::String localizedText = Localization::Lookup("TXT_KEY_NOTIFICATION_GREAT_MUSICIAN_POPULAR_TOUR");
-				localizedText << GET_PLAYER(eOwner).getCivilizationAdjectiveKey();
-				localizedText << iTourismBlast;
-				localizedText << iEra;
-				Localization::String localizedSummary = Localization::Lookup("TXT_KEY_NOTIFICATION_GREAT_MUSICIAN_POPULAR_TOUR_S");
-				localizedSummary << GET_PLAYER(eOwner).getCivilizationAdjectiveKey();
-				pNotifications->Add(NOTIFICATION_GREAT_PERSON_ACTIVE_PLAYER, localizedText.toUTF8(), localizedSummary.toUTF8(), getX(), getY(), getUnitType());
-			}
-			CvNotifications* pNotifications2 = GET_PLAYER(eOwner).GetNotifications();
-			if (pNotifications2) 
-			{
-				Localization::String localizedText = Localization::Lookup("TXT_KEY_NOTIFICATION_GREAT_MUSICIAN_POPULAR_TOUR_TARGET");
-				localizedText << GET_PLAYER(getOwner()).getCivilizationAdjectiveKey();
-				localizedText << iTourismBlast;
-				localizedText << iCap;
-				Localization::String localizedSummary = Localization::Lookup("TXT_KEY_NOTIFICATION_GREAT_MUSICIAN_POPULAR_TOUR_TARGET_S");
-				localizedSummary << GET_PLAYER(getOwner()).getCivilizationAdjectiveKey();
-				pNotifications2->Add(NOTIFICATION_CULTURE_VICTORY_SOMEONE_INFLUENTIAL, localizedText.toUTF8(), localizedSummary.toUTF8(), getX(), getY(), eOwner);
-			}
-			if(GC.getLogging() && GC.getAILogging())
-			{
-				CvString strLogString;
-				strLogString.Format("Foreign Tour, Popular. Tourism gained: %d. Happiness gained: %d", iTourismBlast, (iEra * 2));
-				GET_PLAYER(getOwner()).GetHomelandAI()->LogHomelandMessage(strLogString);
-			}
+			Localization::String localizedText = Localization::Lookup("TXT_KEY_NOTIFICATION_GREAT_MUSICIAN_FAMILIAR_TOUR_TARGET");
+			localizedText << GET_PLAYER(getOwner()).getCivilizationAdjectiveKey();
+			localizedText << iTourismBlast;
+			Localization::String localizedSummary = Localization::Lookup("TXT_KEY_NOTIFICATION_GREAT_MUSICIAN_FAMILIAR_TOUR_TARGET_S");
+			localizedSummary << GET_PLAYER(getOwner()).getCivilizationAdjectiveKey();
+			pNotifications2->Add(NOTIFICATION_CULTURE_VICTORY_SOMEONE_INFLUENTIAL, localizedText.toUTF8(), localizedSummary.toUTF8(), getX(), getY(), eOwner);
+		}
+		if(GC.getLogging() && GC.getAILogging())
+		{
+			CvString strLogString;
+			strLogString.Format("Foreign Tour, Familiar. Tourism gained: %d. Happiness they gained: %d", iTourismBlast, iCap);
+			GET_PLAYER(getOwner()).GetHomelandAI()->LogHomelandMessage(strLogString);
 		}
 	}
 #endif
-
-	int iTourismBlast = getBlastTourism();
 
 	int iTourismBlastPercentOthers = m_pUnitInfo->GetOneShotTourismPercentOthers();
 	PlayerTypes eOwner = pPlot->getOwner();
@@ -12916,7 +13116,7 @@ bool CvUnit::canBuild(const CvPlot* pPlot, BuildTypes eBuild, bool bTestVisible,
 	{
 #if defined(MOD_BUGFIX_UNITCLASS_NOT_UNIT)
 		// Needs the associated SQL executing - UPDATE Builds SET CanBeEmbarked=1 WHERE Type='BUILD_FISHING_BOATS_NO_KILL';
-		if ((isEmbarked() && !pkBuildInfo->IsCanBeEmbarked()))
+		if (pPlot->needsEmbarkation(this) && !pkBuildInfo->IsCanBeEmbarked())
 #else
 		if ((isEmbarked() && !pkBuildInfo->IsCanBeEmbarked())  && (strcmp("UNIT_JAPANESE_SAMURAI", getUnitInfo().GetType()) != 0))
 #endif
@@ -12989,7 +13189,12 @@ bool CvUnit::build(BuildTypes eBuild)
 		}
 	}
 
+	int iWorkRateWithMoves = workRate(false);
+
 	int iStartedYet = pPlot->getBuildProgress(eBuild);
+#if defined(MOD_CIV6_WORKER)
+	int iMaxTimetoBuild = pPlot->getBuildTime(eBuild, getOwner());
+#endif
 
 	// if we are starting something new wipe out the old thing immediately
 	if(iStartedYet == 0)
@@ -13015,11 +13220,11 @@ bool CvUnit::build(BuildTypes eBuild)
 
 		// wipe out all build progress also
 
-		bFinished = pPlot->changeBuildProgress(eBuild, workRate(false), getOwner());
+		bFinished = pPlot->changeBuildProgress(eBuild, iWorkRateWithMoves, getOwner());
 
 	}
 
-	bFinished = pPlot->changeBuildProgress(eBuild, workRate(false), getOwner());
+	bFinished = pPlot->changeBuildProgress(eBuild, iWorkRateWithMoves, getOwner());
 
 #if defined(MOD_EVENTS_PLOT)
 	if (MOD_EVENTS_PLOT) {
@@ -13056,6 +13261,168 @@ bool CvUnit::build(BuildTypes eBuild)
 #endif
 					}
 				}
+#if defined(MOD_BALANCE_CORE)
+				UnitTypes eBestUnit = NO_UNIT;
+				int iStrengthBestLandCombat = 0;
+				UnitTypes eWarrior = (UnitTypes)GC.getInfoTypeForString("UNIT_WARRIOR");
+				UnitTypes eTrireme = (UnitTypes)GC.getInfoTypeForString("UNIT_TRIREME");
+				if(pkBuildInfo->IsFreeBestDomainUnit())
+				{
+					bool bWater = false;
+					for(int iI = 0; iI < GC.getNumUnitClassInfos(); iI++)
+					{
+						const UnitClassTypes eUnitClass = static_cast<UnitClassTypes>(iI);
+						CvUnitClassInfo* pkUnitClassInfo = GC.getUnitClassInfo(eUnitClass);
+						if(pkUnitClassInfo)
+						{
+							const UnitTypes eUnit = (UnitTypes) kPlayer.getCivilizationInfo().getCivilizationUnits(eUnitClass);
+							CvUnitEntry* pUnitEntry = GC.getUnitInfo(eUnit);
+							if(pUnitEntry)
+							{
+								if(pkBuildInfo->IsWater())
+								{
+									bWater = true;
+								}
+								if(bWater)
+								{
+									if(!pUnitEntry->GetDomainType() == DOMAIN_SEA)
+									{
+										continue;
+									}
+									if(!kPlayer.canTrain(eUnit))
+									{
+										continue;
+									}
+									if(!pUnitEntry->GetRangedCombat())
+									{
+										bool bBad = false;
+										ResourceTypes eResource;
+										for(int iResourceLoop = 0; iResourceLoop < GC.getNumResourceInfos(); iResourceLoop++)
+										{
+											eResource = (ResourceTypes) iResourceLoop;
+											int iNumResource = pUnitEntry->GetResourceQuantityRequirement(eResource);
+											if (iNumResource > 0)
+											{
+												if(kPlayer.getNumResourceAvailable(eResource, true) < iNumResource)
+												{
+													bBad = true;
+													break;
+												}
+											}
+										}
+										if(bBad)
+										{
+											continue;
+										}
+										int iCombatLandStrength = (std::max(1, pUnitEntry->GetCombat()));
+										if(iCombatLandStrength > iStrengthBestLandCombat)
+										{
+											iStrengthBestLandCombat = iCombatLandStrength;
+											eBestUnit = eUnit;
+										}
+									}
+								}
+								else if(!bWater)
+								{
+									if(!kPlayer.canTrain(eUnit))
+									{
+										continue;
+									}
+									if(pUnitEntry->GetRangedCombat() > 0)
+									{
+										continue;
+									}
+									if(pUnitEntry->GetDomainType() == DOMAIN_LAND)
+									{
+										bool bBad = false;
+										ResourceTypes eResource;
+										for(int iResourceLoop = 0; iResourceLoop < GC.getNumResourceInfos(); iResourceLoop++)
+										{
+											eResource = (ResourceTypes) iResourceLoop;
+											int iNumResource = pUnitEntry->GetResourceQuantityRequirement(eResource);
+											if (iNumResource > 0)
+											{
+												if(kPlayer.getNumResourceAvailable(eResource, true) < iNumResource)
+												{
+													bBad = true;
+													break;
+												}
+											}
+										}
+										if(bBad)
+										{
+											continue;
+										}
+										int iCombatLandStrength = (std::max(1, pUnitEntry->GetCombat()));
+										if(iCombatLandStrength > iStrengthBestLandCombat)
+										{
+											iStrengthBestLandCombat = iCombatLandStrength;
+											eBestUnit = eUnit;
+										}
+									}
+								}
+							}
+						}
+					}
+					if(eBestUnit == NO_UNIT && bWater)
+					{
+						eBestUnit = eTrireme;
+					}
+					else if(eBestUnit == NO_UNIT && !bWater)
+					{
+						eBestUnit = eWarrior;
+					}
+					if(eBestUnit != NO_UNIT)
+					{
+						CvUnit* pkUnit = kPlayer.initUnit(eBestUnit, pPlot->getX(), pPlot->getY());
+						bool bJumpSuccess = pkUnit->jumpToNearestValidPlot();
+						if (bJumpSuccess)
+						{
+							kPlayer.getCapitalCity()->addProductionExperience(pkUnit);
+						}
+						else
+						{
+							pkUnit->kill(false);
+						}
+					}
+				}
+				if(pkBuildInfo->IsCultureBoost())
+				{
+					float fDelay = 0.5f;
+					int iValue = kPlayer.GetTotalJONSCulturePerTurn() * 2;
+					kPlayer.changeJONSCulture(iValue);
+					if(kPlayer.getCapitalCity() != NULL)
+					{
+						kPlayer.getCapitalCity()->ChangeJONSCultureStored(iValue);
+					}
+					if(kPlayer.GetID() == GC.getGame().getActivePlayer())
+					{
+						char text[256] = {0};
+						fDelay += 0.5f;
+						sprintf_s(text, "[COLOR_MAGENTA]+%d[ENDCOLOR][ICON_CULTURE]", iValue);
+						DLLUI->AddPopupText(getX(), getY(), text, fDelay);
+					}
+				}
+				if(pkBuildInfo->IsKillImprovement())
+				{
+					if(pPlot != NULL && pPlot->getResourceType() == NO_RESOURCE)
+					{
+						ResourceTypes eResourceFromImprovement = (ResourceTypes)pkImprovementInfo->GetResourceFromImprovement();
+						int iQuantity = pkImprovementInfo->GetResourceQuantityFromImprovement();
+						if(iQuantity <= 0)
+						{
+							iQuantity = 1;
+						}
+						if(eResourceFromImprovement != NO_RESOURCE)
+						{
+							pPlot->setResourceType(eResourceFromImprovement, iQuantity);
+							if(pPlot->GetResourceLinkedCity() != NULL && !pPlot->IsResourceLinkedCityActive())
+								pPlot->SetResourceLinkedCityActive(true);
+						}
+					}
+					pPlot->setImprovementType(NO_IMPROVEMENT);
+				}
+#endif
 			}
 #if defined(GLOBAL_ALPINE_PASSES)
 			// Can be both an improvement and a route
@@ -13131,6 +13498,36 @@ bool CvUnit::build(BuildTypes eBuild)
 #endif
 			}
 
+#if defined(MOD_CIV6_WORKER)
+			//if we are a builder (something with builderstrength)
+			if (getBuilderStrength() > 0)
+			{
+				//check the amount of work done
+				int iTotalCost = pkBuildInfo->getBuilderCost();
+				int iTimeUsed = pPlot->getBuildProgress(eBuild) - iStartedYet;
+				if (bFinished)
+				{
+					iTimeUsed = iMaxTimetoBuild - iStartedYet;
+				}
+				int iCostThisTurn = iTotalCost * iTimeUsed;
+				iCostThisTurn /= iMaxTimetoBuild;
+				
+				//special mod for route construction (used by a policy)
+				if (pkBuildInfo->getRoute() != NO_ROUTE)
+				{
+					iCostThisTurn *= 100 + kPlayer.GetRouteBuilderCostMod();
+					iCostThisTurn /= 100;
+				}
+
+				// remove this amount (and kill me if it's too high)
+				setBuilderStrength(getBuilderStrength() - iCostThisTurn);
+				if (m_iBuilderStrength == 0){
+					//delete unit
+					kill(true);
+				}
+			}
+#endif
+
 			// Add to player's Improvement count, which will increase cost of future Improvements
 			if(pkBuildInfo->getImprovement() != NO_IMPROVEMENT || pkBuildInfo->getRoute() != NO_ROUTE)	// Prevents chopping Forest or Jungle from counting
 			{
@@ -13186,6 +13583,20 @@ bool CvUnit::build(BuildTypes eBuild)
 	return bFinished;
 }
 
+//	--------------------------------------------------------------------------------
+int CvUnit::getBuilderStrength() const
+{
+	return m_iBuilderStrength;
+}
+
+//	--------------------------------------------------------------------------------
+void CvUnit::setBuilderStrength(const int newPower)
+{
+	m_iBuilderStrength = newPower;
+	if (m_iBuilderStrength < 0) m_iBuilderStrength = 0;
+
+}
+
 
 //	--------------------------------------------------------------------------------
 bool CvUnit::canPromote(PromotionTypes ePromotion, int iLeaderUnitId) const
@@ -13199,7 +13610,7 @@ bool CvUnit::canPromote(PromotionTypes ePromotion, int iLeaderUnitId) const
 		}
 
 		// The command is always possible if it's coming from a Warlord unit that gives just experience points
-		UnitHandle pWarlord = GET_PLAYER(getOwner()).getUnit(iLeaderUnitId);
+		CvUnit* pWarlord = GET_PLAYER(getOwner()).getUnit(iLeaderUnitId);
 		if(pWarlord &&
 				NO_UNIT != pWarlord->getUnitType() &&
 				pWarlord->getUnitInfo().GetLeaderExperience() > 0 &&
@@ -13230,7 +13641,7 @@ bool CvUnit::canPromote(PromotionTypes ePromotion, int iLeaderUnitId) const
 	{
 		if(iLeaderUnitId >= 0)
 		{
-			UnitHandle pWarlord = GET_PLAYER(getOwner()).getUnit(iLeaderUnitId);
+			CvUnit* pWarlord = GET_PLAYER(getOwner()).getUnit(iLeaderUnitId);
 			if(pWarlord && NO_UNIT != pWarlord->getUnitType())
 			{
 				return (pWarlord->getUnitInfo().GetLeaderPromotion() == ePromotion);
@@ -13267,7 +13678,7 @@ void CvUnit::promote(PromotionTypes ePromotion, int iLeaderUnitId)
 
 	if(iLeaderUnitId >= 0)
 	{
-		UnitHandle pWarlord = GET_PLAYER(getOwner()).getUnit(iLeaderUnitId);
+		CvUnit* pWarlord = GET_PLAYER(getOwner()).getUnit(iLeaderUnitId);
 		if(pWarlord)
 		{
 			pWarlord->giveExperience();
@@ -13302,24 +13713,39 @@ void CvUnit::promote(PromotionTypes ePromotion, int iLeaderUnitId)
 			//Insta-heal removed, gain health with each promotion instead.
 			changeDamage((-GC.getINSTA_HEAL_RATE() / 5));
 		}
+		if (getOriginCity() == NULL)
+		{
+			CvCity* pCaptial = GET_PLAYER(getOwner()).getCapitalCity();
+			if(pCaptial != NULL)
+			{
+				GET_PLAYER(getOwner()).doInstantYield(INSTANT_YIELD_TYPE_LEVEL_UP, false, NO_GREATPERSON, NO_BUILDING, (getLevel() - 1), false, NO_PLAYER, NULL, false, pCaptial, getDomainType(), true, false, NO_YIELD, this);
+			}
+		}
+		else if (getOriginCity() != NULL)
+		{
+			GET_PLAYER(getOwner()).doInstantYield(INSTANT_YIELD_TYPE_LEVEL_UP, false, NO_GREATPERSON, NO_BUILDING, (getLevel() - 1), false, NO_PLAYER, NULL, false, getOriginCity(), getDomainType(), true, false, NO_YIELD, this);
+		}
 #endif
 
 #if defined(MOD_EVENTS_UNIT_UPGRADES)
-		if (MOD_EVENTS_UNIT_UPGRADES) {
-			GAMEEVENTINVOKE_HOOK(GAMEEVENT_UnitPromoted, getOwner(), GetID(), ePromotion);
-		} else {
-#endif
-		ICvEngineScriptSystem1* pkScriptSystem = gDLL->GetScriptSystem();
-		if (pkScriptSystem)
+		if (MOD_EVENTS_UNIT_UPGRADES)
 		{
-			CvLuaArgsHandle args;
-			args->Push(((int)getOwner()));
-			args->Push(GetID());
-			args->Push(ePromotion);
-
-			bool bResult;
-			LuaSupport::CallHook(pkScriptSystem, "UnitPromoted", args.get(), bResult);
+			GAMEEVENTINVOKE_HOOK(GAMEEVENT_UnitPromoted, getOwner(), GetID(), ePromotion);
 		}
+		else
+		{
+#endif
+			ICvEngineScriptSystem1* pkScriptSystem = gDLL->GetScriptSystem();
+			if (pkScriptSystem)
+			{
+				CvLuaArgsHandle args;
+				args->Push(((int)getOwner()));
+				args->Push(GetID());
+				args->Push(ePromotion);
+
+				bool bResult;
+				LuaSupport::CallHook(pkScriptSystem, "UnitPromoted", args.get(), bResult);
+			}
 #if defined(MOD_EVENTS_UNIT_UPGRADES)
 		}
 #endif
@@ -13354,7 +13780,7 @@ bool CvUnit::lead(int iUnitId)
 	}
 	else
 	{
-		UnitHandle pUnit = GET_PLAYER(getOwner()).getUnit(iUnitId);
+		CvUnit* pUnit = GET_PLAYER(getOwner()).getUnit(iUnitId);
 
 		if(!pUnit || !pUnit->canPromote(eLeaderPromotion, GetID()))
 		{
@@ -13403,7 +13829,7 @@ int CvUnit::canLead(const CvPlot* pPlot, int iUnitId) const
 	}
 	else
 	{
-		const UnitHandle pUnit = GET_PLAYER(getOwner()).getUnit(iUnitId);
+		const CvUnit* pUnit = GET_PLAYER(getOwner()).getUnit(iUnitId);
 		if(pUnit && pUnit != this && pUnit->canPromote((PromotionTypes)kUnitInfo.GetLeaderPromotion(), GetID()))
 		{
 			iNumUnits = 1;
@@ -13567,7 +13993,7 @@ bool CvUnit::CanUpgradeTo(UnitTypes eUpgradeUnitType, bool bOnlyTestVisible) con
 			return false;
 #endif
 #if defined(MOD_BALANCE_CORE)
-		if(isEmbarked() || (plot()->isWater() && getDomainType() != DOMAIN_SEA))
+		if(isEmbarked() || ((plot()->isWater() && getDomainType() != DOMAIN_SEA) && !isCargo()))
 		{
 			return false;
 		}
@@ -13580,29 +14006,36 @@ bool CvUnit::CanUpgradeTo(UnitTypes eUpgradeUnitType, bool bOnlyTestVisible) con
 			return false;
 
 		// Resource Requirements
+#if defined(MOD_BALANCE_CORE)
+		if (!isBarbarian())
+		{
+#endif
 		int iNumOfThisResourceAvailable;
 		ResourceTypes eResource;
 		int iNumResourceNeeded;
-		for(int iResourceLoop = 0; iResourceLoop < GC.getNumResourceInfos(); iResourceLoop++)
+		for (int iResourceLoop = 0; iResourceLoop < GC.getNumResourceInfos(); iResourceLoop++)
 		{
-			eResource = (ResourceTypes) iResourceLoop;
+			eResource = (ResourceTypes)iResourceLoop;
 			iNumResourceNeeded = pUpgradeUnitInfo->GetResourceQuantityRequirement(eResource);
 
-			if(iNumResourceNeeded > 0)
+			if (iNumResourceNeeded > 0)
 			{
 				// Amount we have lying around
 				iNumOfThisResourceAvailable = kPlayer.getNumResourceAvailable(eResource);
 				// Amount this old unit is using
 				iNumOfThisResourceAvailable += m_pUnitInfo->GetResourceQuantityRequirement(eResource);
 
-				if(iNumOfThisResourceAvailable <= 0 || iNumOfThisResourceAvailable < iNumResourceNeeded)
+				if (iNumOfThisResourceAvailable <= 0 || iNumOfThisResourceAvailable < iNumResourceNeeded)
 					return false;
 			}
 		}
-
+#if defined(MOD_BALANCE_CORE)
+		}
+#endif
 		if(getDomainType() == DOMAIN_AIR)
 		{
-			if(!pPlot->isCity() || isCargo())	// Air units must be in a city, and no sneaky "I'm on a carrier in the city" either.
+			// Yes! upgrade if in territory and on a carrier. Community Patch knows how to Retrofit bitch on a Carrier!
+			if(!pPlot->isCity() && !isCargo())
 			{
 				return false;
 			}
@@ -13617,9 +14050,10 @@ bool CvUnit::CanUpgradeTo(UnitTypes eUpgradeUnitType, bool bOnlyTestVisible) con
 
 			bool bResult = false;
 			if (LuaSupport::CallTestAll(pkScriptSystem, "CanHaveAnyUpgrade", args.get(), bResult)) {
-				if (bResult == false) {
+				if (bResult == false)
+				{
 					return false;
-	}
+				}
 			}
 		}
 	}
@@ -13668,7 +14102,7 @@ bool CvUnit::CanUpgradeInTerritory(bool bOnlyTestVisible) const
 		CvPlot* pPlot = plot();
 		const PlayerTypes kPlotOwner = pPlot->getOwner();
 
-		// Must be in territory owned by the player or by an allied militaristic City State
+		// Must be in territory owned by the player or by a friendly City State
 		if (kPlotOwner != getOwner()) 
 		{
 			if(MOD_GLOBAL_CS_UPGRADES && kPlotOwner != NO_PLAYER && GET_PLAYER(getOwner()).CanUpgradeCSTerritory()) 
@@ -13680,7 +14114,7 @@ bool CvUnit::CanUpgradeInTerritory(bool bOnlyTestVisible) const
 				}
 				else
 				{
-					if(pPlotOwner.GetMinorCivAI()->GetAlly() != getOwner())
+					if(!pPlotOwner.GetMinorCivAI()->IsFriends(getOwner()))
 					{
 						return false;
 					}
@@ -13861,10 +14295,11 @@ CvUnit* CvUnit::DoUpgradeTo(UnitTypes eUnitType, bool bFree)
 	int iUpgradeCost = upgradePrice(eUnitType);
 	CvPlayerAI& thisPlayer = GET_PLAYER(getOwner());
 #if defined(MOD_API_EXTENSIONS)
-	if (!bFree) {
+	if (!bFree) 
+	{
 #endif
-	thisPlayer.GetTreasury()->LogExpenditure(getUnitInfo().GetText(), iUpgradeCost, 3);
-	thisPlayer.GetTreasury()->ChangeGold(-iUpgradeCost);
+		thisPlayer.GetTreasury()->LogExpenditure(getUnitInfo().GetText(), iUpgradeCost, 3);
+		thisPlayer.GetTreasury()->ChangeGold(-iUpgradeCost);
 #if defined(MOD_API_EXTENSIONS)
 	}
 #endif
@@ -13882,23 +14317,36 @@ CvUnit* CvUnit::DoUpgradeTo(UnitTypes eUnitType, bool bFree)
 
 #if defined(MOD_EVENTS_UNIT_UPGRADES)
 		// MUST call the event before convert() as that kills the old unit
-		if (MOD_EVENTS_UNIT_UPGRADES) {
-			GAMEEVENTINVOKE_HOOK(GAMEEVENT_UnitUpgraded, getOwner(), GetID(), pNewUnit->GetID(), false);
-		} else {
-#endif
-		ICvEngineScriptSystem1* pkScriptSystem = gDLL->GetScriptSystem();
-		if (pkScriptSystem) 
+		if (MOD_EVENTS_UNIT_UPGRADES)
 		{
-			CvLuaArgsHandle args;
-			args->Push(((int)getOwner()));
-			args->Push(GetID());
-			args->Push(pNewUnit->GetID());
-			args->Push(false); // bGoodyHut
-
-			bool bResult;
-			LuaSupport::CallHook(pkScriptSystem, "UnitUpgraded", args.get(), bResult);
+			GAMEEVENTINVOKE_HOOK(GAMEEVENT_UnitUpgraded, getOwner(), GetID(), pNewUnit->GetID(), false);
 		}
+		else
+		{
+#endif
+			ICvEngineScriptSystem1* pkScriptSystem = gDLL->GetScriptSystem();
+			if (pkScriptSystem) 
+			{
+				CvLuaArgsHandle args;
+				args->Push(((int)getOwner()));
+				args->Push(GetID());
+				args->Push(pNewUnit->GetID());
+				args->Push(false); // bGoodyHut
+
+				bool bResult;
+				LuaSupport::CallHook(pkScriptSystem, "UnitUpgraded", args.get(), bResult);
+			}
 #if defined(MOD_EVENTS_UNIT_UPGRADES)
+		}
+#endif
+#if defined(MOD_BALANCE_CORE)
+		if(isCultureFromExperienceDisbandUpgrade())
+		{
+			int iExperience = getExperienceTimes100() / 100;
+			if(iExperience > 0)
+			{
+				GET_PLAYER(getOwner()).changeJONSCulture(iExperience);
+			}
 		}
 #endif
 		pNewUnit->convert(this, true);
@@ -13906,17 +14354,22 @@ CvUnit* CvUnit::DoUpgradeTo(UnitTypes eUnitType, bool bFree)
 		
 		// Can't move after upgrading
 #if defined(MOD_GLOBAL_MOVE_AFTER_UPGRADE)
-		if (MOD_GLOBAL_MOVE_AFTER_UPGRADE && pNewUnit->getUnitInfo().CanMoveAfterUpgrade()) {
+		if (MOD_GLOBAL_MOVE_AFTER_UPGRADE && pNewUnit->getUnitInfo().CanMoveAfterUpgrade())
+		{
 			pNewUnit->setSetUpForRangedAttack(isSetUpForRangedAttack());
 			pNewUnit->m_iAttacksMade = m_iAttacksMade;
 			pNewUnit->m_iMadeInterceptionCount = m_iMadeInterceptionCount;
 			pNewUnit->m_eActivityType = m_eActivityType;
-			if (IsFortifiedThisTurn()) {
+			if (IsFortifiedThisTurn())
+			{
 				pNewUnit->SetFortifiedThisTurn(true);
-			} else {
+			}
+			else
+			{
 				pNewUnit->setFortifyTurns(getFortifyTurns());
 			}
-		} else 
+		}
+		else 
 #endif
 		pNewUnit->finishMoves();
 
@@ -14011,10 +14464,19 @@ UnitTypes CvUnit::getCaptureUnitType(CivilizationTypes eCivilization) const
 
 
 //	--------------------------------------------------------------------------------
-UnitCombatTypes CvUnit::getUnitCombatType() const
+int CvUnit::getUnitCombatType() const
 {
 	VALIDATE_OBJECT
-	return ((UnitCombatTypes)(m_pUnitInfo->GetUnitCombatType()));
+	return m_eCombatType;
+}
+
+void CvUnit::setUnitCombatType(UnitCombatTypes eCombat)
+{
+	VALIDATE_OBJECT
+	if(getUnitCombatType() != eCombat)
+	{
+		m_eCombatType = eCombat;
+	}
 }
 
 #if defined(MOD_GLOBAL_PROMOTION_CLASSES)
@@ -14028,16 +14490,31 @@ UnitCombatTypes CvUnit::getUnitPromotionType() const
 
 bool CvUnit::isNativeDomain(const CvPlot* pPlot) const
 {
+#if defined(MOD_SHIPS_FIRE_IN_CITIES_IMPROVEMENTS)
+	ImprovementTypes eImprovement = pPlot->getImprovementType();
+	CvImprovementEntry* pkImprovementInfo = GC.getImprovementInfo(eImprovement);
+#endif
 	switch (getDomainType())
 	{
 	case DOMAIN_LAND:
-		return (!pPlot->isWater() || IsHoveringUnit()) && !isCargo();
+		return !pPlot->isWater() || IsHoveringUnit() || isCargo();
 		break;
 	case DOMAIN_AIR:
 		return true;
 		break;
 	case DOMAIN_SEA:
-		return pPlot->isWater();
+#if defined(MOD_SHIPS_FIRE_IN_CITIES_IMPROVEMENTS)
+		if(MOD_SHIPS_FIRE_IN_CITIES_IMPROVEMENTS)
+		{
+			return (pPlot->isWater() || pPlot->isCity() || (pkImprovementInfo != NULL && pkImprovementInfo->IsMakesPassable()));
+		}
+		else
+		{
+			return (pPlot->isWater());
+		}
+#else
+		return (pPlot->isWater());
+#endif
 		break;
 	case DOMAIN_HOVER:
 		return true;
@@ -14378,7 +14855,7 @@ bool CvUnit::canBuildRoute() const
 BuildTypes CvUnit::getBuildType() const
 {
 	VALIDATE_OBJECT
-	const MissionQueueNode* pkMissionNode = HeadMissionQueueNode();
+	const MissionData* pkMissionNode = HeadMissionData();
 	if(pkMissionNode != NULL)
 	{
 		if(pkMissionNode->eMissionType == CvTypes::getMISSION_ROUTE_TO())
@@ -14572,41 +15049,38 @@ bool CvUnit::canCoexistWithEnemyUnit(TeamTypes eTeam) const
 {
 	VALIDATE_OBJECT
 	if(NO_TEAM == eTeam)
-	{
 		return false;
-	}
+
+	if (isDelayedDeath())
+		return true;
 
 	if(isInvisible(eTeam, false))
-	{
 		return true;
-	}
 
 	return false;
 }
 
-
 //	--------------------------------------------------------------------------------
-int CvUnit::getMustSetUpToRangedAttackCount() const
+int CvUnit::getIsSlowInEnemyLandCount() const
 {
 	VALIDATE_OBJECT
-	return m_iMustSetUpToRangedAttackCount;
+	return m_iIsSlowInEnemyLandCount;
 }
 
 //	--------------------------------------------------------------------------------
-bool CvUnit::isMustSetUpToRangedAttack() const
+bool CvUnit::isSlowInEnemyLand() const
 {
 	VALIDATE_OBJECT
-	return getMustSetUpToRangedAttackCount() > 0;
+	return getIsSlowInEnemyLandCount() > 0;
 }
 
 //	--------------------------------------------------------------------------------
-void CvUnit::changeMustSetUpToRangedAttackCount(int iChange)
+void CvUnit::changeIsSlowInEnemyLandCount(int iChange)
 {
 	VALIDATE_OBJECT
-	m_iMustSetUpToRangedAttackCount = (m_iMustSetUpToRangedAttackCount + iChange);
-	CvAssert(getMustSetUpToRangedAttackCount() >= 0);
+	m_iIsSlowInEnemyLandCount = (m_iIsSlowInEnemyLandCount + iChange);
+	CvAssert(getIsSlowInEnemyLandCount() >= 0);
 }
-
 
 //	--------------------------------------------------------------------------------
 int CvUnit::getRangedSupportFireCount() const
@@ -14795,6 +15269,12 @@ int CvUnit::GetBaseCombatStrengthConsideringDamage() const
 
 	// Mod (Policies, etc.) - lower means Units are less bothered by damage
 	iWoundedDamageMultiplier += GET_PLAYER(getOwner()).GetWoundedUnitDamageMod();
+#if defined(MOD_BALANCE_CORE)
+	if (IsStrongerDamaged() && iWoundedDamageMultiplier != 0)
+	{
+		iWoundedDamageMultiplier += GC.getTRAIT_WOUNDED_DAMAGE_MOD();
+	}
+#endif
 
 	int iStrength = GetMaxAttackStrength(NULL,NULL,NULL) / 100;
 
@@ -14839,32 +15319,34 @@ int CvUnit::GetGenericMaxStrengthModifier(const CvUnit* pOtherUnit, const CvPlot
 		iModifier += GetUnhappinessCombatPenalty();
 	}
 
-#if defined(MOD_BALANCE_CORE_DIPLOMACY_ADVANCED)
-	if(MOD_BALANCE_CORE_DIPLOMACY_ADVANCED)
+#if defined(MOD_BALANCE_CORE_MILITARY)
+	if (!MOD_BALANCE_CORE_MILITARY)
 	{
-		// units cannot heal anymore, but strength is unaffected
-	}
-	else
-	{
-#endif
 	// Over our strategic resource limit?
 	iTempModifier = GetStrategicResourceCombatPenalty();
-	if(iTempModifier != 0)
+	if (iTempModifier != 0)
 		iModifier += iTempModifier;
-#if defined(MOD_BALANCE_CORE_DIPLOMACY_ADVANCED)
+#endif
+#if defined(MOD_BALANCE_CORE_MILITARY)
 	}
 #endif
-
 	if (pFromPlot == NULL)
 	{
 		pFromPlot = plot();
 	}
-
 	// Great General nearby
-	if (IsNearGreatGeneral(pFromPlot) && !IsIgnoreGreatGeneralBenefit())
+#if defined(MOD_PROMOTIONS_AURA_CHANGE)
+	int iAuraEffectChange = 0;
+	if(IsNearGreatGeneral(iAuraEffectChange) && !IsIgnoreGreatGeneralBenefit() && !bIgnoreUnitAdjacency)
+#else
+	if(IsNearGreatGeneral() && !IsIgnoreGreatGeneralBenefit())
+#endif
 	{
 		iModifier += kPlayer.GetGreatGeneralCombatBonus();
 		iModifier += kPlayer.GetPlayerTraits()->GetGreatGeneralExtraBonus();
+#if defined(MOD_PROMOTIONS_AURA_CHANGE)
+		iModifier += iAuraEffectChange;
+#endif
 
 		if (IsStackedGreatGeneral(pFromPlot))
 		{
@@ -14881,24 +15363,7 @@ int CvUnit::GetGenericMaxStrengthModifier(const CvUnit* pOtherUnit, const CvPlot
 			int iCSBonus = GET_PLAYER(eAlly).GetPlayerTraits()->GetAllianceCSStrength();
 			if(iCSBonus > 0)
 			{
-				int iNumAllies = 0;
-				// Loop through all minors and get the total number we've met.
-				for(int iPlayerLoop = 0; iPlayerLoop < MAX_CIV_PLAYERS; iPlayerLoop++)
-				{
-					PlayerTypes eMinor = (PlayerTypes) iPlayerLoop;
-
-					if (GET_PLAYER(eMinor).isAlive() && GET_PLAYER(eMinor).isMinorCiv())
-					{
-						if (GET_PLAYER(eMinor).GetMinorCivAI()->IsAllies(eAlly))
-						{
-							iNumAllies++;
-							if(iNumAllies >= GC.getBALANCE_MAX_CS_ALLY_STRENGTH())
-							{
-								break;
-							}
-						}
-					}
-				}
+				int iNumAllies = GET_PLAYER(eAlly).GetNumCSAllies();
 				if(iNumAllies > GC.getBALANCE_MAX_CS_ALLY_STRENGTH())
 				{
 					iNumAllies = GC.getBALANCE_MAX_CS_ALLY_STRENGTH();
@@ -14912,24 +15377,7 @@ int CvUnit::GetGenericMaxStrengthModifier(const CvUnit* pOtherUnit, const CvPlot
 		int iCSBonus = GET_PLAYER(getOwner()).GetPlayerTraits()->GetAllianceCSStrength();
 		if(iCSBonus > 0)
 		{
-			int iNumAllies = 0;
-			// Loop through all minors and get the total number we've met.
-			for(int iPlayerLoop = 0; iPlayerLoop < MAX_CIV_PLAYERS; iPlayerLoop++)
-			{
-				PlayerTypes eMinor = (PlayerTypes) iPlayerLoop;
-
-				if (GET_PLAYER(eMinor).isAlive() && GET_PLAYER(eMinor).isMinorCiv())
-				{
-					if (GET_PLAYER(eMinor).GetMinorCivAI()->IsAllies(getOwner()))
-					{
-						iNumAllies++;
-						if(iNumAllies >= GC.getBALANCE_MAX_CS_ALLY_STRENGTH())
-						{
-							break;
-						}
-					}
-				}
-			}
+			int iNumAllies = GET_PLAYER(getOwner()).GetNumCSAllies();
 			if(iNumAllies > GC.getBALANCE_MAX_CS_ALLY_STRENGTH())
 			{
 				iNumAllies = GC.getBALANCE_MAX_CS_ALLY_STRENGTH();
@@ -14952,6 +15400,12 @@ int CvUnit::GetGenericMaxStrengthModifier(const CvUnit* pOtherUnit, const CvPlot
 	if(iNearbyImprovementModifier != 0)
 	{
 		iModifier += iNearbyImprovementModifier;
+	}
+	// UnitClass grants a combat bonus if nearby
+	int iNearbyUnitClassModifier = GetNearbyUnitClassModifierFromUnitClass(pFromPlot);
+	if(iNearbyUnitClassModifier != 0)
+	{
+		iModifier += iNearbyUnitClassModifier;
 	}
 
 	// Adjacent Friendly military Unit?
@@ -15004,11 +15458,23 @@ int CvUnit::GetGenericMaxStrengthModifier(const CvUnit* pOtherUnit, const CvPlot
 			iModifier += iTempModifier;
 
 			// Bonus against city states?
-			if(pBattlePlot->isCity() && GET_PLAYER(pBattlePlot->getOwner()).isMinorCiv())
+			if(pBattlePlot->isCity() && pBattlePlot->getOwner()!=NO_PLAYER && GET_PLAYER(pBattlePlot->getOwner()).isMinorCiv())
 			{
 				iModifier += kPlayer.GetPlayerTraits()->GetCityStateCombatModifier();
+#if defined(MOD_BALANCE_CORE)
+				iModifier += kPlayer.GetCityStateCombatModifier();
+#endif
 			}
-
+#if defined(MOD_BALANCE_CORE)
+			// Bonus against Major Civ Cities
+			if(pBattlePlot->isCity() && pBattlePlot->getOwner()!=NO_PLAYER && GET_PLAYER(pBattlePlot->getOwner()).isMajorCiv())
+			{
+				if(kPlayer.isGoldenAge())
+				{
+					iModifier += kPlayer.GetPlayerTraits()->GetConquestOfTheWorldCityAttack();
+				}
+			}
+#endif
 			// Founder Belief bonus (this must be a city controlled by an enemy)
 			CvCity* pPlotCity = pBattlePlot->getWorkingCity();
 			if(pPlotCity)
@@ -15034,15 +15500,11 @@ int CvUnit::GetGenericMaxStrengthModifier(const CvUnit* pOtherUnit, const CvPlot
 		{
 			if(!pOtherUnit->isBarbarian() && !GET_PLAYER(pOtherUnit->getOwner()).isMinorCiv() && pOtherUnit->getOwner() != NO_PLAYER)
 			{
-				ReligionTypes eFoundedReligion = GC.getGame().GetGameReligions()->GetFounderBenefitsReligion(kPlayer.GetID());
-				if(eFoundedReligion == NO_RELIGION)
-				{
-					eFoundedReligion = kPlayer.GetReligions()->GetReligionCreatedByPlayer();
-				}
-				ReligionTypes eTheirReligion = GC.getGame().GetGameReligions()->GetFounderBenefitsReligion(pOtherUnit->getOwner());
+				ReligionTypes eFoundedReligion = GC.getGame().GetGameReligions()->GetReligionCreatedByPlayer(kPlayer.GetID());
+				ReligionTypes eTheirReligion = GC.getGame().GetGameReligions()->GetReligionCreatedByPlayer(pOtherUnit->getOwner());
 				if(eTheirReligion == NO_RELIGION)
 				{
-					eTheirReligion = GET_PLAYER(pOtherUnit->getOwner()).GetReligions()->GetReligionCreatedByPlayer();
+					eTheirReligion = GET_PLAYER(pOtherUnit->getOwner()).GetReligions()->GetReligionInMostCities();
 				} 
 				if(eTheirReligion != NO_RELIGION)
 				{
@@ -15162,7 +15624,7 @@ int CvUnit::GetGenericMaxStrengthModifier(const CvUnit* pOtherUnit, const CvPlot
 		// Unit Combat type Modifier
 		if(pOtherUnit->getUnitCombatType() != NO_UNITCOMBAT)
 		{
-			iTempModifier = unitCombatModifier(pOtherUnit->getUnitCombatType());
+			iTempModifier = unitCombatModifier((UnitCombatTypes)pOtherUnit->getUnitCombatType());
 			iModifier += iTempModifier;
 #if defined(MOD_BALANCE_CORE)
 			CvUnitEntry* pUnitInfo = GC.getUnitInfo(pOtherUnit->getUnitType());
@@ -15182,6 +15644,9 @@ int CvUnit::GetGenericMaxStrengthModifier(const CvUnit* pOtherUnit, const CvPlot
 		if(GET_PLAYER(pOtherUnit->getOwner()).isMinorCiv())
 		{
 			iModifier += kPlayer.GetPlayerTraits()->GetCityStateCombatModifier();
+#if defined(MOD_BALANCE_CORE)
+			iModifier += kPlayer.GetCityStateCombatModifier();
+#endif
 		}
 
 		// OTHER UNIT is a Barbarian
@@ -15241,13 +15706,13 @@ int CvUnit::GetGenericMaxStrengthModifier(const CvUnit* pOtherUnit, const CvPlot
 
 //	--------------------------------------------------------------------------------
 /// What is the max strength of this Unit when attacking?
-int CvUnit::GetMaxAttackStrength(const CvPlot* pFromPlot, const CvPlot* pToPlot, const CvUnit* pDefender) const
+int CvUnit::GetMaxAttackStrength(const CvPlot* pFromPlot, const CvPlot* pToPlot, const CvUnit* pDefender, bool bIgnoreAdjacencyBonus) const
 {
 	VALIDATE_OBJECT
 	if(GetBaseCombatStrength() == 0)
 		return 0;
 
-	int iModifier = GetGenericMaxStrengthModifier(pDefender, pToPlot, /*bIgnoreFlanking*/ false, pFromPlot);
+	int iModifier = GetGenericMaxStrengthModifier(pDefender, pToPlot, bIgnoreAdjacencyBonus, pFromPlot);
 
 	// Generic Attack bonus
 	int iTempModifier = getAttackModifier();
@@ -15272,6 +15737,10 @@ int CvUnit::GetMaxAttackStrength(const CvPlot* pFromPlot, const CvPlot* pToPlot,
 	if(MOD_BALANCE_CORE_MILITARY_PROMOTION_ADVANCED && GET_PLAYER(getOwner()).GetPlayerTraits()->IsFightWellDamaged())
 	{
 		iModifier += (getDamage() / 5);
+	}
+	if (MOD_BALANCE_CORE_MILITARY_PROMOTION_ADVANCED && IsStrongerDamaged())
+	{
+		iModifier += (getDamage() / 3);
 	}
 #endif
 #if defined(MOD_BALANCE_CORE_RESOURCE_MONOPOLIES)
@@ -15433,15 +15902,13 @@ int CvUnit::GetMaxDefenseStrength(const CvPlot* pInPlot, const CvUnit* pAttacker
 {
 	VALIDATE_OBJECT
 
+	//no modifiers for embarked defense
 	if ( (!pInPlot && isEmbarked()) || (pInPlot && pInPlot->needsEmbarkation(this) && CanEverEmbark()) )
-	{
 		return GetEmbarkedUnitDefense();
-	}
 
-	if(GetBaseCombatStrength() == 0)
+	int iCombat = GetBaseCombatStrength();
+	if (iCombat==0)
 		return 0;
-
-	int iCombat;
 
 	int iTempModifier;
 	int iModifier = GetGenericMaxStrengthModifier(pAttacker, pInPlot, /*bIgnoreUnitAdjacency*/ bFromRangedAttack, pInPlot);
@@ -15459,6 +15926,10 @@ int CvUnit::GetMaxDefenseStrength(const CvPlot* pInPlot, const CvUnit* pAttacker
 	if(MOD_BALANCE_CORE_MILITARY_PROMOTION_ADVANCED && GET_PLAYER(getOwner()).GetPlayerTraits()->IsFightWellDamaged())
 	{
 		iModifier += (getDamage() / 5);
+	}
+	if (MOD_BALANCE_CORE_MILITARY_PROMOTION_ADVANCED && IsStrongerDamaged())
+	{
+		iModifier += (getDamage() / 3);
 	}
 #endif
 #if defined(MOD_BALANCE_CORE_RESOURCE_MONOPOLIES)
@@ -15484,7 +15955,7 @@ int CvUnit::GetMaxDefenseStrength(const CvPlot* pInPlot, const CvUnit* pAttacker
 	if(pInPlot != NULL)
 	{
 		// No TERRAIN bonuses for this Unit?
-		iTempModifier = pInPlot->defenseModifier(getTeam(), (pAttacker != NULL) ? pAttacker->ignoreBuildingDefense() : true);
+		iTempModifier = pInPlot->defenseModifier(getTeam(), (pAttacker != NULL) ? pAttacker->ignoreBuildingDefense() : false, false);
 
 		// If we receive normal defensive bonuses OR iTempModifier is actually a PENALTY, then add in the mod
 		if(!noDefensiveBonus() || iTempModifier < 0)
@@ -15560,7 +16031,8 @@ int CvUnit::GetMaxDefenseStrength(const CvPlot* pInPlot, const CvUnit* pAttacker
 	if(iModifier < -90)
 		iModifier = -90;
 
-	iCombat = GetBaseCombatStrength() * (iModifier + 100);
+	// finally apply the modifier
+	iCombat *= (iModifier + 100);
 
 	// Boats do more damage VS one another
 	if(pAttacker != NULL)
@@ -15578,26 +16050,17 @@ int CvUnit::GetMaxDefenseStrength(const CvPlot* pInPlot, const CvUnit* pAttacker
 //	--------------------------------------------------------------------------------
 int CvUnit::GetEmbarkedUnitDefense() const
 {
-	int iRtnValue;
-	int iModifier;
 	CvPlayer& kPlayer = GET_PLAYER(m_eOwner);
 	EraTypes eEra = kPlayer.GetCurrentEra();
 
-	iRtnValue = GC.getEraInfo(eEra)->getEmbarkedUnitDefense() * 100;
+	int iRtnValue = GC.getEraInfo(eEra)->getEmbarkedUnitDefense() * 100 + GetBaseCombatStrength() * 20;
 
-	iModifier = GetEmbarkDefensiveModifier();
+	int iModifier = GetEmbarkDefensiveModifier();
 	if(iModifier > 0)
 	{
 		iRtnValue = iRtnValue * (100 + iModifier);
 		iRtnValue /= 100;
 	}
-#if defined(MOD_BALANCE_CORE_MILITARY_PROMOTION_ADVANCED)
-	if(MOD_BALANCE_CORE_MILITARY_PROMOTION_ADVANCED && !kPlayer.isHuman())
-	{
-		//25% of defense added in. This is largely to help the AI.
-		iRtnValue += (GetBaseCombatStrength()*100) / max(1,GC.getBALANCE_EMBARK_DEFENSE_DIVISOR() );
-	}
-#endif
 
 	return iRtnValue;
 }
@@ -15611,8 +16074,8 @@ int CvUnit::GetResistancePower(const CvUnit* pOtherUnit) const
 
 		if(GET_PLAYER(pOtherUnit->getOwner()).isHuman())
 		{
-			int iMod = (GC.getGame().getHandicapInfo().getAIDifficultyBonus() / 2);
-			iResistance *= (100 + iMod);
+			int iHandicap = GC.getGame().getHandicapInfo().getAIDifficultyBonus() * 5;
+			iResistance *= (100 + iHandicap);
 			iResistance /= 100;
 		}
 		return iResistance;
@@ -15669,7 +16132,7 @@ void CvUnit::SetBaseRangedCombatStrength(int iStrength)
 
 
 //	--------------------------------------------------------------------------------
-int CvUnit::GetMaxRangedCombatStrength(const CvUnit* pOtherUnit, const CvCity* pCity, bool bAttacking, bool bForRangedAttack, const CvPlot* pTargetPlot, const CvPlot* pFromPlot) const
+int CvUnit::GetMaxRangedCombatStrength(const CvUnit* pOtherUnit, const CvCity* pCity, bool bAttacking, bool bForRangedAttack, const CvPlot* pTargetPlot, const CvPlot* pFromPlot, bool bIgnoreAdjacency) const
 {
 	VALIDATE_OBJECT
 
@@ -15747,10 +16210,22 @@ int CvUnit::GetMaxRangedCombatStrength(const CvUnit* pOtherUnit, const CvCity* p
 #endif
 
 	// Great General nearby
-	if (IsNearGreatGeneral(pMyPlot) && !IsIgnoreGreatGeneralBenefit())
+#if defined(MOD_PROMOTIONS_AURA_CHANGE)
+	int iAuraEffectChange = 0;
+	if(IsNearGreatGeneral(iAuraEffectChange) && !IsIgnoreGreatGeneralBenefit() && !bIgnoreAdjacency)
+#else
+	if(IsNearGreatGeneral() && !IsIgnoreGreatGeneralBenefit())
+#endif
 	{
+#if defined(MOD_BUGFIX_MINOR)
+		iModifier += kPlayer.GetGreatGeneralCombatBonus();
+#else
 		iModifier += /*25*/ GC.getGREAT_GENERAL_STRENGTH_MOD();
+#endif
 		iModifier += pTraits->GetGreatGeneralExtraBonus();
+#if defined(MOD_PROMOTIONS_AURA_CHANGE)
+		iModifier += iAuraEffectChange;
+#endif
 
 		if (IsStackedGreatGeneral(pMyPlot))
 		{
@@ -15771,6 +16246,12 @@ int CvUnit::GetMaxRangedCombatStrength(const CvUnit* pOtherUnit, const CvCity* p
 	{
 		iModifier += iNearbyImprovementModifier;
 	}
+	// UnitClass grants a combat bonus if nearby
+	int iNearbyUnitClassModifier = GetNearbyUnitClassModifierFromUnitClass();
+	if(iNearbyUnitClassModifier != 0)
+	{
+		iModifier += iNearbyUnitClassModifier;
+	}
 
 	// Our empire fights well in Golden Ages?
 	if(kPlayer.isGoldenAge())
@@ -15778,9 +16259,13 @@ int CvUnit::GetMaxRangedCombatStrength(const CvUnit* pOtherUnit, const CvCity* p
 
 #if defined(MOD_BALANCE_CORE_MILITARY_PROMOTION_ADVANCED)
 	//If Japan, you should get stronger as you lose health.
-	if(MOD_BALANCE_CORE_MILITARY_PROMOTION_ADVANCED && GET_PLAYER(getOwner()).GetPlayerTraits()->IsFightWellDamaged())
+	if (MOD_BALANCE_CORE_MILITARY_PROMOTION_ADVANCED && GET_PLAYER(getOwner()).GetPlayerTraits()->IsFightWellDamaged())
 	{
 		iModifier += (getDamage() / 5);
+	}
+	if (MOD_BALANCE_CORE_MILITARY_PROMOTION_ADVANCED && IsStrongerDamaged())
+	{
+		iModifier += (getDamage() / 3);
 	}
 #endif
 #if defined(MOD_BALANCE_CORE_RESOURCE_MONOPOLIES)
@@ -15878,7 +16363,7 @@ int CvUnit::GetMaxRangedCombatStrength(const CvUnit* pOtherUnit, const CvCity* p
 
 		// Unit combat modifier VS other unit
 		if(pOtherUnit->getUnitCombatType() != NO_UNITCOMBAT)
-			iModifier += unitCombatModifier(pOtherUnit->getUnitCombatType());
+			iModifier += unitCombatModifier((UnitCombatTypes)pOtherUnit->getUnitCombatType());
 
 		// Domain modifier VS other unit
 		iModifier += domainModifier(pOtherUnit->getDomainType());
@@ -15895,6 +16380,9 @@ int CvUnit::GetMaxRangedCombatStrength(const CvUnit* pOtherUnit, const CvCity* p
 		if(GET_PLAYER(pOtherUnit->getOwner()).isMinorCiv())
 		{
 			iModifier += pTraits->GetCityStateCombatModifier();
+#if defined(MOD_BALANCE_CORE)
+			iModifier += kPlayer.GetCityStateCombatModifier();
+#endif
 		}
 
 		// OTHER UNIT is a Barbarian
@@ -15968,7 +16456,20 @@ int CvUnit::GetMaxRangedCombatStrength(const CvUnit* pOtherUnit, const CvCity* p
 		if(GET_PLAYER(pCity->getOwner()).isMinorCiv())
 		{
 			iModifier += pTraits->GetCityStateCombatModifier();
+#if defined(MOD_BALANCE_CORE)
+			iModifier += kPlayer.GetCityStateCombatModifier();
+#endif
 		}
+#if defined(MOD_BALANCE_CORE)
+		// Bonus against Major Civ Cities
+		if(GET_PLAYER(pCity->getOwner()).isMajorCiv())
+		{
+			if(kPlayer.isGoldenAge())
+			{
+				iModifier += pTraits->GetConquestOfTheWorldCityAttack();
+			}
+		}
+#endif
 	}
 
 	// Ranged attack mod
@@ -15991,7 +16492,7 @@ int CvUnit::GetMaxRangedCombatStrength(const CvUnit* pOtherUnit, const CvCity* p
 	else
 	{
 		// No TERRAIN bonuses for this Unit?
-		iTempModifier = pMyPlot->defenseModifier(getTeam(), false);
+		iTempModifier = pMyPlot->defenseModifier(getTeam(), pOtherUnit ? pOtherUnit->ignoreBuildingDefense() : false, false);
 
 		// If we receive normal defensive bonuses OR iTempModifier is actually a PENALTY, then add in the mod
 		if(!noDefensiveBonus() || iTempModifier < 0)
@@ -16162,7 +16663,7 @@ int CvUnit::GetAirCombatDamage(const CvUnit* pDefender, CvCity* pCity, bool bInc
 
 
 //	--------------------------------------------------------------------------------
-int CvUnit::GetRangeCombatDamage(const CvUnit* pDefender, CvCity* pCity, bool bIncludeRand, int iAssumeExtraDamage, const CvPlot* pTargetPlot, const CvPlot* pFromPlot) const
+int CvUnit::GetRangeCombatDamage(const CvUnit* pDefender, CvCity* pCity, bool bIncludeRand, int iAssumeExtraDamage, const CvPlot* pTargetPlot, const CvPlot* pFromPlot, bool bIgnoreAdjacency) const
 {
 	VALIDATE_OBJECT
 	if (pFromPlot == NULL)
@@ -16181,7 +16682,7 @@ int CvUnit::GetRangeCombatDamage(const CvUnit* pDefender, CvCity* pCity, bool bI
 		}
 	}
 
-	int iAttackerStrength = GetMaxRangedCombatStrength(pDefender, pCity, true, /*bForRangedAttack*/ true, pTargetPlot, pFromPlot);
+	int iAttackerStrength = GetMaxRangedCombatStrength(pDefender, pCity, true, /*bForRangedAttack*/ true, pTargetPlot, pFromPlot, bIgnoreAdjacency);
 	if (iAttackerStrength==0)
 		return 0;
 
@@ -16201,26 +16702,18 @@ int CvUnit::GetRangeCombatDamage(const CvUnit* pDefender, CvCity* pCity, bool bI
 		if (!pDefender->IsCanDefend(pTargetPlot))
 			return /*4*/ GC.getNONCOMBAT_UNIT_RANGED_DAMAGE();
 
-		if (pDefender->CanEverEmbark() && pTargetPlot && pTargetPlot->needsEmbarkation(pDefender))
+		// Use Ranged combat value for defender (except impi)
+		if (pDefender->isRanged() && !pDefender->isRangedSupportFire())
 		{
-			iDefenderStrength = pDefender->GetEmbarkedUnitDefense();
-		}
-		// Use Ranged combat value for defender, UNLESS it's a boat or an Impi (ranged support)
-#if defined(MOD_BALANCE_CORE)
-		//Correction - make this apply to all ranged units, naval too.
-		else if (!pDefender->isRangedSupportFire() && pDefender->isRanged())
-#else
-		else if (!pDefender->isRangedSupportFire() && pDefender->getDomainType() != DOMAIN_SEA)
-#endif
-		{
-			iDefenderStrength = pDefender->GetMaxRangedCombatStrength(this, /*pCity*/ NULL, false, false, pTargetPlot, pFromPlot);
-			if (iDefenderStrength==0)
-				iDefenderStrength = pDefender->GetMaxDefenseStrength(pTargetPlot, this, /*bFromRangedAttack*/ true);
+			//have to consider embarkation explicitly
+			if ( (!pTargetPlot && pDefender->isEmbarked()) || (pTargetPlot && pTargetPlot->needsEmbarkation(pDefender) && pDefender->CanEverEmbark()) )
+				iDefenderStrength = GetEmbarkedUnitDefense();
+			else
+				iDefenderStrength = pDefender->GetMaxRangedCombatStrength(this, /*pCity*/ NULL, false, false, pTargetPlot, pFromPlot);
 		}
 		else
-		{
+			//this considers embarkation implicitly
 			iDefenderStrength = pDefender->GetMaxDefenseStrength(pTargetPlot, this, /*bFromRangedAttack*/ true);
-		}
 	}
 	else
 	{
@@ -16234,7 +16727,12 @@ int CvUnit::GetRangeCombatDamage(const CvUnit* pDefender, CvCity* pCity, bool bI
 	int iWoundedDamageMultiplier = /*50*/ GC.getWOUNDED_DAMAGE_MULTIPLIER();
 	iWoundedDamageMultiplier += kPlayer.GetWoundedUnitDamageMod();
 
-
+#if defined(MOD_BALANCE_CORE)
+	if (IsStrongerDamaged() && iWoundedDamageMultiplier != 0)
+	{
+		iWoundedDamageMultiplier += GC.getTRAIT_WOUNDED_DAMAGE_MOD();
+	}
+#endif
 	int iAttackerDamageRatio = GC.getMAX_HIT_POINTS() - ((getDamage() - iAssumeExtraDamage) * iWoundedDamageMultiplier / 100);
 	if(iAttackerDamageRatio < 0)
 		iAttackerDamageRatio = 0;
@@ -16246,7 +16744,14 @@ int CvUnit::GetRangeCombatDamage(const CvUnit* pDefender, CvCity* pCity, bool bI
 	int iAttackerRoll = 0;
 	if(bIncludeRand)
 	{
-		iAttackerRoll = /*300*/ GC.getGame().getJonRandNum(GC.getRANGE_ATTACK_SAME_STRENGTH_POSSIBLE_EXTRA_DAMAGE(), "Unit Ranged Combat Damage");
+		if (isBarbarian())
+		{
+			iAttackerRoll = /*300*/ GC.getGame().getSmallFakeRandNum(10, GetID()) * 120;
+		}
+		else
+		{
+			iAttackerRoll = /*300*/ GC.getGame().getJonRandNum(GC.getRANGE_ATTACK_SAME_STRENGTH_POSSIBLE_EXTRA_DAMAGE(), "Unit Ranged Combat Damage");
+		}
 		iAttackerRoll *= iAttackerDamageRatio;
 		iAttackerRoll /= GC.getMAX_HIT_POINTS();
 	}
@@ -17033,7 +17538,37 @@ void CvUnit::SetCombatBonusImprovement(ImprovementTypes eImprovement)
 	m_eCombatBonusImprovement = eImprovement;
 }
 #endif
+#if defined(MOD_BALANCE_CORE)
+int CvUnit::GetNearbyUnitClassBonus() const
+{
+	return m_iNearbyUnitClassBonus;
+}
 
+void CvUnit::SetNearbyUnitClassBonus(int iCombatBonus)
+{
+	m_iNearbyUnitClassBonus = iCombatBonus;
+}
+
+int CvUnit::GetNearbyUnitClassBonusRange() const
+{
+	return m_iNearbyUnitClassBonusRange;
+}
+
+void CvUnit::SetNearbyUnitClassBonusRange(int iBonusRange)
+{
+	m_iNearbyUnitClassBonusRange = iBonusRange;
+}
+
+UnitClassTypes CvUnit::GetCombatBonusFromNearbyUnitClass() const
+{
+	return m_iCombatBonusFromNearbyUnitClass;
+}
+
+void CvUnit::SetCombatBonusFromNearbyUnitClass(UnitClassTypes eUnitClass)
+{
+	m_iCombatBonusFromNearbyUnitClass = eUnitClass;
+}
+#endif
 #if defined(MOD_PROMOTIONS_CROSS_MOUNTAINS)
 //	--------------------------------------------------------------------------------
 bool CvUnit::canCrossMountains() const
@@ -17172,6 +17707,31 @@ void CvUnit::ChangeGainsXPFromScouting(int iValue)
 		m_iGainsXPFromScouting += iValue;
 	}
 }
+#if defined(MOD_PROMOTIONS_GG_FROM_BARBARIANS)
+//	--------------------------------------------------------------------------------
+bool CvUnit::isGGFromBarbarians() const
+{
+	VALIDATE_OBJECT
+	return GET_PLAYER(getOwner()).GetPlayerTraits()->IsGGFromBarbarians() || (MOD_PROMOTIONS_GG_FROM_BARBARIANS && getGGFromBarbariansCount() > 0);
+}
+
+//	--------------------------------------------------------------------------------
+int CvUnit::getGGFromBarbariansCount() const
+{
+	VALIDATE_OBJECT
+	return m_iGGFromBarbariansCount;
+}
+
+//	--------------------------------------------------------------------------------
+void CvUnit::changeGGFromBarbariansCount(int iValue)
+{
+	VALIDATE_OBJECT
+	if(iValue != 0)
+	{
+		m_iGGFromBarbariansCount += iValue;
+	}
+}
+#endif
 //	--------------------------------------------------------------------------------
 int CvUnit::GetBarbarianCombatBonus() const
 {
@@ -17671,7 +18231,7 @@ int CvUnit::withdrawalProbability() const
 /// How many enemy Units are adjacent to this guy?
 int CvUnit::GetNumEnemyUnitsAdjacent(const CvUnit* pUnitToExclude) const
 {
-	return plot()->GetNumEnemyUnitsAdjacent( getTeam(), getDomainType(), pUnitToExclude);
+	return plot()->GetNumEnemyUnitsAdjacent( getTeam(), plot()->getDomain(), pUnitToExclude);
 }
 
 //	--------------------------------------------------------------------------------
@@ -18054,8 +18614,47 @@ int CvUnit::cargoSpaceAvailable(SpecialUnitTypes eSpecialCargo, DomainTypes eDom
 			return 0;
 		}
 	}
-
+#if defined(MOD_CARGO_SHIPS)
+	if(MOD_CARGO_SHIPS)
+	{
+		IDInfo* pUnitNode;
+		CvUnit* pLoopUnit;
+		CvPlot* pPlot;
+		if(domainCargo() == DOMAIN_LAND)
+		{
+			pPlot = plot();
+			pUnitNode = pPlot->headUnitNode();
+			while (pUnitNode != NULL)
+			{
+				pLoopUnit = ::getUnit(*pUnitNode);
+				pUnitNode = pPlot->nextUnitNode(pUnitNode);
+				if(pLoopUnit != NULL)
+				{
+					CvPlot* pAdjacentPlot;
+					int iI;
+					for(iI = 0; iI < NUM_DIRECTION_TYPES; ++iI)
+					{
+						pAdjacentPlot = plotDirection(getX(), getY(), ((DirectionTypes)iI));
+						if(pAdjacentPlot != NULL)
+						{
+							if(pLoopUnit->isCargo() && pLoopUnit->IsCanAttackWithMove() && pLoopUnit->canMoveInto(*pAdjacentPlot, MOVEFLAG_ATTACK))
+							{
+								return std::max(0, (cargoSpace() - getCargo() + 1));
+							}
+						}
+					}
+				}
+			}
+			return std::max(0, (cargoSpace() - getCargo()));
+		}
+		else
+ 			return std::max(0, (cargoSpace() - getCargo()));
+	}
+	else
+		return std::max(0, (cargoSpace() - getCargo()));
+#else
 	return std::max(0, (cargoSpace() - getCargo()));
+#endif
 }
 
 
@@ -18162,11 +18761,11 @@ bool CvUnit::IsHasNoValidMove() const
 	}
 
 	ReachablePlots plots;
-	TacticalAIHelpers::GetAllPlotsInReach(this,plot(),plots,true,true,false);
+	TacticalAIHelpers::GetAllPlotsInReachThisTurn(this,plot(),plots,true,true,false);
 
 	for (ReachablePlots::const_iterator it=plots.begin(); it!=plots.end(); ++it)
 	{
-		CvPlot* pToPlot = GC.getMap().plotByIndexUnchecked(it->first);
+		CvPlot* pToPlot = GC.getMap().plotByIndexUnchecked(it->iPlotIndex);
 
 	#if defined(MOD_GLOBAL_STACKING_RULES)
 		if(pToPlot->getMaxFriendlyUnitsOfType(this) >= pToPlot->getUnitLimit())
@@ -18284,10 +18883,14 @@ void CvUnit::setXY(int iX, int iY, bool bGroup, bool bUpdate, bool bShow, bool b
 
 	eOldActivityType = GetActivityType();
 
+	/* ---------
+	// no longer used!
+	// ---------
 	if(isSetUpForRangedAttack())
 	{
 		setSetUpForRangedAttack(false);
 	}
+	*/
 
 	if(!bGroup || isCargo())
 	{
@@ -18394,15 +18997,18 @@ void CvUnit::setXY(int iX, int iY, bool bGroup, bool bUpdate, bool bShow, bool b
 										bool bDoEvade = false;
 										if(pLoopUnit->IsCivilianUnit() && pLoopUnit->getExtraWithdrawal() > 0 && pLoopUnit->CanWithdrawFromMelee(*this))
 										{
-											bDoEvade = true;
-											pLoopUnit->DoWithdrawFromMelee(*this);
-											strMessage = Localization::Lookup("TXT_KEY_UNIT_WITHDREW_DETAILED_PIONEER");
-											strMessage << pLoopUnit->getUnitInfo().GetTextKey();
-											strSummary = Localization::Lookup("TXT_KEY_UNIT_WITHDREW_PIONEER");
+											if(!pLoopUnit->isEmbarked())
+											{
+												bDoEvade = true;
+												pLoopUnit->DoWithdrawFromMelee(*this);
+												strMessage = Localization::Lookup("TXT_KEY_UNIT_WITHDREW_DETAILED_PIONEER");
+												strMessage << pLoopUnit->getUnitInfo().GetTextKey();
+												strSummary = Localization::Lookup("TXT_KEY_UNIT_WITHDREW_PIONEER");
 
-											CvNotifications* pNotification = GET_PLAYER(pLoopUnit->getOwner()).GetNotifications();
-											if(pNotification)
-											pNotification->Add(NOTIFICATION_GENERIC, strMessage.toUTF8(), strSummary.toUTF8(), pLoopUnit->getX(), pLoopUnit->getY(), (int) pLoopUnit->getUnitType(), pLoopUnit->getOwner());
+												CvNotifications* pNotification = GET_PLAYER(pLoopUnit->getOwner()).GetNotifications();
+												if(pNotification)
+												pNotification->Add(NOTIFICATION_GENERIC, strMessage.toUTF8(), strSummary.toUTF8(), pLoopUnit->getX(), pLoopUnit->getY(), (int) pLoopUnit->getUnitType(), pLoopUnit->getOwner());
+											}
 
 										}
 #endif
@@ -18598,52 +19204,67 @@ if (!bDoEvade)
 			GC.getMap().plotManager().AddUnit(GetIDInfo(), iX, iY, iMapLayer);
 		}
 #if defined(MOD_BALANCE_CORE)
-		bool bZero = false;
-		if(IsGainsXPFromScouting())
+		if(IsCombatUnit())
 		{
-#if defined(MOD_UNITS_XP_TIMES_100)
-			if(getExperienceTimes100() <= (GC.getBALANCE_SCOUT_XP_MAXIMUM() * 100))
-#else
-			if(getExperience() <= GC.getBALANCE_SCOUT_XP_MAXIMUM())
-#endif
+			pUnitNode = pNewPlot->headUnitNode();
+			while(pUnitNode != NULL)
 			{
-				int iExperience = GC.getBALANCE_SCOUT_XP_BASE();
-				iExperience += GetNumTilesRevealedThisTurn();
-				iExperience /= 6;
-				if(iExperience > 0)
+				pLoopUnit = ::getUnit(*pUnitNode);
+				pUnitNode = pNewPlot->nextUnitNode(pUnitNode);
+				if (pLoopUnit != NULL)
 				{
-					//Up to max barb value - rest has to come through combat!
-#if defined(MOD_UNITS_XP_TIMES_100)
-					changeExperienceTimes100(iExperience * 100);
-#else
-					changeExperience(iExperience);
+#if defined(MOD_GLOBAL_STACKING_RULES)
+					if(MOD_GLOBAL_STACKING_RULES)
+					{
+						if(pLoopUnit->IsStackingUnit())
+						{
+							if(pNewPlot->GetNumCombatUnits()>1)
+							{
+								pLoopUnit->SetBaseCombatStrength(pLoopUnit->getUnitInfo().GetCombat() + pLoopUnit->getUnitInfo().StackCombat());
+							}
+							else
+							{
+								pLoopUnit->SetBaseCombatStrength(pLoopUnit->getUnitInfo().GetCombat());
+							}
+						}
+					}
 #endif
-					bZero = true;
 				}
 			}
 		}
-		if(IsGainsYieldFromScouting())
+		DoNearbyUnitPromotion(this, pNewPlot);
+		if(isConvertUnit())
 		{
-			bool bSea = false;
-			if(getDomainType() == DOMAIN_SEA)
+			CvUnit* pConvertUnit = NULL;
+			for (int iI = 0; iI < GC.getNumPromotionInfos(); iI++)
 			{
-				bSea = true;
+				const PromotionTypes eLoopPromotion = static_cast<PromotionTypes>(iI);
+				CvPromotionEntry* pkPromotionInfo = GC.getPromotionInfo(eLoopPromotion);
+				if(pkPromotionInfo)
+				{
+					if(pkPromotionInfo->GetConvertDomainUnit() != NO_UNIT)
+					{
+						if((pNewPlot->getDomain() == pkPromotionInfo->GetConvertDomain()) && (this->isHasPromotion(eLoopPromotion)) && (pkPromotionInfo->getRequiredUnit() == this->getUnitType()))
+						{
+							UnitAITypes eAIType = NO_UNITAI;
+							const CvUnitEntry* pkUnitType = GC.getUnitInfo(pkPromotionInfo->GetConvertDomainUnit());
+							if(pkUnitType != NULL)
+							{
+								eAIType = (UnitAITypes)pkUnitType->GetDefaultUnitAIType();
+								CvUnit* pNewUnit = GET_PLAYER(getOwner()).initUnit(pkPromotionInfo->GetConvertDomainUnit(), this->getX(), this->getY(), eAIType, NO_DIRECTION, false, false, 0, 0, NO_CONTRACT, false);
+								pConvertUnit = pNewUnit;
+							}
+						}
+					}
+				}
 			}
-			CvCity* pCity = GC.getMap().findCity(getX(), getY(), getOwner(), getTeam());
-
-			if(pCity == NULL)
+			if(pConvertUnit != NULL)
 			{
-				pCity = GET_PLAYER(getOwner()).getCapitalCity();
+				this->setEmbarked(false);
+				pConvertUnit->convert(this, true);
+				pConvertUnit->setupGraphical();
+				pConvertUnit->finishMoves();
 			}
-			if(pCity != NULL)
-			{
-				GET_PLAYER(getOwner()).doInstantYield(INSTANT_YIELD_TYPE_SCOUTING, false, NO_GREATPERSON, NO_BUILDING, 0, false, NO_PLAYER, NULL, false, pCity, bSea, true, false, NO_YIELD, this);
-				bZero = true;
-			}
-		}
-		if(bZero)
-		{
-			SetNumTilesRevealedThisTurn(0);
 		}
 #endif
 		// Moving into a City (friend or foe)
@@ -18744,7 +19365,76 @@ if (!bDoEvade)
 		{
 			load();
 		}
+#if defined(MOD_CARGO_SHIPS)
+		if(IsCombatUnit())
+		{
+			if(MOD_CARGO_SHIPS)
+			{
+				pUnitNode = pNewPlot->headUnitNode();
+				while(pUnitNode != NULL)
+				{
+					pLoopUnit = ::getUnit(*pUnitNode);
+					pUnitNode = pNewPlot->nextUnitNode(pUnitNode);
+					if (pLoopUnit != NULL)
+					{				
+						if(pLoopUnit->IsCargoCombatUnit() && pLoopUnit->hasCargo())
+						{
+							DoCargoPromotions(*pLoopUnit);
+						}
+					}
+				}
+			}
+		}
+#endif
+#if defined(MOD_BALANCE_CORE)
+		bool bZero = false;
+		if(IsGainsXPFromScouting())
+		{
+#if defined(MOD_UNITS_XP_TIMES_100)
+			if(getExperienceTimes100() <= (GC.getBALANCE_SCOUT_XP_MAXIMUM() * 100))
+#else
+			if(getExperience() <= GC.getBALANCE_SCOUT_XP_MAXIMUM())
+#endif
+			{
+				int iExperience = GC.getBALANCE_SCOUT_XP_BASE();
+				iExperience += GetNumTilesRevealedThisTurn();
+				iExperience /= 6;
+				if(iExperience > 0)
+				{
+					//Up to max barb value - rest has to come through combat!
+#if defined(MOD_UNITS_XP_TIMES_100)
+					changeExperienceTimes100(iExperience * 100);
+#else
+					changeExperience(iExperience);
+#endif
+					bZero = true;
+				}
+			}
+		}
+		if(IsGainsYieldFromScouting())
+		{
+			bool bSea = false;
+			if(getDomainType() == DOMAIN_SEA)
+			{
+				bSea = true;
+			}
+			CvCity* pCity = GC.getMap().findCity(getX(), getY(), getOwner(), getTeam());
 
+			if(pCity == NULL)
+			{
+				pCity = GET_PLAYER(getOwner()).getCapitalCity();
+			}
+			if(pCity != NULL)
+			{
+				GET_PLAYER(getOwner()).doInstantYield(INSTANT_YIELD_TYPE_SCOUTING, false, NO_GREATPERSON, NO_BUILDING, 0, false, NO_PLAYER, NULL, false, pCity, bSea, true, false, NO_YIELD, this);
+				bZero = true;
+			}
+		}
+		if(bZero)
+		{
+			SetNumTilesRevealedThisTurn(0);
+		}
+#endif
 		// Can someone can see the plot we moved our Unit into?
 		TeamTypes eTeamLoop;
 		for(iI = 0; iI < MAX_CIV_TEAMS; iI++)
@@ -18799,11 +19489,22 @@ if (!bDoEvade)
 				{
 					kOurTeam.meet(pAdjacentPlot->getTeam(), false);
 				}
-
+#if defined(MOD_BALANCE_CORE)
+				if(pAdjacentPlot->isCity())
+				{
+					CvCity* pAdjCity = pAdjacentPlot->getPlotCity();
+					{
+						if(pAdjCity != NULL && !isEnemy(pAdjCity->getTeam()))
+						{
+							pAdjCity->updateStrengthValue();
+						}
+					}
+				}
+#endif
 				// Have a naval unit here?
 				if(isBarbarian() && getDomainType() == DOMAIN_SEA && pAdjacentPlot->isWater())
 				{
-					UnitHandle pAdjacentUnit = pAdjacentPlot->getBestDefender(NO_PLAYER, BARBARIAN_PLAYER, NULL, true);
+					CvUnit* pAdjacentUnit = pAdjacentPlot->getBestDefender(NO_PLAYER, BARBARIAN_PLAYER, NULL, true);
 					if(pAdjacentUnit)
 					{
 						GET_PLAYER(pAdjacentUnit->getOwner()).GetPlayerTraits()->CheckForBarbarianConversion(this, pAdjacentPlot);
@@ -18824,7 +19525,7 @@ if (!bDoEvade)
 						const CvReligion* pReligion = GC.getGame().GetGameReligions()->GetReligion(eFoundedReligion, kPlayer.GetID());
 						if (pReligion && pReligion->m_Beliefs.IsConvertsBarbarians(getOwner()))
 						{
-							UnitHandle pAdjacentUnit = pAdjacentPlot->getBestDefender(BARBARIAN_PLAYER);
+							CvUnit* pAdjacentUnit = pAdjacentPlot->getBestDefender(BARBARIAN_PLAYER);
 							if(pAdjacentUnit)
 							{
 #if defined(MOD_EVENTS_UNIT_CAPTURE)
@@ -18868,719 +19569,11 @@ if (!bDoEvade)
 						}
 					}
 				}
-
-				// Natural wonder that provides free promotions?
-				FeatureTypes eFeature = pAdjacentPlot->getFeatureType();
-#if defined(MOD_BALANCE_CORE)
-				if(eFeature != NO_FEATURE)
-#else
-				if(eFeature != NO_FEATURE && GC.getFeatureInfo(eFeature)->IsNaturalWonder())
-#endif
-				{
-					PromotionTypes ePromotion = (PromotionTypes)GC.getFeatureInfo(eFeature)->getAdjacentUnitFreePromotion();
-					if(ePromotion != NO_PROMOTION)
-					{
-#if defined(MOD_BALANCE_CORE)
-						CvPromotionEntry* pkOriginalPromotionInfo = GC.getPromotionInfo(ePromotion);
-						if(pkOriginalPromotionInfo && m_pUnitInfo->GetUnitCombatType() != NO_UNITCOMBAT && (::IsPromotionValidForUnitCombatType(ePromotion, getUnitType())))
-						{
-							bool bNoPromotion = false;
-							// Check for negating promotions
-							if(pkOriginalPromotionInfo->IsBarbarianOnly() && !isBarbarian())
-							{
-								bNoPromotion = true;
-							}
-							if(pkOriginalPromotionInfo->IsCityStateOnly() && !GET_PLAYER(getOwner()).isMinorCiv())
-							{
-								bNoPromotion = true;
-							}
-							if(!bNoPromotion)
-							{
-								for(int iI = 0; iI < GC.getNumPromotionInfos(); iI++)
-								{
-									const PromotionTypes eNegatingPromotion = static_cast<PromotionTypes>(iI);
-									CvPromotionEntry* pkPromotionInfo = GC.getPromotionInfo(eNegatingPromotion);
-									if(pkPromotionInfo)
-									{
-										PromotionTypes eNegatorPromotion = (PromotionTypes)pkPromotionInfo->NegatesPromotion();
-										// Unit has negation promotion
-										if(isHasPromotion(eNegatingPromotion) && ePromotion == eNegatorPromotion)
-										{
-											bNoPromotion = true;
-											break;
-										}
-									}
-								}
-							}
-							if(!bNoPromotion)
-							{
-								setHasPromotion(ePromotion, true);
-							}
-						}
-					}
-				}
-				// Adjacent terrain that provides free promotions?
-				TerrainTypes eTerrain = pAdjacentPlot->getTerrainType();
-				if(eTerrain != NO_TERRAIN && (eTerrain <= TERRAIN_SNOW))
-				{
-					PromotionTypes ePromotion = (PromotionTypes)GC.getTerrainInfo(eTerrain)->getAdjacentUnitFreePromotion();
-					if(ePromotion != NO_PROMOTION)
-					{
-						CvPromotionEntry* pkOriginalPromotionInfo = GC.getPromotionInfo(ePromotion);
-						if(pkOriginalPromotionInfo && m_pUnitInfo->GetUnitCombatType() != NO_UNITCOMBAT && (::IsPromotionValidForUnitCombatType(ePromotion, getUnitType())))
-						{
-							bool bNoPromotion = false;
-							// Check for negating promotions
-							if(pkOriginalPromotionInfo->IsBarbarianOnly() && !isBarbarian())
-							{
-								bNoPromotion = true;
-							}
-							if(pkOriginalPromotionInfo->IsCityStateOnly() && !GET_PLAYER(getOwner()).isMinorCiv())
-							{
-								bNoPromotion = true;
-							}
-							if(!bNoPromotion)
-							{
-								for(int iI = 0; iI < GC.getNumPromotionInfos(); iI++)
-								{
-									const PromotionTypes eNegatingPromotion = static_cast<PromotionTypes>(iI);
-									CvPromotionEntry* pkPromotionInfo = GC.getPromotionInfo(eNegatingPromotion);
-									if(pkPromotionInfo)
-									{
-										PromotionTypes eNegatorPromotion = (PromotionTypes)pkPromotionInfo->NegatesPromotion();
-										// Unit has negation promotion
-										if(isHasPromotion(eNegatingPromotion) && ePromotion == eNegatorPromotion)
-										{
-											bNoPromotion = true;
-											break;
-										}
-									}
-								}
-							}
-							if(!bNoPromotion)
-							{
-								setHasPromotion(ePromotion, true);
-							}
-						}
-					}
-				}
-				// Adjacent terrain that provides free promotions?
-				if(pAdjacentPlot->isHills())
-				{
-					PromotionTypes ePromotion = (PromotionTypes)GC.getTerrainInfo(TERRAIN_HILL)->getAdjacentUnitFreePromotion();
-					if(ePromotion != NO_PROMOTION)
-					{
-						CvPromotionEntry* pkOriginalPromotionInfo = GC.getPromotionInfo(ePromotion);
-						if(pkOriginalPromotionInfo && m_pUnitInfo->GetUnitCombatType() != NO_UNITCOMBAT && (::IsPromotionValidForUnitCombatType(ePromotion, getUnitType())))
-						{
-							bool bNoPromotion = false;
-							// Check for negating promotions
-							if(pkOriginalPromotionInfo->IsBarbarianOnly() && !isBarbarian())
-							{
-								bNoPromotion = true;
-							}
-							if(pkOriginalPromotionInfo->IsCityStateOnly() && !GET_PLAYER(getOwner()).isMinorCiv())
-							{
-								bNoPromotion = true;
-							}
-							if(!bNoPromotion)
-							{
-								for(int iI = 0; iI < GC.getNumPromotionInfos(); iI++)
-								{
-									const PromotionTypes eNegatingPromotion = static_cast<PromotionTypes>(iI);
-									CvPromotionEntry* pkPromotionInfo = GC.getPromotionInfo(eNegatingPromotion);
-									if(pkPromotionInfo)
-									{
-										PromotionTypes eNegatorPromotion = (PromotionTypes)pkPromotionInfo->NegatesPromotion();
-										// Unit has negation promotion
-										if(isHasPromotion(eNegatingPromotion) && ePromotion == eNegatorPromotion)
-										{
-											bNoPromotion = true;
-											break;
-										}
-									}
-								}
-							}
-							if(!bNoPromotion)
-							{
-								setHasPromotion(ePromotion, true);
-							}
-						}
-					}
-				}
-				// Adjacent terrain that provides free promotions?
-				if(pAdjacentPlot->isMountain())
-				{
-					PromotionTypes ePromotion = (PromotionTypes)GC.getTerrainInfo(TERRAIN_MOUNTAIN)->getAdjacentUnitFreePromotion();
-					if(ePromotion != NO_PROMOTION)
-					{
-						CvPromotionEntry* pkOriginalPromotionInfo = GC.getPromotionInfo(ePromotion);
-						if(pkOriginalPromotionInfo && m_pUnitInfo->GetUnitCombatType() != NO_UNITCOMBAT && (::IsPromotionValidForUnitCombatType(ePromotion, getUnitType())))
-						{
-							bool bNoPromotion = false;
-							// Check for negating promotions
-							if(pkOriginalPromotionInfo->IsBarbarianOnly() && !isBarbarian())
-							{
-								bNoPromotion = true;
-							}
-							if(pkOriginalPromotionInfo->IsCityStateOnly() && !GET_PLAYER(getOwner()).isMinorCiv())
-							{
-								bNoPromotion = true;
-							}
-							if(!bNoPromotion)
-							{
-								for(int iI = 0; iI < GC.getNumPromotionInfos(); iI++)
-								{
-									const PromotionTypes eNegatingPromotion = static_cast<PromotionTypes>(iI);
-									CvPromotionEntry* pkPromotionInfo = GC.getPromotionInfo(eNegatingPromotion);
-									if(pkPromotionInfo)
-									{
-										PromotionTypes eNegatorPromotion = (PromotionTypes)pkPromotionInfo->NegatesPromotion();
-										// Unit has negation promotion
-										if(isHasPromotion(eNegatingPromotion) && ePromotion == eNegatorPromotion)
-										{
-											bNoPromotion = true;
-											break;
-										}
-									}
-								}
-							}
-							if(!bNoPromotion)
-							{
-								setHasPromotion(ePromotion, true);
-							}
-						}
-					}
-				}
-				if(pAdjacentPlot->isShallowWater() && !pAdjacentPlot->isLake())
-				{
-					PromotionTypes ePromotion = (PromotionTypes)GC.getTerrainInfo(TERRAIN_COAST)->getAdjacentUnitFreePromotion();
-					if(ePromotion != NO_PROMOTION)
-					{
-						CvPromotionEntry* pkOriginalPromotionInfo = GC.getPromotionInfo(ePromotion);
-						if(pkOriginalPromotionInfo && m_pUnitInfo->GetUnitCombatType() != NO_UNITCOMBAT && (::IsPromotionValidForUnitCombatType(ePromotion, getUnitType())))
-						{
-							bool bNoPromotion = false;
-							// Check for negating promotions
-							if(pkOriginalPromotionInfo->IsBarbarianOnly() && !isBarbarian())
-							{
-								bNoPromotion = true;
-							}
-							if(pkOriginalPromotionInfo->IsCityStateOnly() && !GET_PLAYER(getOwner()).isMinorCiv())
-							{
-								bNoPromotion = true;
-							}
-							if(!bNoPromotion)
-							{
-								for(int iI = 0; iI < GC.getNumPromotionInfos(); iI++)
-								{
-									const PromotionTypes eNegatingPromotion = static_cast<PromotionTypes>(iI);
-									CvPromotionEntry* pkPromotionInfo = GC.getPromotionInfo(eNegatingPromotion);
-									if(pkPromotionInfo)
-									{
-										PromotionTypes eNegatorPromotion = (PromotionTypes)pkPromotionInfo->NegatesPromotion();
-										// Unit has negation promotion
-										if(isHasPromotion(eNegatingPromotion) && ePromotion == eNegatorPromotion)
-										{
-											bNoPromotion = true;
-											break;
-										}
-									}
-								}
-							}
-							if(!bNoPromotion)
-							{
-								setHasPromotion(ePromotion, true);
-							}
-						}
-					}
-				}
-				if(!pAdjacentPlot->isShallowWater() && !pAdjacentPlot->isLake() && pAdjacentPlot->isWater())
-				{
-					PromotionTypes ePromotion = (PromotionTypes)GC.getTerrainInfo(TERRAIN_OCEAN)->getAdjacentUnitFreePromotion();
-					if(ePromotion != NO_PROMOTION)
-					{
-						CvPromotionEntry* pkOriginalPromotionInfo = GC.getPromotionInfo(ePromotion);
-						if(pkOriginalPromotionInfo && m_pUnitInfo->GetUnitCombatType() != NO_UNITCOMBAT && (::IsPromotionValidForUnitCombatType(ePromotion, getUnitType())))
-						{
-							bool bNoPromotion = false;
-							// Check for negating promotions
-							if(pkOriginalPromotionInfo->IsBarbarianOnly() && !isBarbarian())
-							{
-								bNoPromotion = true;
-							}
-							if(pkOriginalPromotionInfo->IsCityStateOnly() && !GET_PLAYER(getOwner()).isMinorCiv())
-							{
-								bNoPromotion = true;
-							}
-							if(!bNoPromotion)
-							{
-								for(int iI = 0; iI < GC.getNumPromotionInfos(); iI++)
-								{
-									const PromotionTypes eNegatingPromotion = static_cast<PromotionTypes>(iI);
-									CvPromotionEntry* pkPromotionInfo = GC.getPromotionInfo(eNegatingPromotion);
-									if(pkPromotionInfo)
-									{
-										PromotionTypes eNegatorPromotion = (PromotionTypes)pkPromotionInfo->NegatesPromotion();
-										// Unit has negation promotion
-										if(isHasPromotion(eNegatingPromotion) && ePromotion == eNegatorPromotion)
-										{
-											bNoPromotion = true;
-											break;
-										}
-									}
-								}
-							}
-							if(!bNoPromotion)
-							{
-								setHasPromotion(ePromotion, true);
-							}
-						}
-					}
-				}
-#else
-						// Is this a valid Promotion for the UnitCombatType?
-						if(m_pUnitInfo->GetUnitCombatType() != NO_UNITCOMBAT &&
-								(::IsPromotionValidForUnitCombatType(ePromotion, getUnitType())))
-						{
-							setHasPromotion(ePromotion, true);
-						}
-					}
-				}
-#endif
 			}
 		}
 #if defined(MOD_BALANCE_CORE)
-		// Feature that provides free promotions?
-		FeatureTypes eFeature = pNewPlot->getFeatureType();
-		if(eFeature != NO_FEATURE)
-		{
-			PromotionTypes ePromotion = (PromotionTypes)GC.getFeatureInfo(eFeature)->getLocationUnitFreePromotion();
-			if(ePromotion != NO_PROMOTION)
-			{
-				CvPromotionEntry* pkOriginalPromotionInfo = GC.getPromotionInfo(ePromotion);
-				if(pkOriginalPromotionInfo && m_pUnitInfo->GetUnitCombatType() != NO_UNITCOMBAT && (::IsPromotionValidForUnitCombatType(ePromotion, getUnitType())))
-				{
-					bool bNoPromotion = false;
-					// Check for negating promotions
-					if(pkOriginalPromotionInfo->IsBarbarianOnly() && !isBarbarian())
-					{
-						bNoPromotion = true;
-					}
-					if(pkOriginalPromotionInfo->IsCityStateOnly() && !GET_PLAYER(getOwner()).isMinorCiv())
-					{
-						bNoPromotion = true;
-					}
-					if(!bNoPromotion)
-					{
-						for(int iI = 0; iI < GC.getNumPromotionInfos(); iI++)
-						{
-							const PromotionTypes eNegatingPromotion = static_cast<PromotionTypes>(iI);
-							CvPromotionEntry* pkPromotionInfo = GC.getPromotionInfo(eNegatingPromotion);
-							if(pkPromotionInfo)
-							{
-								PromotionTypes eNegatorPromotion = (PromotionTypes)pkPromotionInfo->NegatesPromotion();
-								// Unit has negation promotion
-								if(isHasPromotion(eNegatingPromotion) && ePromotion == eNegatorPromotion)
-								{
-									bNoPromotion = true;
-									break;
-								}
-							}
-						}
-					}
-					if(!bNoPromotion)
-					{
-						setHasPromotion(ePromotion, true);
-					}
-				}
-			}
-		}
-		//Improvement that provides free promotion?
-		ImprovementTypes eNeededImprovement = pNewPlot->getImprovementType();
-		if(eNeededImprovement != NO_IMPROVEMENT)
-		{
-			PromotionTypes ePromotion = (PromotionTypes)GC.getImprovementInfo(eNeededImprovement)->GetUnitFreePromotion();
-			if(ePromotion != NO_PROMOTION)
-			{
-				CvPromotionEntry* pkOriginalPromotionInfo = GC.getPromotionInfo(ePromotion);
-				if(pkOriginalPromotionInfo && m_pUnitInfo->GetUnitCombatType() != NO_UNITCOMBAT && (::IsPromotionValidForUnitCombatType(ePromotion, getUnitType())))
-				{
-					bool bNoPromotion = false;
-					// Check for negating promotions
-					if(pkOriginalPromotionInfo->IsBarbarianOnly() && !isBarbarian())
-					{
-						bNoPromotion = true;
-					}
-					if(pkOriginalPromotionInfo->IsCityStateOnly() && !GET_PLAYER(getOwner()).isMinorCiv())
-					{
-						bNoPromotion = true;
-					}
-					if(!bNoPromotion)
-					{
-						for(int iI = 0; iI < GC.getNumPromotionInfos(); iI++)
-						{
-							const PromotionTypes eNegatingPromotion = static_cast<PromotionTypes>(iI);
-							CvPromotionEntry* pkPromotionInfo = GC.getPromotionInfo(eNegatingPromotion);
-							if(pkPromotionInfo)
-							{
-								PromotionTypes eNegatorPromotion = (PromotionTypes)pkPromotionInfo->NegatesPromotion();
-								// Unit has negation promotion
-								if(isHasPromotion(eNegatingPromotion) && ePromotion == eNegatorPromotion)
-								{
-									bNoPromotion = true;
-									break;
-								}
-							}
-						}
-					}
-					if(!bNoPromotion)
-					{
-						setHasPromotion(ePromotion, true);
-					}
-				}
-			}
-		}
-		// Terrain that provides free promotions?
-		TerrainTypes eTerrain = pNewPlot->getTerrainType();
-		if(eTerrain != NO_TERRAIN && (eTerrain <= TERRAIN_SNOW))
-		{
-			PromotionTypes ePromotion = (PromotionTypes)GC.getTerrainInfo(eTerrain)->getLocationUnitFreePromotion();
-			if(ePromotion != NO_PROMOTION)
-			{
-				CvPromotionEntry* pkOriginalPromotionInfo = GC.getPromotionInfo(ePromotion);
-				if(pkOriginalPromotionInfo && m_pUnitInfo->GetUnitCombatType() != NO_UNITCOMBAT && (::IsPromotionValidForUnitCombatType(ePromotion, getUnitType())))
-				{
-					bool bNoPromotion = false;
-					// Check for negating promotions
-					if(pkOriginalPromotionInfo->IsBarbarianOnly() && !isBarbarian())
-					{
-						bNoPromotion = true;
-					}
-					if(pkOriginalPromotionInfo->IsCityStateOnly() && !GET_PLAYER(getOwner()).isMinorCiv())
-					{
-						bNoPromotion = true;
-					}
-					if(!bNoPromotion)
-					{
-						for(int iI = 0; iI < GC.getNumPromotionInfos(); iI++)
-						{
-							const PromotionTypes eNegatingPromotion = static_cast<PromotionTypes>(iI);
-							CvPromotionEntry* pkPromotionInfo = GC.getPromotionInfo(eNegatingPromotion);
-							if(pkPromotionInfo)
-							{
-								PromotionTypes eNegatorPromotion = (PromotionTypes)pkPromotionInfo->NegatesPromotion();
-								// Unit has negation promotion
-								if(isHasPromotion(eNegatingPromotion) && ePromotion == eNegatorPromotion)
-								{
-									bNoPromotion = true;
-									break;
-								}
-							}
-						}
-					}
-					if(!bNoPromotion)
-					{
-						setHasPromotion(ePromotion, true);
-					}
-				}
-			}
-		}
-		if(pNewPlot->isHills())
-		{
-			PromotionTypes ePromotion = (PromotionTypes)GC.getTerrainInfo(TERRAIN_HILL)->getLocationUnitFreePromotion();
-			if(ePromotion != NO_PROMOTION)
-			{
-				CvPromotionEntry* pkOriginalPromotionInfo = GC.getPromotionInfo(ePromotion);
-				if(pkOriginalPromotionInfo && m_pUnitInfo->GetUnitCombatType() != NO_UNITCOMBAT && (::IsPromotionValidForUnitCombatType(ePromotion, getUnitType())))
-				{
-					bool bNoPromotion = false;
-					// Check for negating promotions
-					if(pkOriginalPromotionInfo->IsBarbarianOnly() && !isBarbarian())
-					{
-						bNoPromotion = true;
-					}
-					if(pkOriginalPromotionInfo->IsCityStateOnly() && !GET_PLAYER(getOwner()).isMinorCiv())
-					{
-						bNoPromotion = true;
-					}
-					if(!bNoPromotion)
-					{
-						for(int iI = 0; iI < GC.getNumPromotionInfos(); iI++)
-						{
-							const PromotionTypes eNegatingPromotion = static_cast<PromotionTypes>(iI);
-							CvPromotionEntry* pkPromotionInfo = GC.getPromotionInfo(eNegatingPromotion);
-							if(pkPromotionInfo)
-							{
-								PromotionTypes eNegatorPromotion = (PromotionTypes)pkPromotionInfo->NegatesPromotion();
-								// Unit has negation promotion
-								if(isHasPromotion(eNegatingPromotion) && ePromotion == eNegatorPromotion)
-								{
-									bNoPromotion = true;
-									break;
-								}
-							}
-						}
-					}
-					if(!bNoPromotion)
-					{
-						setHasPromotion(ePromotion, true);
-					}
-				}
-			}
-		}
-		if(pNewPlot->isMountain())
-		{
-			PromotionTypes ePromotion = (PromotionTypes)GC.getTerrainInfo(TERRAIN_MOUNTAIN)->getLocationUnitFreePromotion();
-			if(ePromotion != NO_PROMOTION)
-			{
-				CvPromotionEntry* pkOriginalPromotionInfo = GC.getPromotionInfo(ePromotion);
-				if(pkOriginalPromotionInfo && m_pUnitInfo->GetUnitCombatType() != NO_UNITCOMBAT && (::IsPromotionValidForUnitCombatType(ePromotion, getUnitType())))
-				{
-					bool bNoPromotion = false;
-					// Check for negating promotions
-					if(pkOriginalPromotionInfo->IsBarbarianOnly() && !isBarbarian())
-					{
-						bNoPromotion = true;
-					}
-					if(pkOriginalPromotionInfo->IsCityStateOnly() && !GET_PLAYER(getOwner()).isMinorCiv())
-					{
-						bNoPromotion = true;
-					}
-					if(!bNoPromotion)
-					{
-						for(int iI = 0; iI < GC.getNumPromotionInfos(); iI++)
-						{
-							const PromotionTypes eNegatingPromotion = static_cast<PromotionTypes>(iI);
-							CvPromotionEntry* pkPromotionInfo = GC.getPromotionInfo(eNegatingPromotion);
-							if(pkPromotionInfo)
-							{
-								PromotionTypes eNegatorPromotion = (PromotionTypes)pkPromotionInfo->NegatesPromotion();
-								// Unit has negation promotion
-								if(isHasPromotion(eNegatingPromotion) && ePromotion == eNegatorPromotion)
-								{
-									bNoPromotion = true;
-									break;
-								}
-							}
-						}
-					}
-					if(!bNoPromotion)
-					{
-						setHasPromotion(ePromotion, true);
-					}
-				}
-			}
-		}
-		if(pNewPlot->isShallowWater() && !pNewPlot->isLake())
-		{
-			PromotionTypes ePromotion = (PromotionTypes)GC.getTerrainInfo(TERRAIN_COAST)->getLocationUnitFreePromotion();
-			if(ePromotion != NO_PROMOTION)
-			{
-				CvPromotionEntry* pkOriginalPromotionInfo = GC.getPromotionInfo(ePromotion);
-				if(pkOriginalPromotionInfo && m_pUnitInfo->GetUnitCombatType() != NO_UNITCOMBAT && (::IsPromotionValidForUnitCombatType(ePromotion, getUnitType())))
-				{
-					bool bNoPromotion = false;
-					// Check for negating promotions
-					if(pkOriginalPromotionInfo->IsBarbarianOnly() && !isBarbarian())
-					{
-						bNoPromotion = true;
-					}
-					if(pkOriginalPromotionInfo->IsCityStateOnly() && !GET_PLAYER(getOwner()).isMinorCiv())
-					{
-						bNoPromotion = true;
-					}
-					if(!bNoPromotion)
-					{
-						for(int iI = 0; iI < GC.getNumPromotionInfos(); iI++)
-						{
-							const PromotionTypes eNegatingPromotion = static_cast<PromotionTypes>(iI);
-							CvPromotionEntry* pkPromotionInfo = GC.getPromotionInfo(eNegatingPromotion);
-							if(pkPromotionInfo)
-							{
-								PromotionTypes eNegatorPromotion = (PromotionTypes)pkPromotionInfo->NegatesPromotion();
-								// Unit has negation promotion
-								if(isHasPromotion(eNegatingPromotion) && ePromotion == eNegatorPromotion)
-								{
-									bNoPromotion = true;
-									break;
-								}
-							}
-						}
-					}
-					if(!bNoPromotion)
-					{
-						setHasPromotion(ePromotion, true);
-					}
-				}
-			}
-		}
-		if(!pNewPlot->isShallowWater() && !pNewPlot->isLake() && pNewPlot->isWater())
-		{
-			PromotionTypes ePromotion = (PromotionTypes)GC.getTerrainInfo(TERRAIN_OCEAN)->getLocationUnitFreePromotion();
-			if(ePromotion != NO_PROMOTION)
-			{
-				CvPromotionEntry* pkOriginalPromotionInfo = GC.getPromotionInfo(ePromotion);
-				if(pkOriginalPromotionInfo && m_pUnitInfo->GetUnitCombatType() != NO_UNITCOMBAT && (::IsPromotionValidForUnitCombatType(ePromotion, getUnitType())))
-				{
-					bool bNoPromotion = false;
-					// Check for negating promotions
-					if(pkOriginalPromotionInfo->IsBarbarianOnly() && !isBarbarian())
-					{
-						bNoPromotion = true;
-					}
-					if(pkOriginalPromotionInfo->IsCityStateOnly() && !GET_PLAYER(getOwner()).isMinorCiv())
-					{
-						bNoPromotion = true;
-					}
-					if(!bNoPromotion)
-					{
-						for(int iI = 0; iI < GC.getNumPromotionInfos(); iI++)
-						{
-							const PromotionTypes eNegatingPromotion = static_cast<PromotionTypes>(iI);
-							CvPromotionEntry* pkPromotionInfo = GC.getPromotionInfo(eNegatingPromotion);
-							if(pkPromotionInfo)
-							{
-								PromotionTypes eNegatorPromotion = (PromotionTypes)pkPromotionInfo->NegatesPromotion();
-								// Unit has negation promotion
-								if(isHasPromotion(eNegatingPromotion) && ePromotion == eNegatorPromotion)
-								{
-									bNoPromotion = true;
-									break;
-								}
-							}
-						}
-					}
-					if(!bNoPromotion)
-					{
-						setHasPromotion(ePromotion, true);
-					}
-				}
-			}
-		}
-		if(pOldPlot != NULL)
-		{
-			// No longer on terrain that provides free promotions?
-			if(pOldPlot->getTerrainType() != pNewPlot->getTerrainType())
-			{
-				for(iI = 0; iI < GC.getNumTerrainInfos(); iI++)
-				{
-					const TerrainTypes eNeededTerrain = static_cast<TerrainTypes>(iI);
-					CvTerrainInfo* pkTerrainInfo = GC.getTerrainInfo(eNeededTerrain);
-					if(pkTerrainInfo)
-					{
-						if(pOldPlot->isHills() && eNeededTerrain == TERRAIN_HILL)
-						{
-							PromotionTypes ePromotion = (PromotionTypes)GC.getTerrainInfo(TERRAIN_HILL)->getLocationUnitFreePromotion();
-							if(ePromotion != NO_PROMOTION && isHasPromotion(ePromotion))
-							{
-								CvPromotionEntry* pkPromotionInfo = GC.getPromotionInfo(ePromotion);
-								if(pkPromotionInfo && pkPromotionInfo->IsLostOnMove())
-								{
-									setHasPromotion(ePromotion, false);
-								}
-							}
-						}
-						if(pOldPlot->isMountain() && eNeededTerrain == TERRAIN_MOUNTAIN)
-						{
-							PromotionTypes ePromotion = (PromotionTypes)GC.getTerrainInfo(TERRAIN_MOUNTAIN)->getLocationUnitFreePromotion();
-							if(ePromotion != NO_PROMOTION && isHasPromotion(ePromotion))
-							{
-								CvPromotionEntry* pkPromotionInfo = GC.getPromotionInfo(ePromotion);
-								if(pkPromotionInfo && pkPromotionInfo->IsLostOnMove())
-								{
-									setHasPromotion(ePromotion, false);
-								}
-							}
-						}
-						if((pOldPlot->isWater() && pOldPlot->isShallowWater() && !pOldPlot->isLake()) && eNeededTerrain == TERRAIN_COAST)
-						{
-							PromotionTypes ePromotion = (PromotionTypes)GC.getTerrainInfo(TERRAIN_COAST)->getLocationUnitFreePromotion();
-							if(ePromotion != NO_PROMOTION && isHasPromotion(ePromotion))
-							{
-								CvPromotionEntry* pkPromotionInfo = GC.getPromotionInfo(ePromotion);
-								if(pkPromotionInfo && pkPromotionInfo->IsLostOnMove())
-								{
-									setHasPromotion(ePromotion, false);
-								}
-							}
-						}
-						if((pOldPlot->isWater() && !pOldPlot->isShallowWater() && !pOldPlot->isLake()) && eNeededTerrain == TERRAIN_OCEAN)
-						{
-							PromotionTypes ePromotion = (PromotionTypes)GC.getTerrainInfo(TERRAIN_OCEAN)->getLocationUnitFreePromotion();
-							if(ePromotion != NO_PROMOTION && isHasPromotion(ePromotion))
-							{
-								CvPromotionEntry* pkPromotionInfo = GC.getPromotionInfo(ePromotion);
-								if(pkPromotionInfo && pkPromotionInfo->IsLostOnMove())
-								{
-									setHasPromotion(ePromotion, false);
-								}
-							}
-						}
-						if(eNeededTerrain == pOldPlot->getTerrainType() && (eNeededTerrain <= TERRAIN_SNOW))
-						{
-							PromotionTypes ePromotion = (PromotionTypes)GC.getTerrainInfo(eNeededTerrain)->getLocationUnitFreePromotion();
-							if(ePromotion != NO_PROMOTION && isHasPromotion(ePromotion))
-							{
-								CvPromotionEntry* pkPromotionInfo = GC.getPromotionInfo(ePromotion);
-								if(pkPromotionInfo && pkPromotionInfo->IsLostOnMove())
-								{
-									setHasPromotion(ePromotion, false);
-								}
-							}
-						}
-					}
-				}
-			}
-			if(pOldPlot->getFeatureType() != pNewPlot->getFeatureType())
-			{
-				//No longer on feature that provides free promotions?
-				for(iI = 0; iI < GC.getNumFeatureInfos(); iI++)
-				{
-					const FeatureTypes eNeededFeature = static_cast<FeatureTypes>(iI);
-					CvFeatureInfo* pkFeatureInfo = GC.getFeatureInfo(eNeededFeature);
-					if(pkFeatureInfo)
-					{
-						if(eNeededFeature == pOldPlot->getFeatureType())
-						{
-							PromotionTypes ePromotion = (PromotionTypes)GC.getFeatureInfo(eNeededFeature)->getLocationUnitFreePromotion();
-							if(ePromotion != NO_PROMOTION && isHasPromotion(ePromotion))
-							{
-								CvPromotionEntry* pkPromotionInfo = GC.getPromotionInfo(ePromotion);
-								if(pkPromotionInfo && pkPromotionInfo->IsLostOnMove())
-								{
-									setHasPromotion(ePromotion, false);
-								}
-							}
-						}
-					}
-				}
-			}
-			if(pOldPlot->getImprovementType() != pNewPlot->getImprovementType())
-			{
-				//No longer on improvement that provides free promotion?
-				for(iI = 0; iI < GC.getNumImprovementInfos(); iI++)
-				{
-					const ImprovementTypes eNeededImprovement = static_cast<ImprovementTypes>(iI);
-					CvImprovementEntry* pkImprovementInfo = GC.getImprovementInfo(eNeededImprovement);
-					if(pkImprovementInfo)
-					{
-						if(eNeededImprovement == pOldPlot->getImprovementType())
-						{
-							PromotionTypes ePromotion = (PromotionTypes)GC.getImprovementInfo(eNeededImprovement)->GetUnitFreePromotion();
-							if(ePromotion != NO_PROMOTION && isHasPromotion(ePromotion))
-							{
-								CvPromotionEntry* pkPromotionInfo = GC.getPromotionInfo(ePromotion);
-								if(pkPromotionInfo && pkPromotionInfo->IsLostOnMove())
-								{
-										setHasPromotion(ePromotion, false);
-								}
-							}
-						}
-					}
-				}
-			}
-		}
+		DoLocationPromotions(false, pOldPlot, pNewPlot);
+		DoConvertEnemyUnitToBarbarian(pNewPlot);
 #endif
 
 		if(pOldPlot != NULL && getDomainType() == DOMAIN_SEA)
@@ -19617,6 +19610,27 @@ if (!bDoEvade)
 
 	if(pOldPlot != NULL)
 	{
+#if defined(MOD_BALANCE_CORE)
+		CvPlot* pAdjacentOldPlot;
+		for(iI = 0; iI < NUM_DIRECTION_TYPES; ++iI)
+		{
+			pAdjacentOldPlot = plotDirection(pOldPlot->getX(), pOldPlot->getY(), ((DirectionTypes)iI));
+
+			if(pAdjacentOldPlot != NULL)
+			{
+				if(pAdjacentOldPlot->isCity())
+				{
+					CvCity* pAdjOldCity = pAdjacentOldPlot->getPlotCity();
+					{
+						if(pAdjOldCity != NULL && !isEnemy(pAdjOldCity->getTeam()))
+						{
+							pAdjOldCity->updateStrengthValue();
+						}
+					}
+				}
+			}
+		}
+#endif
 		if(hasCargo())
 		{
 			pUnitNode = pOldPlot->headUnitNode();
@@ -19635,6 +19649,45 @@ if (!bDoEvade)
 				}
 			}
 		}
+#if defined(MOD_BALANCE_CORE)
+		if(IsCombatUnit())
+		{
+			pUnitNode = pOldPlot->headUnitNode();
+			while(pUnitNode != NULL)
+			{
+				pLoopUnit = ::getUnit(*pUnitNode);
+				pUnitNode = pOldPlot->nextUnitNode(pUnitNode);
+				if (pLoopUnit != NULL)
+				{
+#if defined(MOD_GLOBAL_STACKING_RULES)
+					if(MOD_GLOBAL_STACKING_RULES)
+					{
+						if(pLoopUnit->IsStackingUnit())
+						{
+							if(pOldPlot->GetNumCombatUnits()>1)
+							{
+								pLoopUnit->SetBaseCombatStrength(pLoopUnit->getUnitInfo().GetCombat() + pLoopUnit->getUnitInfo().StackCombat());
+							}
+							else
+							{
+								pLoopUnit->SetBaseCombatStrength(pLoopUnit->getUnitInfo().GetCombat());
+							}
+						}
+					}
+#endif
+#if defined(MOD_CARGO_SHIPS)
+					if(MOD_CARGO_SHIPS)
+					{
+						if(pLoopUnit->IsCargoCombatUnit())
+						{
+							RemoveCargoPromotions(*pLoopUnit);
+						}
+					}
+#endif
+				}
+			}
+		}
+#endif
 	}
 
 	if(pNewPlot != NULL && iMapLayer == DEFAULT_UNIT_MAP_LAYER)
@@ -19882,6 +19935,44 @@ if (!bDoEvade)
 		}
 	}
 
+	if (bOwnerIsActivePlayer)
+		DLLUI->SetDontShowPopups(false);
+
+	// update garrison status for old and new city, if applicable
+	if (pkPrevGarrisonedCity)
+	{
+		//when moving out, another unit might be present to take over garrison duty
+		pkPrevGarrisonedCity->SetGarrison( pkPrevGarrisonedCity->plot()->getBestGarrison( pkPrevGarrisonedCity->getOwner() ) );
+		auto_ptr<ICvCity1> pkDllCity(new CvDllCity(pkPrevGarrisonedCity));
+		DLLUI->SetSpecificCityInfoDirty(pkDllCity.get(), CITY_UPDATE_TYPE_GARRISON);
+#if defined(MOD_BALANCE_CORE)
+		pkPrevGarrisonedCity->updateYield();
+#endif
+	}
+	else if(pNewPlot)
+	{
+		if (pNewPlot->isCity())
+		{
+			//when moving in, see if we're better than the previous garrison
+			CvUnit* pBestGarrison = pNewPlot->getBestGarrison(pNewPlot->getOwner());
+			if (pBestGarrison==this)
+			{
+				CvCity* pkNewGarrisonedCity = pNewPlot->getPlotCity();
+				pkNewGarrisonedCity->SetGarrison(this);
+				auto_ptr<ICvCity1> pkDllCity(new CvDllCity(pkNewGarrisonedCity));
+				DLLUI->SetSpecificCityInfoDirty(pkDllCity.get(), CITY_UPDATE_TYPE_GARRISON);
+#if defined(MOD_BALANCE_CORE)
+				pkNewGarrisonedCity->updateYield();
+#endif
+			}
+		}
+		else //no city
+		{
+			//normally re-setting the garrison in pkPrevGarrisonedCity should have set this already, but better be safe
+			SetGarrisonedCity(-1);
+		}
+	}
+
 	ICvEngineScriptSystem1* pkScriptSystem = gDLL->GetScriptSystem();
 	if(pkScriptSystem)
 	{
@@ -19893,38 +19984,6 @@ if (!bDoEvade)
 
 		bool bResult;
 		LuaSupport::CallHook(pkScriptSystem, "UnitSetXY", args.get(), bResult);
-	}
-
-	if (bOwnerIsActivePlayer)
-		DLLUI->SetDontShowPopups(false);
-
-	// update garrison status for old and new city, if applicable
-	if (pkPrevGarrisonedCity)
-	{
-		//when moving out, another unit might be present to take over garrison duty
-		pkPrevGarrisonedCity->SetGarrison( pkPrevGarrisonedCity->plot()->getBestGarrison( pkPrevGarrisonedCity->getOwner() ).pointer() );
-		auto_ptr<ICvCity1> pkDllCity(new CvDllCity(pkPrevGarrisonedCity));
-		DLLUI->SetSpecificCityInfoDirty(pkDllCity.get(), CITY_UPDATE_TYPE_GARRISON);
-	}
-	else if(pNewPlot)
-	{
-		if (pNewPlot->isCity())
-		{
-			//when moving in, see if we're better than the previous garrison
-			CvUnit* pBestGarrison = pNewPlot->getBestGarrison(pNewPlot->getOwner()).pointer();
-			if (pBestGarrison==this)
-			{
-				CvCity* pkNewGarrisonedCity = pNewPlot->getPlotCity();
-				pkNewGarrisonedCity->SetGarrison(this);
-				auto_ptr<ICvCity1> pkDllCity(new CvDllCity(pkNewGarrisonedCity));
-				DLLUI->SetSpecificCityInfoDirty(pkDllCity.get(), CITY_UPDATE_TYPE_GARRISON);
-			}
-		}
-		else //no city
-		{
-			//normally re-setting the garrison in pkPrevGarrisonedCity should have set this already, but better be safe
-			SetGarrisonedCity(-1);
-		}
 	}
 
 #if !defined(NO_ACHIEVEMENTS)
@@ -20000,7 +20059,28 @@ bool CvUnit::onMap() const
 	return (plot() != NULL);
 }
 
+#if defined(MOD_BALANCE_CORE)
+//	--------------------------------------------------------------------------------
+CvCity* CvUnit::getOriginCity()
+{
+	if(getOwner() == NO_PLAYER)
+		return NULL;
 
+	if(m_iOriginCity == -1)
+		return NULL;
+
+	VALIDATE_OBJECT
+	return GET_PLAYER(getOwner()).getCity(m_iOriginCity);
+}
+
+
+//	--------------------------------------------------------------------------------
+void CvUnit::setOriginCity(int iNewValue)
+{
+	VALIDATE_OBJECT
+	m_iOriginCity = iNewValue;
+}
+#endif
 //	--------------------------------------------------------------------------------
 int CvUnit::getLastMoveTurn() const
 {
@@ -20031,6 +20111,11 @@ void CvUnit::SetCycleOrder(int iNewValue)
 {
 	VALIDATE_OBJECT
 	m_iCycleOrder = iNewValue;
+}
+
+bool CvUnit::IsRecentlyDeployedFromOperation() const
+{
+	return m_iDeployFromOperationTurn+GC.getAI_TACTICAL_MAP_TEMP_ZONE_TURNS()>=GC.getGame().getGameTurn();
 }
 
 
@@ -20142,6 +20227,10 @@ void CvUnit::setGameTurnCreated(int iNewValue)
 //	--------------------------------------------------------------------------------
 int CvUnit::getDamage() const
 {
+	//for debugging - hook in here and mouse over a unit to get the current tactical zone info
+	if (0)
+		OutputDebugString( getTacticalZoneInfo().c_str() );
+
 	VALIDATE_OBJECT
 	return m_iDamage;
 }
@@ -20363,7 +20452,7 @@ void CvUnit::setMoves(int iNewValue)
 		auto_ptr<ICvPlot1> pDllSelectionPlot(DLLUI->getSelectionPlot());
 		int iSelectionPlotIndex = (pDllSelectionPlot.get() != NULL)? pDllSelectionPlot->GetPlotIndex() : -1;
 
-		if(pPlot->GetPlotIndex() == iSelectionPlotIndex)
+		if(pPlot && pPlot->GetPlotIndex() == iSelectionPlotIndex)
 		{
 			DLLUI->setDirty(PlotListButtons_DIRTY_BIT, true);
 		}
@@ -20568,6 +20657,7 @@ void CvUnit::setExperience(int iNewValue, int iMax)
 				}
 
 #if defined(SHOW_PLOT_POPUP)
+				//possibly iX and iY are invalid if the unit is not initialized yet, but the macro catches this
 				SHOW_PLOT_POPUP(GC.getMap().plot(iX, iY), getOwner(), localizedText.toUTF8(), 0.0f);
 #else
 				DLLUI->AddPopupText(iX, iY, localizedText.toUTF8(), fDelay);
@@ -21268,8 +21358,27 @@ void CvUnit::changeHillsDoubleMoveCount(int iChange)
 	m_iHillsDoubleMoveCount = (m_iHillsDoubleMoveCount + iChange);
 	CvAssert(getHillsDoubleMoveCount() >= 0);
 }
-
-
+#if defined(MOD_BALANCE_CORE)
+//	--------------------------------------------------------------------------------
+int CvUnit::getMountainsDoubleMoveCount() const
+{
+	VALIDATE_OBJECT
+	return m_iMountainsDoubleMoveCount;
+}
+//	--------------------------------------------------------------------------------
+bool CvUnit::isMountainsDoubleMove() const
+{
+	VALIDATE_OBJECT
+	return (getMountainsDoubleMoveCount() > 0);
+}
+//	--------------------------------------------------------------------------------
+void CvUnit::changeMountainsDoubleMoveCount(int iChange)
+{
+	VALIDATE_OBJECT
+	m_iMountainsDoubleMoveCount = (m_iMountainsDoubleMoveCount + iChange);
+	CvAssert(getMountainsDoubleMoveCount() >= 0);
+}
+#endif
 //	--------------------------------------------------------------------------------
 int CvUnit::getImmuneToFirstStrikesCount() const
 {
@@ -21533,6 +21642,22 @@ int CvUnit::getPlaguedCount() const
 	VALIDATE_OBJECT
 	return m_iIsPlagued;
 }
+void CvUnit::setContractUnit(ContractTypes eContract)
+{
+	if(eContract != m_eUnitContract)
+	{
+		m_eUnitContract = eContract;
+	}
+}
+bool CvUnit::isContractUnit() const
+{
+	return (m_eUnitContract != NO_CONTRACT);
+}
+ContractTypes CvUnit::getContract() const
+{
+	return m_eUnitContract;
+}
+
 #endif
 //	--------------------------------------------------------------------------------
 int CvUnit::getExtraEnemyHeal() const
@@ -22080,11 +22205,15 @@ bool CvUnit::IsNearCityAttackSupport(const CvPlot* pAtPlot, const CvUnit* pIgnor
 			return false;
 	}
 
-	const std::vector<int>& possibleUnits = GET_PLAYER(getOwner()).GetAreaEffectPositiveUnits();
-	for(std::vector<int>::const_iterator it = possibleUnits.begin(); it!=possibleUnits.end(); ++it)
+	const std::vector<std::pair<int,int>>& possibleUnits = GET_PLAYER(getOwner()).GetAreaEffectPositiveUnits();
+	for(std::vector<std::pair<int,int>>::const_iterator it = possibleUnits.begin(); it!=possibleUnits.end(); ++it)
 	{
-		UnitHandle pUnit = GET_PLAYER(getOwner()).getUnit(*it);
+		//first quick check with a large, fixed distance
+		CvPlot* pUnitPlot = GC.getMap().plotByIndexUnchecked(it->second);
+		if ( plotDistance(pUnitPlot->getX(),pUnitPlot->getY(),getX(), getY())>5 )
+			continue;
 
+		CvUnit* pUnit = GET_PLAYER(getOwner()).getUnit(it->first);
 		if (pUnit && pUnit != pIgnoreThisGeneral && pUnit->IsCityAttackSupport())
 		{
 			// Same domain
@@ -22099,11 +22228,24 @@ bool CvUnit::IsNearCityAttackSupport(const CvPlot* pAtPlot, const CvUnit* pIgnor
 
 	return false;
 }
+//	--------------------------------------------------------------------------------
+/// Great General close enough to give us a bonus?
+#if defined(MOD_PROMOTIONS_AURA_CHANGE)
+bool CvUnit::IsNearGreatGeneral(int& iAuraEffectChange, const CvPlot* pAtPlot, const CvUnit* pIgnoreThisGeneral) const
+#else
 bool CvUnit::IsNearGreatGeneral(const CvPlot* pAtPlot, const CvUnit* pIgnoreThisGeneral) const
+#endif
 {
 	VALIDATE_OBJECT
 
+#if defined(MOD_PROMOTIONS_AURA_CHANGE)
+	bool bFound = false;
+	iAuraEffectChange = 0;
+	
+	int iGreatGeneralRange = /*2*/ GC.getGREAT_GENERAL_MAX_RANGE();
+#else
 	int iGreatGeneralRange = /*2*/ GC.getGREAT_GENERAL_RANGE();
+#endif
 
 	if (pAtPlot == NULL)
 	{
@@ -22112,16 +22254,43 @@ bool CvUnit::IsNearGreatGeneral(const CvPlot* pAtPlot, const CvUnit* pIgnoreThis
 			return false;
 	}
 
-	const std::vector<int>& possibleUnits = GET_PLAYER(getOwner()).GetAreaEffectPositiveUnits();
-	for(std::vector<int>::const_iterator it = possibleUnits.begin(); it!=possibleUnits.end(); ++it)
+	const std::vector<std::pair<int,int>>& possibleUnits = GET_PLAYER(getOwner()).GetAreaEffectPositiveUnits();
+	for(std::vector<std::pair<int,int>>::const_iterator it = possibleUnits.begin(); it!=possibleUnits.end(); ++it)
 	{
-		UnitHandle pUnit = GET_PLAYER(getOwner()).getUnit(*it);
+		//first quick check with a large, fixed distance
+		CvPlot* pUnitPlot = GC.getMap().plotByIndexUnchecked(it->second);
+		if ( plotDistance(pUnitPlot->getX(),pUnitPlot->getY(),getX(), getY())>5 )
+			continue;
 
+		CvUnit* pUnit = GET_PLAYER(getOwner()).getUnit(it->first);
 		if (pUnit && pUnit != pIgnoreThisGeneral && !pUnit->IsCityAttackSupport())
 		{
 			// Same domain
 			if(pUnit->getDomainType() == getDomainType())
 			{
+#if defined(MOD_PROMOTIONS_AURA_CHANGE)
+				if (MOD_PROMOTIONS_AURA_CHANGE)
+				{
+					if(plotDistance(getX(), getY(), pUnit->getX(), pUnit->getY()) <= (iGreatGeneralRange + pUnit->GetAuraRangeChange()))
+					{
+						// We have to check all possible units as one may be better than another
+						if (!bFound)
+						{
+							// Can't do a straight compare for the first one found, as it could have a negative modifier
+							iAuraEffectChange = pUnit->GetAuraEffectChange();
+						}
+						else
+						{
+							if (pUnit->GetAuraEffectChange() > iAuraEffectChange)
+							{
+								iAuraEffectChange = pUnit->GetAuraEffectChange();
+							}
+						}
+					
+						bFound = true;
+					}
+				} else
+#endif
 				if (plotDistance( pAtPlot->getX(),pAtPlot->getY(),pUnit->getX(),pUnit->getY() ) <= iGreatGeneralRange)
 					return true;
 			}
@@ -22129,7 +22298,11 @@ bool CvUnit::IsNearGreatGeneral(const CvPlot* pAtPlot, const CvUnit* pIgnoreThis
 
 	}
 
+#if defined(MOD_PROMOTIONS_AURA_CHANGE)
+	return bFound;
+#else
 	return false;
+#endif
 }
 #endif
 
@@ -22235,18 +22408,19 @@ int CvUnit::GetReverseGreatGeneralModifier(const CvPlot* pAtPlot) const
 	}
 	
 	int iMaxMod = 0;
-
 	const std::vector<PlayerTypes>& vEnemies = GET_PLAYER(getOwner()).GetPlayersAtWarWith();
-
 	for(std::vector<PlayerTypes>::const_iterator it=vEnemies.begin(); it!=vEnemies.end(); ++it)
 	{
 		CvPlayer& kLoopPlayer = GET_PLAYER(*it);
-		const std::vector<int>& possibleUnits = kLoopPlayer.GetAreaEffectNegativeUnits();
-
-		for(std::vector<int>::const_iterator it = possibleUnits.begin(); it!=possibleUnits.end(); ++it)
+		const std::vector<std::pair<int,int>>& possibleUnits = kLoopPlayer.GetAreaEffectNegativeUnits();
+		for(std::vector<std::pair<int,int>>::const_iterator it = possibleUnits.begin(); it!=possibleUnits.end(); ++it)
 		{
-			UnitHandle pUnit = kLoopPlayer.getUnit(*it);
+			//first quick check with a large, fixed distance
+			CvPlot* pUnitPlot = GC.getMap().plotByIndexUnchecked(it->second);
+			if ( plotDistance(pUnitPlot->getX(),pUnitPlot->getY(),getX(), getY())>5 )
+				continue;
 
+			CvUnit* pUnit = kLoopPlayer.getUnit(it->first);
 			if (pUnit)
 			{
 				// Unit with a combat modifier against the enemy
@@ -22380,13 +22554,606 @@ int CvUnit::GetNearbyImprovementModifier()const
 	return 0;
 }
 
+#if defined(MOD_BALANCE_CORE)
+int CvUnit::GetNearbyUnitClassModifierFromUnitClass(const CvPlot* pAtPlot) const
+{
+	return GetNearbyUnitClassModifier(GetCombatBonusFromNearbyUnitClass(), GetNearbyUnitClassBonusRange(), GetNearbyUnitClassBonus(), pAtPlot);
+}
+
+int CvUnit::GetNearbyUnitClassModifier(UnitClassTypes eUnitClass, int iUnitClassRange, int iUnitClassModifier, const CvPlot* pAtPlot) const
+{
+	if(iUnitClassModifier != 0)
+	{
+		if (pAtPlot == NULL)
+		{
+			pAtPlot = plot();
+			if (pAtPlot == NULL)
+				return false;
+		}
+
+		CvPlot* pLoopPlot;
+		// Look around this Unit to see if there's a nearby UnitClass that will give us the modifier
+		for(int iX = -iUnitClassRange; iX <= iUnitClassRange; iX++)
+		{
+			for(int iY = -iUnitClassRange; iY <= iUnitClassRange; iY++)
+			{
+				pLoopPlot = plotXYWithRangeCheck(pAtPlot->getX(), pAtPlot->getY(), iX, iY, iUnitClassRange);
+				if(pLoopPlot != NULL)
+				{
+					// Is the right Unitclass here?
+					IDInfo* pUnitNode = pLoopPlot->headUnitNode();
+					if (pUnitNode != NULL)
+					{
+						CvUnit* pLoopUnit = ::getUnit(*pUnitNode);
+						pUnitNode = pLoopPlot->nextUnitNode(pUnitNode);
+						if(pLoopUnit)
+						{
+							if (pLoopUnit->getUnitClassType() == eUnitClass)
+							{
+								if(GET_PLAYER(pLoopUnit->getOwner()).getTeam() == GET_PLAYER(getOwner()).getTeam())
+								{
+									return iUnitClassModifier;
+								}
+							}
+						}
+					}
+				}
+			}
+		}
+	}
+	return 0;
+}
+
+void CvUnit::DoNearbyUnitPromotion(CvUnit* pUnit, const CvPlot* pPlot)
+{
+	VALIDATE_OBJECT
+	if (pPlot == NULL)
+	{
+		pPlot = pUnit->plot();
+	}
+	int iX = pPlot->getX(); int iY = pPlot->getY();
+	if(pPlot != NULL)
+	{
+		int iI;
+		for(iI = 0; iI < GC.getNumPromotionInfos(); iI++)
+		{
+			const PromotionTypes eLoopPromotion = static_cast<PromotionTypes>(iI);
+			CvPromotionEntry* pkPromotionInfo = GC.getPromotionInfo(eLoopPromotion);
+			if(pkPromotionInfo != NULL)
+			{
+				if(pkPromotionInfo->IsNearbyPromotion())
+				{
+					if(!pUnit->IsWithinDistanceOfUnitPromotion(pkPromotionInfo->AddedFromNearbyPromotion(), pkPromotionInfo->GetNearbyRange(), true, false) || pUnit->HasPromotion(pkPromotionInfo->AddedFromNearbyPromotion()))
+					{
+						pUnit->setHasPromotion(eLoopPromotion, false);
+					}
+					else
+					{
+						if(::IsPromotionValidForUnitCombatType(eLoopPromotion, pUnit->getUnitType()))
+						{
+							pUnit->setHasPromotion(eLoopPromotion, true);
+						}
+					}
+					if(pUnit->isHasPromotion(pkPromotionInfo->AddedFromNearbyPromotion()))
+					{	
+						int iDistance = pkPromotionInfo->GetNearbyRange();
+						CvUnit* pLoopUnit;
+						for(int iJ = 0; iJ < GC.getNumUnitCombatClassInfos(); iJ++)
+						{
+							UnitCombatTypes ethiscombatunit = NO_UNITCOMBAT;
+							const UnitCombatTypes eUnitCombatClass = static_cast<UnitCombatTypes>(iJ);
+							CvBaseInfo* pkUnitCombatClassInfo = GC.getUnitCombatClassInfo(eUnitCombatClass);
+							if(pkUnitCombatClassInfo)
+							{
+								if(pkPromotionInfo->GetUnitCombatClass(eUnitCombatClass))
+								{
+									ethiscombatunit = eUnitCombatClass;
+								}
+								if(ethiscombatunit != NO_UNITCOMBAT)
+								{
+									for (int i = -iDistance; i <= iDistance; ++i)
+									{
+										for (int j = -iDistance; j <= iDistance; ++j)
+										{
+											CvPlot* pLoopPlot = ::plotXYWithRangeCheck(iX, iY, i, j, iDistance);
+											if (pLoopPlot != NULL && pLoopPlot->getNumUnits() != 0)
+											{
+												for(int iK = 0; iK < pLoopPlot->getNumUnits(); iK++)
+												{
+													pLoopUnit = pLoopPlot->getUnitByIndex(iK);
+													if(pLoopUnit != NULL)
+													{
+														if(pLoopUnit->getUnitCombatType() == ethiscombatunit && !pLoopUnit->HasPromotion(pkPromotionInfo->AddedFromNearbyPromotion()))
+														{
+															if(GET_PLAYER(pLoopUnit->getOwner()).getTeam() == GET_PLAYER(pUnit->getOwner()).getTeam())
+															{
+																if(::IsPromotionValidForUnitCombatType(eLoopPromotion, pLoopUnit->getUnitType()))
+																{
+																	pLoopUnit->setHasPromotion(eLoopPromotion, true);
+																}
+															}
+														}
+													}
+												}
+											}
+										}
+									}
+								}
+							}
+						}
+					}
+				}				
+				if(pkPromotionInfo->IsNearbyCityPromotion() && pkPromotionInfo->getRequiredUnit() == pUnit->getUnitType())
+				{
+					if(!pUnit->IsWithinDistanceOfCity(pkPromotionInfo->GetNearbyRange(), true, true))
+					{
+						pUnit->setHasPromotion(eLoopPromotion, false);
+					}
+					else
+					{
+						if(::IsPromotionValidForUnitCombatType(eLoopPromotion, pUnit->getUnitType()))
+						{
+							pUnit->setHasPromotion(eLoopPromotion, true);
+						}
+					}
+				}
+				if(pkPromotionInfo->IsNearbyFriendlyCityPromotion() && pkPromotionInfo->getRequiredUnit() == pUnit->getUnitType())
+				{
+					if(!pUnit->IsWithinDistanceOfCity(pkPromotionInfo->GetNearbyRange(), true, false))
+					{
+						pUnit->setHasPromotion(eLoopPromotion, false);
+					}
+					else
+					{
+						if(::IsPromotionValidForUnitCombatType(eLoopPromotion, pUnit->getUnitType()))
+						{
+							pUnit->setHasPromotion(eLoopPromotion, true);
+						}
+					}
+				}
+				if(pkPromotionInfo->IsNearbyEnemyCityPromotion() && pkPromotionInfo->getRequiredUnit() == pUnit->getUnitType())
+				{
+					if(!pUnit->IsWithinDistanceOfCity(pkPromotionInfo->GetNearbyRange(), false, true))
+					{
+						pUnit->setHasPromotion(eLoopPromotion, false);
+					}
+					else
+					{
+						if(::IsPromotionValidForUnitCombatType(eLoopPromotion, pUnit->getUnitType()))
+						{
+							pUnit->setHasPromotion(eLoopPromotion, true);
+						}
+					}
+				}
+				if(pkPromotionInfo->IsFriendlyLands() && pkPromotionInfo->getRequiredUnit() == pUnit->getUnitType())
+				{
+					if(pPlot->IsFriendlyTerritory(pUnit->getOwner()) || (pPlot->getOwner() != NO_PLAYER && GET_PLAYER(pPlot->getOwner()).HasSameIdeology(pUnit->getOwner()) && GET_TEAM(pPlot->getTeam()).IsAllowsOpenBordersToTeam(pUnit->getTeam())))
+					{
+						if(::IsPromotionValidForUnitCombatType(eLoopPromotion, pUnit->getUnitType()))
+						{
+							pUnit->setHasPromotion(eLoopPromotion, true);
+						}
+					}
+					else
+					{
+						pUnit->setHasPromotion(eLoopPromotion, false);
+					}
+				}
+				if(pkPromotionInfo->IsEnemyLands())
+				{
+					for(int iJ = 0; iJ < MAX_PLAYERS; iJ++)
+					{
+						CvPlayerAI& kPlayer = GET_PLAYER((PlayerTypes)iJ);
+						if(kPlayer.GetPlayerTraits()->IsWarsawPact())
+						{
+							if(GET_TEAM(pUnit->getTeam()).isAtWar(GET_TEAM(kPlayer.getTeam()).GetID()))
+							{
+								if((pPlot->getTeam() != NO_TEAM && pPlot->getTeam() == GET_TEAM(kPlayer.getTeam()).GetID()) || (pPlot->getOwner() != NO_PLAYER && GET_PLAYER(pPlot->getOwner()).isMinorCiv() && GET_PLAYER(pPlot->getOwner()).GetMinorCivAI()->GetFriendshipLevelWithMajor(kPlayer.GetID()) >= 1) || (pPlot->getOwner() != NO_PLAYER && GET_PLAYER(pPlot->getOwner()).HasSameIdeology(kPlayer.GetID()) && GET_TEAM(pPlot->getTeam()).IsAllowsOpenBordersToTeam(GET_TEAM(kPlayer.getTeam()).GetID())))
+								{
+									pUnit->setHasPromotion(eLoopPromotion, true);
+								}
+								else
+								{
+									pUnit->setHasPromotion(eLoopPromotion, false);
+								}
+							}
+							else
+							{
+								if(pUnit->HasPromotion(eLoopPromotion))
+								{
+									pUnit->setHasPromotion(eLoopPromotion, false);
+								}
+							}
+						}
+					}
+				}
+				if(pkPromotionInfo->GetAdjacentSameType() != NO_PROMOTION)
+				{
+					if(pUnit->HasPromotion(pkPromotionInfo->GetAdjacentSameType()) && pUnit->IsAdjacentToUnitPromotion(pkPromotionInfo->GetAdjacentSameType(), true, false))
+					{
+						pUnit->setHasPromotion(eLoopPromotion, true);
+					}
+					else
+					{
+						pUnit->setHasPromotion(eLoopPromotion, false);
+					}
+				}
+				if(pkPromotionInfo->GetPillageBonusStrengthPercent() > 0 && pUnit->HasPromotion(eLoopPromotion))
+				{
+					if(pPlot->IsImprovementPillaged())
+					{
+						pUnit->SetBaseCombatStrength(pUnit->getUnitInfo().GetCombat() + ((pkPromotionInfo->GetPillageBonusStrengthPercent() * pUnit->getUnitInfo().GetCombat()) / 100));
+					}
+					else
+					{
+						pUnit->SetBaseCombatStrength(pUnit->getUnitInfo().GetCombat());
+					}
+				}
+			}
+		}
+	}
+}
+void CvUnit::DoImprovementExperience(const CvPlot* pPlot)
+{
+	if (pPlot == NULL)
+	{
+		pPlot = plot();
+	}
+	if(pPlot != NULL)
+	{
+		int iExperience = 0;
+		ImprovementTypes eImprovement = pPlot->getImprovementType();
+		if(eImprovement != NO_IMPROVEMENT)
+		{
+			if(pPlot->getOwner() == getOwner() && !pPlot->IsImprovementPillaged())
+			{
+				CvImprovementEntry* pkImprovementInfo = GC.getImprovementInfo(eImprovement);
+				{
+					if(pkImprovementInfo->IsExperience())
+					{
+						if(pkImprovementInfo->GetUnitPlotExperience() > 0)
+						{
+							iExperience += GC.getImprovementInfo(eImprovement)->GetUnitPlotExperience();
+						}
+						if(pkImprovementInfo->GetGAUnitPlotExperience() > 0 && GET_PLAYER(getOwner()).isGoldenAge())
+						{
+							iExperience += GC.getImprovementInfo(eImprovement)->GetGAUnitPlotExperience();
+						}
+						if(IsCombatUnit() && IsOnImprovement(eImprovement))
+						{
+							changeExperienceTimes100(iExperience * 100);
+						}
+					}
+				}
+			}
+		}
+	}
+}
+
+void CvUnit::DoStackedGreatGeneralExperience(const CvPlot* pPlot)
+{
+	if (pPlot == NULL)
+	{
+		pPlot = plot();
+	}
+	if(pPlot != NULL)
+	{
+		int iExperience = 0;
+		if(IsStackedGreatGeneral(pPlot))
+		{
+			int iI;
+			for(iI = 0; iI < GC.getNumPromotionInfos(); iI++)
+			{
+				const PromotionTypes eLoopPromotion = static_cast<PromotionTypes>(iI);
+				CvPromotionEntry* pkPromotionInfo = GC.getPromotionInfo(eLoopPromotion);
+				if(pkPromotionInfo != NULL)
+				{
+					if(pkPromotionInfo->GetStackedGreatGeneralExperience() > 0)
+					{
+						iExperience += pkPromotionInfo->GetStackedGreatGeneralExperience();
+						if(IsCombatUnit() && HasPromotion(eLoopPromotion))
+						{
+							changeExperienceTimes100(iExperience * 100);
+						}
+					}
+				}
+			}
+		}
+	}
+}
+
+void CvUnit::DoConvertOnDamageThreshold(const CvPlot* pPlot)
+{
+	if (pPlot == NULL)
+	{
+		pPlot = plot();
+	}
+	if(pPlot != NULL)
+	{
+		if(this->isConvertOnDamage())
+		{
+			CvUnit* pConvertUnit = NULL;
+			int iDamage = this->getUnitInfo().GetDamageThreshold();
+			if(this->getDamage() > iDamage)
+			{
+				for(int iI = 0; iI < GC.getNumUnitInfos(); iI++)
+				{
+					const UnitTypes eLoopUnit = static_cast<UnitTypes>(iI);
+					CvUnitEntry* pkUnitInfo = GC.getUnitInfo(eLoopUnit);
+					if(pkUnitInfo)
+					{
+						if(pkUnitInfo->GetConvertUnit() != NO_UNIT && pkUnitInfo->IsConvertOnDamage() && eLoopUnit == this->getUnitType())
+						{
+							UnitAITypes eAIType = NO_UNITAI;
+							const CvUnitEntry* pkUnitType = GC.getUnitInfo(pkUnitInfo->GetConvertUnit());
+							if(pkUnitType != NULL)
+							{
+								eAIType = (UnitAITypes)pkUnitType->GetDefaultUnitAIType();
+								CvUnit* pNewUnit = GET_PLAYER(getOwner()).initUnit(pkUnitInfo->GetConvertUnit(), this->getX(), this->getY(), eAIType);
+								pConvertUnit = pNewUnit;
+							}
+						}
+					}
+				}
+				if(pConvertUnit != NULL)
+				{
+					pConvertUnit->convert(this, false);
+					pConvertUnit->finishMoves();
+					pConvertUnit->setMoves(pConvertUnit->maxMoves());
+				}
+			}
+		}
+		if(this->isConvertOnFullHP())
+		{
+			CvUnit* pConvertUnit = NULL;
+			if(this->getDamage() == 0)
+			{
+				for(int iI = 0; iI < GC.getNumUnitInfos(); iI++)
+				{
+					const UnitTypes eLoopUnit = static_cast<UnitTypes>(iI);
+					CvUnitEntry* pkUnitInfo = GC.getUnitInfo(eLoopUnit);
+					if(pkUnitInfo)
+					{
+						if(pkUnitInfo->GetConvertUnit() != NO_UNIT && pkUnitInfo->IsConvertOnFullHP() && eLoopUnit == this->getUnitType())
+						{
+							UnitAITypes eAIType = NO_UNITAI;
+							const CvUnitEntry* pkUnitType = GC.getUnitInfo(pkUnitInfo->GetConvertUnit());
+							if(pkUnitType != NULL)
+							{
+								eAIType = (UnitAITypes)pkUnitType->GetDefaultUnitAIType();
+								CvUnit* pNewUnit = GET_PLAYER(getOwner()).initUnit(pkUnitInfo->GetConvertUnit(), this->getX(), this->getY(), eAIType);
+								pConvertUnit = pNewUnit;
+							}
+						}
+					}
+				}
+				if(pConvertUnit != NULL)
+				{
+					pConvertUnit->convert(this, false);
+					pConvertUnit->finishMoves();
+					pConvertUnit->setMoves(pConvertUnit->maxMoves());
+				}
+			}
+		}
+	}
+}
+// Have a unit that'll convert an enemy unit into a Barbarian?
+void CvUnit::DoConvertEnemyUnitToBarbarian(const CvPlot* pPlot)
+{
+	if (pPlot == NULL)
+	{
+		pPlot = plot();
+	}
+	if(pPlot != NULL)
+	{
+		CvPlot* pAdjacentPlot;
+		for(int iI = 0; iI < NUM_DIRECTION_TYPES; ++iI)
+		{
+			pAdjacentPlot = plotDirection(pPlot->getX(), pPlot->getY(), ((DirectionTypes)iI));
+
+			if(pAdjacentPlot != NULL)
+			{
+				if(isConvertEnemyUnitToBarbarian())
+				{
+					CvUnit* pConvertUnit = NULL;
+					int iDamageTheshold = this->getUnitInfo().GetDamageThreshold();
+					CvUnit* pAdjacentUnit = pAdjacentPlot->getBestDefender(NO_PLAYER);
+					if(pAdjacentUnit != NULL && pAdjacentUnit->IsCombatUnit() && !pAdjacentUnit->isBarbarian())
+					{
+						int iExistingDamage = pAdjacentUnit->getDamage();
+						if(GET_PLAYER(getOwner()).IsAtWarWith(pAdjacentUnit->getOwner()))
+						{
+							if(iExistingDamage > iDamageTheshold)
+							{
+								CvPlayer* pBarbPlayer = &GET_PLAYER(BARBARIAN_PLAYER);
+								pConvertUnit = pBarbPlayer->initUnit(pAdjacentUnit->getUnitType(), pAdjacentUnit->getX(), pAdjacentUnit->getY(), pAdjacentUnit->AI_getUnitAIType(), NO_DIRECTION, true /*bNoMove*/, false);
+								pConvertUnit->convert(pAdjacentUnit, false);
+								pConvertUnit->setupGraphical();
+								pConvertUnit->setDamage(iExistingDamage, BARBARIAN_PLAYER);
+								pConvertUnit->finishMoves();
+
+								CvNotifications* pNotifications = GET_PLAYER(this->getOwner()).GetNotifications();
+								if(pNotifications)
+								{
+									CvString strBuffer = GetLocalizedText("TXT_KEY_NOTIFICATION_CHAOS_CONVERSION");
+									CvString strSummary = GetLocalizedText("TXT_KEY_NOTIFICATION_SUMMARY_CHAOS_CONVERSION");
+									pNotifications->Add(NOTIFICATION_GENERIC, strBuffer, strSummary, pAdjacentUnit->getX(), pAdjacentUnit->getY(), -1);
+								}
+							}
+						}
+					}
+				}
+				// Is this unit running into a unit that might convert it into a barbarian??
+				else if(IsCombatUnit() && !isBarbarian())
+				{
+					CvUnit* pConvertUnit = NULL;
+					int iExistingDamage = getDamage();
+					if(pAdjacentPlot->getNumUnits() > 0)
+					{
+						for(int iNearbyUnitLoop = 0; iNearbyUnitLoop < pAdjacentPlot->getNumUnits(); iNearbyUnitLoop++)
+						{
+							const CvUnit* const adjUnit = pAdjacentPlot->getUnitByIndex(iNearbyUnitLoop);
+							if(adjUnit != NULL && adjUnit->isConvertEnemyUnitToBarbarian())
+							{
+								int iDamageTheshold = adjUnit->getUnitInfo().GetDamageThreshold();
+								if(GET_PLAYER(getOwner()).IsAtWarWith(adjUnit->getOwner()))
+								{
+									if(iExistingDamage > iDamageTheshold)
+									{
+
+										CvPlayer* pBarbPlayer = &GET_PLAYER(BARBARIAN_PLAYER);
+										pConvertUnit = pBarbPlayer->initUnit(this->getUnitType(), this->getX(), this->getY(), this->AI_getUnitAIType(), NO_DIRECTION, true /*bNoMove*/, false);
+										pConvertUnit->convert(this, false);
+										pConvertUnit->setupGraphical();
+										pConvertUnit->setDamage(iExistingDamage, BARBARIAN_PLAYER);
+										pConvertUnit->finishMoves();
+
+										CvNotifications* pNotifications = GET_PLAYER(adjUnit->getOwner()).GetNotifications();
+										if(pNotifications)
+										{
+											CvString strBuffer = GetLocalizedText("TXT_KEY_NOTIFICATION_CHAOS_CONVERSION");
+											CvString strSummary = GetLocalizedText("TXT_KEY_NOTIFICATION_SUMMARY_CHAOS_CONVERSION");
+											pNotifications->Add(NOTIFICATION_GENERIC, strBuffer, strSummary, this->getX(), this->getY(), -1);
+										}
+									}
+								}
+							}
+						}
+					}
+				}
+			}
+		}
+	}
+}
+
+void CvUnit::DoConvertReligiousUnitsToMilitary(const CvPlot* pPlot)
+{
+	if (pPlot == NULL)
+	{
+		pPlot = plot();
+	}
+	if(pPlot != NULL)
+	{
+		CvUnit* pConvertUnit = NULL;
+		if(m_pUnitInfo->IsFoundReligion() || m_pUnitInfo->IsSpreadReligion() || m_pUnitInfo->IsRemoveHeresy())
+		{
+			for(int iI = 0; iI < MAX_PLAYERS; iI++)
+			{
+				CvPlayerAI& kPlayer = GET_PLAYER((PlayerTypes)iI);
+				if(kPlayer.GetPlayerTraits()->GetChanceToConvertReligiousUnits() > 0)
+				{
+					if(pPlot->getTeam() == GET_TEAM(kPlayer.getTeam()).GetID() && getTeam() != GET_TEAM(kPlayer.getTeam()).GetID())
+					{
+						if(GC.getGame().getJonRandNum(100, "Chance for conversion") <= kPlayer.GetPlayerTraits()->GetChanceToConvertReligiousUnits())
+						{
+							UnitTypes eBestLandUnit = NO_UNIT;
+							int iStrengthBestLandCombat = 0;
+							for(int iJ = 0; iJ < GC.getNumUnitClassInfos(); iJ++)
+							{
+								const UnitClassTypes eUnitClass = static_cast<UnitClassTypes>(iJ);
+								CvUnitClassInfo* pkUnitClassInfo = GC.getUnitClassInfo(eUnitClass);
+								if(pkUnitClassInfo)
+								{
+									const UnitTypes eUnit = (UnitTypes) kPlayer.getCivilizationInfo().getCivilizationUnits(eUnitClass);
+									CvUnitEntry* pUnitEntry = GC.getUnitInfo(eUnit);
+									if(pUnitEntry)
+									{
+										if(!kPlayer.canTrain(eUnit))
+										{
+											continue;
+										}
+										if(pUnitEntry->GetRangedCombat() > 0)
+										{
+											continue;
+										}
+										if(pUnitEntry->GetDomainType() == DOMAIN_LAND)
+										{
+											bool bBad = false;
+											ResourceTypes eResource;
+											for(int iResourceLoop = 0; iResourceLoop < GC.getNumResourceInfos(); iResourceLoop++)
+											{
+												eResource = (ResourceTypes) iResourceLoop;
+												int iNumResource = pUnitEntry->GetResourceQuantityRequirement(eResource);
+												if (iNumResource > 0)
+												{
+													if(kPlayer.getNumResourceAvailable(eResource, true) < iNumResource)
+													{
+														bBad = true;
+														break;
+													}
+												}
+											}
+											if(bBad)
+											{
+												continue;
+											}
+											int iCombatLandStrength = (std::max(1, pUnitEntry->GetCombat()));
+											if(iCombatLandStrength > iStrengthBestLandCombat)
+											{
+												iStrengthBestLandCombat = iCombatLandStrength;
+												eBestLandUnit = eUnit;
+											}
+										}
+									}
+								}
+							}
+							if(eBestLandUnit != NO_UNIT)
+							{
+								CvUnitEntry* pkbUnitEntry = GC.getUnitInfo(eBestLandUnit);
+								if(pkbUnitEntry)
+								{
+									UnitAITypes eUnitAI = pkbUnitEntry->GetDefaultUnitAIType();
+									pConvertUnit = kPlayer.initUnit(eBestLandUnit, this->getX(), this->getY(), eUnitAI, NO_DIRECTION, true);
+									pConvertUnit->convert(this, false);
+									CvNotifications* pNotifications = kPlayer.GetNotifications();
+									if (pNotifications)
+									{
+										Localization::String strText = Localization::Lookup("TXT_KEY_NOTIFICATION_HUSSITE_CONVERSION");
+										strText << pConvertUnit->getNameKey() << kPlayer.getNameKey();
+										Localization::String strSummary = Localization::Lookup("TXT_KEY_NOTIFICATION_SUMMARY_HUSSITE_CONVERSION");
+										strSummary << kPlayer.getNameKey();
+										pNotifications->Add(NOTIFICATION_GENERIC, strText.toUTF8(), strSummary.toUTF8(), pConvertUnit->getX(), pConvertUnit->getY(), -1);
+									}
+								}
+							}
+							else
+							{
+								UnitTypes eWarrior = (UnitTypes)GC.getInfoTypeForString("UNIT_WARRIOR");
+								CvUnitEntry* pkbUnitEntry = GC.getUnitInfo(eWarrior);
+								if(pkbUnitEntry)
+								{
+									UnitAITypes eUnitAI = pkbUnitEntry->GetDefaultUnitAIType();
+									pConvertUnit = kPlayer.initUnit(eWarrior, this->getX(), this->getY(), eUnitAI, NO_DIRECTION, true);
+									pConvertUnit->convert(this, false);
+									CvNotifications* pNotifications = kPlayer.GetNotifications();
+									if (pNotifications)
+									{
+										Localization::String strText = Localization::Lookup("TXT_KEY_NOTIFICATION_HUSSITE_CONVERSION");
+										strText << pConvertUnit->getNameKey() << kPlayer.getNameKey();
+										Localization::String strSummary = Localization::Lookup("TXT_KEY_NOTIFICATION_SUMMARY_HUSSITE_CONVERSION");
+										strSummary << kPlayer.getNameKey();
+										pNotifications->Add(NOTIFICATION_GENERIC, strText.toUTF8(), strSummary.toUTF8(), pConvertUnit->getX(), pConvertUnit->getY(), -1);
+									}
+								}
+							}
+						}
+					}
+				}
+			}
+		}
+	}
+}
+#endif 
+
 //	--------------------------------------------------------------------------------
 bool CvUnit::IsGreatGeneral() const
 {
 	VALIDATE_OBJECT
 
 #if defined(MOD_BALANCE_CORE_MILITARY)
-	if( AI_getUnitAIType() == UNITAI_GENERAL && !IsCombatUnit())
+	if(IsCombatUnit())
+		return false;
+	if(getUnitInfo().GetUnitAIType(UNITAI_GENERAL))
 	{
 		return true;
 	}
@@ -22415,7 +23182,9 @@ bool CvUnit::IsGreatAdmiral() const
 	VALIDATE_OBJECT
 
 #if defined(MOD_BALANCE_CORE_MILITARY)
-	if( AI_getUnitAIType() == UNITAI_ADMIRAL && !IsCombatUnit())
+	if(IsCombatUnit())
+		return false;
+	if(getUnitInfo().GetUnitAIType(UNITAI_ADMIRAL))
 	{
 		return true;
 	}
@@ -22437,6 +23206,36 @@ void CvUnit::ChangeGreatAdmiralCount(int iChange)
 	VALIDATE_OBJECT
 	m_iGreatAdmiralCount += iChange;
 }
+
+#if defined(MOD_PROMOTIONS_AURA_CHANGE)
+//	--------------------------------------------------------------------------------
+int CvUnit::GetAuraRangeChange() const
+{
+	VALIDATE_OBJECT
+	return m_iAuraRangeChange;
+}
+
+//	--------------------------------------------------------------------------------
+void CvUnit::ChangeAuraRangeChange(int iChange)
+{
+	VALIDATE_OBJECT
+	m_iAuraRangeChange += iChange;
+}
+
+//	--------------------------------------------------------------------------------
+int CvUnit::GetAuraEffectChange() const
+{
+	VALIDATE_OBJECT
+	return m_iAuraEffectChange;
+}
+
+//	--------------------------------------------------------------------------------
+void CvUnit::ChangeAuraEffectChange(int iChange)
+{
+	VALIDATE_OBJECT
+	m_iAuraEffectChange += iChange;
+}
+#endif
 
 //	--------------------------------------------------------------------------------
 int CvUnit::getGreatGeneralModifier() const
@@ -22756,6 +23555,18 @@ bool CvUnit::IsHalfNearSapper(const CvCity* pTargetCity) const
 
 	return false;
 }
+//	--------------------------------------------------------------------------------
+bool CvUnit::IsStrongerDamaged() const
+{
+	return m_iStrongerDamaged> 0;
+}
+
+//	--------------------------------------------------------------------------------
+void CvUnit::ChangeIsStrongerDamaged(int iChange)
+{
+	m_iStrongerDamaged += iChange;
+}
+
 #endif
 
 //	--------------------------------------------------------------------------------
@@ -23513,17 +24324,36 @@ void CvUnit::setTransportUnit(CvUnit* pTransportUnit)
 			CvAssertMsg(pTransportUnit->cargoSpaceAvailable(getSpecialUnitType(), getDomainType()) > 0, "Cargo space is expected to be available");
 
 			m_transportUnit = pTransportUnit->GetIDInfo();
-
+#if defined(MOD_CARGO_SHIPS)
+			if(!MOD_CARGO_SHIPS)
+			{
+				if(getDomainType() != DOMAIN_AIR)
+				{
+					SetActivityType(ACTIVITY_SLEEP);
+				}
+			}
+#else
 			if(getDomainType() != DOMAIN_AIR)
 			{
 				SetActivityType(ACTIVITY_SLEEP);
 			}
-
-			if(GC.getGame().isFinalInitialized())
+#endif
+#if defined(MOD_CARGO_SHIPS)
+			if(MOD_CARGO_SHIPS)
 			{
-				finishMoves();
+				if(GC.getGame().isFinalInitialized() && getDomainType() == DOMAIN_AIR)
+				{
+					finishMoves();
+				}
 			}
-
+			else
+			{
+				if(GC.getGame().isFinalInitialized())
+				{
+					finishMoves();
+				}
+			}
+#endif
 			pTransportUnit->changeCargo(1);
 			pTransportUnit->SetActivityType(ACTIVITY_AWAKE);
 		}
@@ -23635,7 +24465,21 @@ void CvUnit::setName(CvString strNewValue)
 	m_strName = strNewValue;
 	DLLUI->setDirty(UnitInfo_DIRTY_BIT, true);
 }
+#if defined(MOD_GLOBAL_NO_LOST_GREATWORKS)
+//	--------------------------------------------------------------------------------
+const CvString CvUnit::getGreatName() const
+{
+	VALIDATE_OBJECT
+	return m_strGreatName.GetCString();
+}
 
+//	--------------------------------------------------------------------------------
+void CvUnit::setGreatName(CvString strName)
+{
+	VALIDATE_OBJECT
+	m_strGreatName = strName;
+}
+#endif
 //	--------------------------------------------------------------------------------
 GreatWorkType CvUnit::GetGreatWork() const
 {
@@ -23649,6 +24493,19 @@ void CvUnit::SetGreatWork(GreatWorkType eGreatWork)
 	m_eGreatWork = eGreatWork;
 }
 
+#if defined(MOD_API_EXTENSIONS)
+//	--------------------------------------------------------------------------------
+bool CvUnit::HasGreatWork() const
+{
+	return (m_eGreatWork != NO_GREAT_WORK);
+}
+
+//	--------------------------------------------------------------------------------
+bool CvUnit::HasUnusedGreatWork() const
+{
+	return (HasGreatWork() && !GC.getGame().GetGameCulture()->IsGreatWorkCreated(m_eGreatWork));
+}
+#endif
 //	--------------------------------------------------------------------------------
 int CvUnit::GetTourismBlastStrength() const
 {
@@ -24627,7 +25484,7 @@ void CvUnit::setHasPromotion(PromotionTypes eIndex, bool bNewValue)
 		changeRiverCrossingNoPenaltyCount((thisPromotion.IsRiver()) ? iChange : 0);
 		changeEnemyRouteCount((thisPromotion.IsEnemyRoute()) ? iChange : 0);
 		changeRivalTerritoryCount((thisPromotion.IsRivalTerritory()) ? iChange : 0);
-		changeMustSetUpToRangedAttackCount((thisPromotion.IsMustSetUpToRangedAttack()) ? iChange : 0);
+		changeIsSlowInEnemyLandCount((thisPromotion.IsMustSetUpToRangedAttack()) ? iChange : 0); //intended. promotion purpose was redefined
 		changeRangedSupportFireCount((thisPromotion.IsRangedSupportFire()) ? iChange : 0);
 		changeAlwaysHealCount((thisPromotion.IsAlwaysHeal()) ? iChange : 0);
 		changeHealOutsideFriendlyCount((thisPromotion.IsHealOutsideFriendly()) ? iChange : 0);
@@ -24648,6 +25505,14 @@ void CvUnit::setHasPromotion(PromotionTypes eIndex, bool bNewValue)
 			}
 		}
 #endif
+#if defined(MOD_BALANCE_CORE)
+		if (thisPromotion.GetNearbyUnitClassBonus() > 0)
+		{
+			SetNearbyUnitClassBonus(thisPromotion.GetNearbyUnitClassBonus());
+			SetNearbyUnitClassBonusRange(thisPromotion.GetNearbyUnitClassBonusRange());
+			SetCombatBonusFromNearbyUnitClass(thisPromotion.GetCombatBonusFromNearbyUnitClass());
+		}
+#endif
 #if defined(MOD_PROMOTIONS_CROSS_MOUNTAINS)
 		if (MOD_PROMOTIONS_CROSS_MOUNTAINS) {
 			changeCanCrossMountainsCount((thisPromotion.CanCrossMountains()) ? iChange : 0);
@@ -24661,6 +25526,11 @@ void CvUnit::setHasPromotion(PromotionTypes eIndex, bool bNewValue)
 #if defined(MOD_PROMOTIONS_CROSS_ICE)
 		if (MOD_PROMOTIONS_CROSS_ICE) {
 			changeCanCrossIceCount((thisPromotion.CanCrossIce()) ? iChange : 0);
+		}
+#endif
+#if defined(MOD_PROMOTIONS_GG_FROM_BARBARIANS)
+		if (MOD_PROMOTIONS_GG_FROM_BARBARIANS) {
+			changeGGFromBarbariansCount((thisPromotion.IsGGFromBarbarians()) ? iChange : 0);
 		}
 #endif
 		ChangeRoughTerrainEndsTurnCount((thisPromotion.IsRoughTerrainEndsTurn()) ? iChange : 0);
@@ -24690,6 +25560,7 @@ void CvUnit::setHasPromotion(PromotionTypes eIndex, bool bNewValue)
 		ChangeCityAttackOnlyCount((thisPromotion.IsCityAttackSupport()) ? iChange: 0);
 		ChangeCaptureDefeatedEnemyCount((thisPromotion.IsCaptureDefeatedEnemy()) ? iChange: 0);
 #if defined(MOD_BALANCE_CORE)
+		changeMountainsDoubleMoveCount((thisPromotion.IsMountainsDoubleMove()) ? iChange : 0);
 		ChangeBarbarianCombatBonus((thisPromotion.GetBarbarianCombatBonus()) * iChange);
 		ChangeGainsXPFromScouting((thisPromotion.IsGainsXPFromScouting()) ? iChange: 0);
 		ChangeCannotBeCapturedCount((thisPromotion.CannotBeCaptured()) ? iChange: 0);
@@ -24697,11 +25568,33 @@ void CvUnit::setHasPromotion(PromotionTypes eIndex, bool bNewValue)
 		ChangeChangeDamageValue((thisPromotion.ChangeDamageValue()) * iChange);
 		ChangeMoraleBreakChance((thisPromotion.GetMoraleBreakChance()) * iChange);
 
-		ChangePromotionDuration(eIndex, (thisPromotion.PromotionDuration()) * iChange);
-		if(getPromotionDuration(eIndex) > 0)
+		if(thisPromotion.PromotionDuration() != 0)
 		{
-			SetTurnPromotionGained(eIndex, GC.getGame().getGameTurn());
+			if(bNewValue)
+			{
+				ChangePromotionDuration(eIndex, (thisPromotion.PromotionDuration()) * iChange);
+				if(getPromotionDuration(eIndex) > 0)
+				{
+					SetTurnPromotionGained(eIndex, GC.getGame().getGameTurn());
+				}
+			}
+			else
+			{
+				ChangePromotionDuration(NO_PROMOTION, 0);
+			}
 		}
+		if(thisPromotion.NegatesPromotion() != NO_PROMOTION)
+		{
+			if(bNewValue)
+			{
+				SetNegatorPromotion((int)thisPromotion.NegatesPromotion());
+			}
+			else
+			{
+				SetNegatorPromotion(-1);
+			}
+		}
+		ChangeIsStrongerDamaged((thisPromotion.IsStrongerDamaged()) ? iChange : 0);
 #endif
 		ChangeCanHeavyChargeCount((thisPromotion.IsCanHeavyCharge()) ? iChange : 0);
 
@@ -24769,7 +25662,10 @@ void CvUnit::setHasPromotion(PromotionTypes eIndex, bool bNewValue)
 
 		ChangeGreatGeneralCount(thisPromotion.IsGreatGeneral() ? iChange: 0);
 		ChangeGreatAdmiralCount(thisPromotion.IsGreatAdmiral() ? iChange: 0);
-
+#if defined(MOD_PROMOTIONS_AURA_CHANGE)
+		ChangeAuraRangeChange(thisPromotion.GetAuraRangeChange() * iChange);
+		ChangeAuraEffectChange(thisPromotion.GetAuraEffectChange() * iChange);
+#endif
 		changeGreatGeneralModifier(thisPromotion.GetGreatGeneralModifier() * iChange);
 		ChangeGreatGeneralReceivesMovementCount(thisPromotion.IsGreatGeneralReceivesMovement() ? iChange: 0);
 		ChangeGreatGeneralCombatModifier(thisPromotion.GetGreatGeneralCombatModifier() * iChange);
@@ -24978,12 +25874,12 @@ bool CvUnit::CanSwapWithUnitHere(CvPlot& swapPlot) const
 
 	if(getDomainType() == DOMAIN_LAND || getDomainType() == DOMAIN_SEA)
 	{
-		if(canEnterTerrain(swapPlot))
+		if(canEnterTerrain(swapPlot,CvUnit::MOVEFLAG_DESTINATION))
 		{
 			// Can I get there this turn?
-			CvUnit* pUnit = (CvUnit*)this;
+			SPathFinderUserData data(this,CvUnit::MOVEFLAG_IGNORE_DANGER | CvUnit::MOVEFLAG_IGNORE_STACKING,1);
 
-			SPathFinderUserData data(pUnit,CvUnit::MOVEFLAG_IGNORE_DANGER | CvUnit::MOVEFLAG_IGNORE_STACKING,1);
+			//need to be careful here, this method may be called from GUI and gamecore, this can lead to a deadlock
 			SPath path = GC.GetPathFinder().GetPath(plot(), &swapPlot, data);
 			if (!!path)
 			{
@@ -25016,11 +25912,11 @@ bool CvUnit::CanSwapWithUnitHere(CvPlot& swapPlot) const
 								if(AreUnitsOfSameType(*pLoopUnit))
 								{
 									CvPlot* here = plot();
-									if(here && pLoopUnit->canEnterTerrain(*here) && pLoopUnit->canMove())
+									if(here && pLoopUnit->canEnterTerrain(*here,CvUnit::MOVEFLAG_DESTINATION) && pLoopUnit->ReadyToMove())
 									{
 										// Can the unit I am swapping with get to me this turn?
 										SPathFinderUserData data(pLoopUnit,CvUnit::MOVEFLAG_IGNORE_DANGER | CvUnit::MOVEFLAG_IGNORE_STACKING,1);
-										SPath path = GC.GetPathFinder().GetPath(pLoopUnit->plot(), pUnit->plot(), data);
+										SPath path = GC.GetPathFinder().GetPath(pLoopUnit->plot(), plot(), data);
 										if (!!path)
 										{
 											CvPlot* pPathEndTurnPlot = PathHelpers::GetPathEndFirstTurnPlot(path);
@@ -25089,6 +25985,7 @@ void CvUnit::read(FDataStream& kStream)
 #endif
 
 	//CBP NOTE: Deleted repeat save data here to reduce bloat and manage memory better for MP
+	kStream >> m_strGreatName;
 	kStream >> m_strName;
 	kStream >> *m_pReligion;
 
@@ -25118,7 +26015,7 @@ void CvUnit::read(FDataStream& kStream)
 	kStream >> uSize;
 	for(UINT uIdx = 0; uIdx < uSize; ++uIdx)
 	{
-		MissionQueueNode Node;
+		MissionData Node;
 
 		kStream >> Node.eMissionType;
 		kStream >> Node.iData1;
@@ -25167,6 +26064,7 @@ void CvUnit::write(FDataStream& kStream) const
 	MOD_SERIALIZE_WRITE(kStream, m_iMaxHitPointsBase);
 #endif
 	//CBP NOTE: Deleted repeat save data here to reduce bloat and manage memory better for MP
+	kStream << m_strGreatName;
 	kStream << m_strName;
 	kStream << *m_pReligion;
 
@@ -25193,7 +26091,7 @@ void CvUnit::write(FDataStream& kStream) const
 	kStream << m_missionQueue.getLength();
 	for(int uIdx = 0; uIdx < m_missionQueue.getLength(); ++uIdx)
 	{
-		MissionQueueNode* pNode = m_missionQueue.getAt(uIdx);
+		MissionData* pNode = m_missionQueue.getAt(uIdx);
 
 		kStream << pNode->eMissionType;
 		kStream << pNode->iData1;
@@ -25222,6 +26120,9 @@ bool CvUnit::canRangeStrike() const
 		return false;
 	}
 
+	/* ---------
+	// no longer used!
+	// ---------
 	if(isMustSetUpToRangedAttack())
 	{
 		if(!isSetUpForRangedAttack())
@@ -25229,6 +26130,7 @@ bool CvUnit::canRangeStrike() const
 			return false;
 		}
 	}
+	*/
 
 	if(isOutOfAttacks())
 	{
@@ -25256,19 +26158,16 @@ bool CvUnit::canRangeStrike() const
 	return true;
 }
 
-#if defined(MOD_AI_SMART_RANGED_UNITS)
-
-bool CvUnit::canEverRangeStrikeAt(int iX, int iY, const CvPlot* pSourcePlot) const
-{
-	if (!pSourcePlot)
-		pSourcePlot = plot();
-#else
-
 bool CvUnit::canEverRangeStrikeAt(int iX, int iY) const
 {
-	VALIDATE_OBJECT
-	const CvPlot* pSourcePlot = plot();
-#endif
+	return canEverRangeStrikeAt(iX,iY,plot(),false);
+}
+
+bool CvUnit::canEverRangeStrikeAt(int iX, int iY, const CvPlot* pSourcePlot, bool bIgnoreVisibility) const
+{
+	if (!pSourcePlot)
+		return false;
+
 	const CvPlot* pTargetPlot = GC.getMap().plot(iX, iY);
 
 	// Plot null?
@@ -25278,7 +26177,7 @@ bool CvUnit::canEverRangeStrikeAt(int iX, int iY) const
 	}
 
 	// Plot not visible?
-	if(!pTargetPlot->isVisible(getTeam()))
+	if(!bIgnoreVisibility && !pTargetPlot->isVisible(getTeam()))
 	{
 		return false;
 	}
@@ -25289,7 +26188,6 @@ bool CvUnit::canEverRangeStrikeAt(int iX, int iY) const
 	if (bIsEmbarkedAttackingLand)
 		return false;
 #endif
-
 
 	// In Range?
 	if(plotDistance(pSourcePlot->getX(), pSourcePlot->getY(), pTargetPlot->getX(), pTargetPlot->getY()) > GetRange())
@@ -25323,7 +26221,7 @@ bool CvUnit::canEverRangeStrikeAt(int iX, int iY) const
 			else
 			{
 #endif
-			return false;
+				return false;
 #if defined(MOD_BALANCE_CORE_MILITARY_PROMOTION_ADVANCED)
 			}
 #endif
@@ -25340,7 +26238,7 @@ bool CvUnit::canEverRangeStrikeAt(int iX, int iY) const
 	}
 
 #if defined(MOD_BALANCE_RANGED_ATTACK_ONLY_IN_NATIVE_DOMAIN)
-    if(!isNativeDomain(plot()))
+    if(!isNativeDomain(pSourcePlot))
     {
         return false;
     }
@@ -25411,14 +26309,17 @@ bool CvUnit::canRangeStrikeAt(int iX, int iY, bool bNeedWar, bool bNoncombatAllo
 
 #if defined(MOD_GLOBAL_SUBS_UNDER_ICE_IMMUNITY)
 				// if the defender is a sub
-				if (MOD_GLOBAL_SUBS_UNDER_ICE_IMMUNITY && pLoopUnit->getInvisibleType() == 0) {
+				if (MOD_GLOBAL_SUBS_UNDER_ICE_IMMUNITY && pLoopUnit->getInvisibleType() == 0)
+				{
 					// if the plot is ice, unless the attacker is also a sub, ignore them
-					if (pTargetPlot->getFeatureType() == FEATURE_ICE && this->getInvisibleType() != 0) {
+					if (pTargetPlot->getFeatureType() == FEATURE_ICE && this->getInvisibleType() != 0)
+					{
 						continue;
 					}
 
 					// if the attacker is an archer type unit, ignore them
-					if (this->getUnitCombatType() == (UnitCombatTypes)GC.getInfoTypeForString("UNITCOMBAT_ARCHER", true)) {
+					if (this->getUnitCombatType() == (UnitCombatTypes)GC.getInfoTypeForString("UNITCOMBAT_ARCHER", true))
+					{
 						continue;
 					}
 				}
@@ -25699,6 +26600,20 @@ void CvUnit::setArmyID(int iNewArmyID)
 	}
 }
 
+CvString CvUnit::getTacticalZoneInfo() const
+{
+	CvTacticalDominanceZone* pZone = GET_PLAYER(m_eOwner).GetTacticalAI()->GetTacticalAnalysisMap()->GetZoneByPlot(plot());
+	if (pZone)
+	{
+		const char* dominance[] = { "no units", "friendly", "enemy", "even" };
+		AITacticalPosture posture = GET_PLAYER(getOwner()).GetTacticalAI()->FindPosture(pZone);
+		return CvString::format("tactical zone %d, dominance %s, %s", pZone->GetDominanceZoneID(), dominance[pZone->GetDominanceFlag()], 
+			posture!=AI_TACTICAL_POSTURE_NONE ? postureNames[posture] : "no posture");
+	}
+
+	return CvString("no tactical zone");
+}
+
 //	--------------------------------------------------------------------------------
 bool CvUnit::IsSelected() const
 {
@@ -25730,6 +26645,11 @@ void CvUnit::IncrementFirstTimeSelected()
 	}
 }
 
+//	--------------------------------------------------------------------------------
+bool CvUnit::HasQueuedVisualizationMoves() const
+{
+	return !m_unitMoveLocs.empty();
+}
 
 //	--------------------------------------------------------------------------------
 void CvUnit::QueueMoveForVisualization(CvPlot* pkPlot)
@@ -25749,13 +26669,13 @@ void CvUnit::QueueMoveForVisualization(CvPlot* pkPlot)
 void CvUnit::PublishQueuedVisualizationMoves()
 {
 	VALIDATE_OBJECT
-	if(m_unitMoveLocs.size())
+	if(HasQueuedVisualizationMoves())
 	{
 		auto_ptr<ICvUnit1> pDllUnit(new CvDllUnit(this));
 		CvPlotIndexVector kPlotArray;
 
 		kPlotArray.reserve(m_unitMoveLocs.size());
-		for(UnitMovementQueue::const_iterator itr = m_unitMoveLocs.begin(); itr != m_unitMoveLocs.end(); ++itr)
+		for(std::vector<CvPlot*>::const_iterator itr = m_unitMoveLocs.begin(); itr != m_unitMoveLocs.end(); ++itr)
 		{
 			kPlotArray.push_back((*itr)->GetPlotIndex());
 		}
@@ -25795,7 +26715,7 @@ FAutoArchive& CvUnit::getSyncArchive()
 bool CvUnit::IsDoingPartialMove() const
 {
 	VALIDATE_OBJECT
-	const MissionQueueNode* pkMissionNode = HeadMissionQueueNode();
+	const MissionData* pkMissionNode = HeadMissionData();
 	if(!pkMissionNode)
 	{
 		return false;
@@ -26044,8 +26964,7 @@ bool CvUnit::SentryAlert() const
 				CvPlot* pPlot = ::plotXYWithRangeCheck(getX(), getY(), iX, iY, iRange);
 				if(NULL != pPlot)
 				{
-					// because canSeePlot() adds one to the range internally
-					if(plot()->canSeePlot(pPlot, getTeam(), (iRange - 1), NO_DIRECTION))
+					if(plot()->canSeePlot(pPlot, getTeam(), iRange, NO_DIRECTION))
 					{
 						if(pPlot->isVisibleEnemyUnit(this))
 						{
@@ -26166,7 +27085,7 @@ RouteTypes CvUnit::GetBestBuildRoute(CvPlot* pPlot, BuildTypes* peBestBuild) con
 	
 #if defined(MOD_GLOBAL_QUICK_ROUTES)
 	CvPlayer& kPlayer = GET_PLAYER(getOwner());
-	const MissionQueueNode* pkMissionNode = HeadMissionQueueNode();
+	const MissionData* pkMissionNode = HeadMissionData();
 	bool bOnlyRoad = MOD_GLOBAL_QUICK_ROUTES && kPlayer.isHuman() && (pkMissionNode != NULL && pkMissionNode->eMissionType == CvTypes::getMISSION_ROUTE_TO());
 	
 	if (bOnlyRoad) {
@@ -26222,90 +27141,116 @@ void CvUnit::PlayActionSound()
 	VALIDATE_OBJECT
 }
 
-//	---------------------------------------------------------------------------
-bool CvUnit::UpdatePathCache(CvPlot* pDestPlot, int iFlags)
+bool CvUnit::ComputePath(const CvPlot* pToPlot, int iFlags, int iMaxTurns)
 {
-	bool bGenerated = false;
+	SPathFinderUserData data(this,iFlags,iMaxTurns);
+	SPath newPath = GC.GetPathFinder().GetPath(getX(), getY(), pToPlot->getX(), pToPlot->getY(), data);
 
-	// this method is only called from ContinueMission and that all previous path data is deleted when a mission is started
-	// we can assume that other than the unit that is moving, nothing on the map will change
-	// so we can re-use the cached path data most of the time
-
-	if (m_uiLastPathCacheDest != pDestPlot->GetPlotIndex() || 
-		m_uiLastPathFlags != iFlags ||
-		m_uiLastPathTurn != GC.getGame().getGameTurn() )	
+	//now copy the new path
+	//but skip the first node, it's the current unit plot
+	//important: this means that an empty m_kLastPath is valid!
+	CvPathNode nextNode;
+	m_kLastPath.clear();
+	for (size_t i=1; i<newPath.vPlots.size(); i++)
 	{
-		bGenerated = GeneratePath(pDestPlot, iFlags);
+		nextNode = newPath.vPlots[i];
+		m_kLastPath.push_back( nextNode );
 	}
-	else
+
+	if(!m_kLastPath.empty())
 	{
-		//visibility might have changed because of this same unit's movement
-		CvPlot* pkPathDest = m_kLastPath.GetFinalPlot();
-		if (pkPathDest)
+		CvMap& kMap = GC.getMap();
+		TeamTypes eTeam = getTeam();
+
+		// Get the state of the plots in the path, they determine how much of the path is re-usable.
+		for (size_t iIndex = 0; iIndex<m_kLastPath.size(); iIndex++)
 		{
-			// Was the path destination invisible at the time of generation? See if it is visible now.
-			if ( m_kLastPath.back().GetFlag(CvPathNode::PLOT_INVISIBLE) && pkPathDest->isVisible(getTeam()))
+			CvPathNode& kNode = m_kLastPath[iIndex];
+			CvPlot* pkPlot = kMap.plotCheckInvalid(kNode.m_iX, kNode.m_iY);
+			if (pkPlot && !pkPlot->isVisible(eTeam))
 			{
-				// The path destination is now visible, recalculate now in case it can't be reached (occupied)
-				if ((bGenerated = GeneratePath(pkPathDest, iFlags)) == false && pDestPlot != pkPathDest)
-				{
-					// Hmm, failed for some reason, re-do the entire path
-					bGenerated = GeneratePath(pDestPlot, iFlags);
-				}
-			}
-			else
-			{
-				// Was the next plot we are stepping into invisible at the time of generation?
-				if (m_kLastPath.front().GetFlag((int)CvPathNode::PLOT_INVISIBLE))
-				{
-					// We are trying to move into a plot that is invisible and we want to continue out into the darkness.  We have to recalculate our path.
-					// Since we have already done a path find to the destination once, we can now just path find to how far out we can get in this turn.
-					CvPlot* pkTurnDest = m_kLastPath.GetTurnDestinationPlot(1);
-					if (pkTurnDest)
-					{
-						if (pkTurnDest && (bGenerated = GeneratePath(pkTurnDest, iFlags)) == false && pDestPlot != pkTurnDest)
-						{
-							// Hmm, failed for some reason, re-do the entire path
-							bGenerated = GeneratePath(pDestPlot, iFlags);
-						}
-					}
-					else
-					{
-						bGenerated = GeneratePath(pDestPlot, iFlags);	// Can't find the dest in the path, regenerate
-					}
-				}
-				else
-				{
-					// The path is still good, just use the next node
-					bGenerated = true;
-				}
+				kNode.SetFlag(CvPathNode::PLOT_INVISIBLE);
+				if (iIndex > 0)
+					m_kLastPath[iIndex-1].SetFlag(CvPathNode::PLOT_ADJACENT_INVISIBLE);
+
+				// Also determine the destination visibility.  
+				// This will be checked in UnitPathTo to see if the destination's visibility has changed and do a re-evaluate again if it has.
+				// This will help a unit to stop early in its pathing if the destination is blocked.
+				CvPlot* pkPathDest = m_kLastPath.GetFinalPlot();
+				if (pkPathDest != NULL && !pkPathDest->isVisible(eTeam))
+					m_kLastPath.back().SetFlag(CvPathNode::PLOT_INVISIBLE);
+
+				break;	// Anything after is 'in the dark' and should be re-evaluated if trying to move a unit into it.
 			}
 		}
 	}
 
-	return bGenerated;
+	// This helps in preventing us from trying to re-path to the same unreachable location.
+	m_uiLastPathCacheOrigin = plot()->GetPlotIndex();
+	m_uiLastPathCacheDestination = pToPlot->GetPlotIndex();
+	m_uiLastPathFlags = iFlags;
+	m_uiLastPathTurn = GC.getGame().getGameTurn();
+	m_uiLastPathLength = (!!newPath) ? m_kLastPath.size() : 0xFFFFFFFF; //length UINT_MAX means invalid
+
+	return !!newPath;
 }
+
 //	---------------------------------------------------------------------------
-// Returns true if attack was made...
-bool CvUnit::UnitAttack(int iX, int iY, int iFlags)
+bool CvUnit::VerifyCachedPath(const CvPlot* pDestPlot, int iFlags, int iMaxTurns)
 {
-	VALIDATE_OBJECT
+	bool bHaveValidPath = false;
+
+	// this method is only called from ContinueMission and that all previous path data is deleted when a mission is started
+	// we can assume that other than the unit that is moving, nothing on the map will change
+	// so we can re-use the cached path data most of the time
+	if (m_kLastPath.empty() || !HaveCachedPathTo(pDestPlot,iFlags))
+		return ComputePath(pDestPlot, iFlags, iMaxTurns);
+
+	// Was the next plot invisible at the time of generation? See if it is visible now.
+	CvPlot* pkNextPlot = m_kLastPath.GetFirstPlot();
+	if ( m_kLastPath.front().GetFlag(CvPathNode::PLOT_INVISIBLE) && pkNextPlot->isVisible(getTeam()))
+	{
+		int iModifiedFlags = iFlags;
+
+		//do we need to stay there?
+		if (m_kLastPath.front().m_iMoves == 0)
+			iModifiedFlags |= CvUnit::MOVEFLAG_DESTINATION;
+
+		//normally we would allow an attack at the destination
+		//since it was invisible we didn't even know that there's a unit there
+		//but we do allow attacks on cities
+		if (pkNextPlot==pDestPlot && pDestPlot->isEnemyCity(*this))
+			iModifiedFlags |= CvUnit::MOVEFLAG_ATTACK;
+		else
+			iModifiedFlags &= ~CvUnit::MOVEFLAG_ATTACK;
+
+		bHaveValidPath = canMoveInto(*pkNextPlot,iModifiedFlags);
+
+		//don't recompute for the destination plot because it's pointless and because it could succeed 
+		//(the pathfinder dynamically sets the attack flag for the destination)
+		if (!bHaveValidPath && pkNextPlot!=pDestPlot)
+			bHaveValidPath = ComputePath(pDestPlot, iFlags, iMaxTurns);
+	}
+	else
+	{
+		// The path is still good, just use the next node
+		bHaveValidPath = IsCachedPathValid();
+	}
+
+	return bHaveValidPath;
+}
+
+bool CvUnit::CheckDOWNeededForMove(int iX, int iY)
+{
 	CvMap& kMap = GC.getMap();
 	CvPlot* pDestPlot = kMap.plot(iX, iY);
 
-	CvAssertMsg(pDestPlot != NULL, "DestPlot is not assigned a valid value");
-	if(!pDestPlot)
-	{
+	// Important
+	if (at(iX,iY))
 		return false;
-	}
-
-#if defined(MOD_GLOBAL_BREAK_CIVILIAN_RESTRICTIONS)
-	if (MOD_GLOBAL_BREAK_CIVILIAN_RESTRICTIONS && IsCivilianUnit())
-		return false;
-#endif
 
 	// Test if this attack requires war to be declared first
-	if(isHuman() && getOwner() == GC.getGame().getActivePlayer() && pDestPlot->isVisible(getTeam()))
+	if(pDestPlot && isHuman() && getOwner() == GC.getGame().getActivePlayer() && pDestPlot->isVisible(getTeam()))
 	{
 		TeamTypes eRivalTeam = GetDeclareWarMove(*pDestPlot);
 
@@ -26333,86 +27278,102 @@ bool CvUnit::UnitAttack(int iX, int iY, int iFlags)
 			}
 			DLLUI->AddPopup(kPopup);
 
-			return false;
+			return true;
 		}
 	}
 
-	bool bAttack = false;
+	return false;
+}
 
-	if(pDestPlot->isAdjacent(plot()) || (getDomainType() == DOMAIN_AIR))
+//	---------------------------------------------------------------------------
+// Returns +1 if attack was made...
+// Return 0 if no target in range
+// Return -1 if attack is not possible
+int CvUnit::UnitAttackWithMove(int iX, int iY, int iFlags)
+{
+	VALIDATE_OBJECT
+	CvMap& kMap = GC.getMap();
+	CvPlot* pDestPlot = kMap.plot(iX, iY);
+
+	CvAssertMsg(pDestPlot != NULL, "DestPlot is not assigned a valid value");
+	if(!pDestPlot)
+		return -1;
+
+	// Air mission
+	if(getDomainType() == DOMAIN_AIR)
 	{
-		if(!isOutOfAttacks() && (!IsCityAttackSupport() || pDestPlot->isEnemyCity(*this) || !pDestPlot->getBestDefender(NO_PLAYER)))
+		if (GetBaseCombatStrength() == 0 && canRangeStrikeAt(iX, iY))
 		{
-			// don't allow an attack if we already have one
-			if(isFighting() || pDestPlot->isFighting())
-			{
-				return true;
-			}
-
-			// Air mission
-			if(getDomainType() == DOMAIN_AIR && GetBaseCombatStrength() == 0)
-			{
-				if(canRangeStrikeAt(iX, iY))
-				{
-					CvUnitCombat::AttackAir(*this, *pDestPlot, (iFlags &  MOVEFLAG_NO_DEFENSIVE_SUPPORT)?CvUnitCombat::ATTACK_OPTION_NO_DEFENSIVE_SUPPORT:CvUnitCombat::ATTACK_OPTION_NONE);
-					bAttack = true;
-				}
-			}
-
-			// City combat
-			else if(pDestPlot->isCity())
-			{
-				if(GET_TEAM(getTeam()).isAtWar(pDestPlot->getPlotCity()->getTeam()))
-				{
-					if(getDomainType() != DOMAIN_AIR)
-					{
-						// Ranged units that are embarked can't do a move-attack
-						if(isRanged() && isEmbarked())
-						{
-							return false;
-						}
-
-						CvUnitCombat::AttackCity(*this, *pDestPlot, (iFlags &  MOVEFLAG_NO_DEFENSIVE_SUPPORT)?CvUnitCombat::ATTACK_OPTION_NO_DEFENSIVE_SUPPORT:CvUnitCombat::ATTACK_OPTION_NONE);
-						bAttack = true;
-					}
-				}
-			}
-
-			// Normal unit combat
-			else
-			{
-				// if there are no defenders, do not attack
-				UnitHandle pBestDefender = pDestPlot->getBestDefender(NO_PLAYER, getOwner(), this, true);
-				if(!pBestDefender)
-				{
-					return false;
-				}
-
-				// Ranged units that are embarked can't do a move-attack
-				if(isRanged() && isEmbarked())
-				{
-					return false;
-				}
-
-				bAttack = true;
-				CvUnitCombat::Attack(*this, *pDestPlot, (iFlags &  MOVEFLAG_NO_DEFENSIVE_SUPPORT)?CvUnitCombat::ATTACK_OPTION_NO_DEFENSIVE_SUPPORT:CvUnitCombat::ATTACK_OPTION_NONE);
-			}
-
-			// Barb camp here that was attacked?
-			if(pDestPlot->getImprovementType() == GC.getBARBARIAN_CAMP_IMPROVEMENT())
-			{
-				CvBarbarians::DoCampAttacked(pDestPlot);
-			}
-#if defined(MOD_DIPLOMACY_CITYSTATES_QUESTS)
-			if(MOD_DIPLOMACY_CITYSTATES_QUESTS && pDestPlot->isCity() && pDestPlot->isBarbarian())
-			{
-				CvBarbarians::DoCityAttacked(pDestPlot);
-			}
-#endif
+			CvUnitCombat::AttackAir(*this, *pDestPlot, (iFlags &  MOVEFLAG_NO_DEFENSIVE_SUPPORT)?CvUnitCombat::ATTACK_OPTION_NO_DEFENSIVE_SUPPORT:CvUnitCombat::ATTACK_OPTION_NONE);
+			return 1;
 		}
+		else
+			return 0;
 	}
 
-	return bAttack;
+	//other domains - look at the next plot in the path
+	CvPlot* pPathPlot = m_kLastPath.GetFirstPlot();
+	if (!pPathPlot)
+		return -1;
+
+	bool bIsEnemyCity = pPathPlot->isEnemyCity(*this);
+	CvUnit* pBestDefender = pPathPlot->getBestDefender(NO_PLAYER, getOwner(), this, true);
+
+	//nothing to attack?
+	if ( !bIsEnemyCity && !pBestDefender )
+		return 0;
+
+	//can we even attack?
+	if(!IsCanAttackWithMove() || isOutOfAttacks())
+		return -1;
+
+	//support units cannot attack themselves
+	if (IsCityAttackSupport() && !bIsEnemyCity)
+		return -1;
+
+	//embarked can't do a move-attack
+	if(pPathPlot->needsEmbarkation(this))
+		return -1;
+
+	//don't allow an attack if we already have one
+	if(isFighting() || pPathPlot->isFighting())
+		return -1;
+
+	//check consistency - we know there's a target there!
+	if (!canMoveInto(*pPathPlot,iFlags|MOVEFLAG_ATTACK))
+		return -1;
+
+	// Publish any queued moves so that the attack doesn't appear to happen out of order
+	PublishQueuedVisualizationMoves();
+
+	// City combat
+	if(bIsEnemyCity)
+	{
+		CvUnitCombat::AttackCity(*this, *pPathPlot, (iFlags &  MOVEFLAG_NO_DEFENSIVE_SUPPORT)?CvUnitCombat::ATTACK_OPTION_NO_DEFENSIVE_SUPPORT:CvUnitCombat::ATTACK_OPTION_NONE);
+#if defined(MOD_DIPLOMACY_CITYSTATES_QUESTS)
+		if(MOD_DIPLOMACY_CITYSTATES_QUESTS && pPathPlot->isCity() && pPathPlot->isBarbarian())
+		{
+			CvBarbarians::DoCityAttacked(pPathPlot);
+		}
+#endif
+		return 1;
+	}
+	// Normal unit combat
+	else if(pBestDefender)
+	{
+		CvUnitCombat::Attack(*this, *pPathPlot, (iFlags &  MOVEFLAG_NO_DEFENSIVE_SUPPORT)?CvUnitCombat::ATTACK_OPTION_NO_DEFENSIVE_SUPPORT:CvUnitCombat::ATTACK_OPTION_NONE);
+
+		// Barb camp here that was attacked?
+		if(pPathPlot->getImprovementType() == GC.getBARBARIAN_CAMP_IMPROVEMENT())
+		{
+			CvBarbarians::DoCampAttacked(pPathPlot);
+		}
+
+		return 1;
+	}
+
+	//cannot happen
+	return 0;
 }
 
 //	---------------------------------------------------------------------------
@@ -26427,14 +27388,11 @@ bool CvUnit::UnitMove(CvPlot* pPlot, bool bCombat, CvUnit* pCombatUnit, bool bEn
 		{
 			bCanMoveIntoPlot = canMoveOrAttackInto(*pPlot);
 		}
-		else	VALIDATE_OBJECT
-
+		else
 		{
 			bCanMoveIntoPlot = canMoveInto(*pPlot);
 		}
 	}
-	VALIDATE_OBJECT
-
 
 	bool bIsNoCapture = isNoCapture();
 	bool bEnemyCity = pPlot && pPlot->isEnemyCity(*this);
@@ -26513,7 +27471,7 @@ int CvUnit::UnitPathTo(int iX, int iY, int iFlags, int iPrevETA, bool bBuildingR
 		}
 
 		pPathPlot = pDestPlot;
-		m_kLastPath.clear();		// Not used by air units, keep it clear.
+		m_kLastPath.clear(); // Not used by air units, keep it clear.
 	}
 	else
 	{
@@ -26551,16 +27509,19 @@ int CvUnit::UnitPathTo(int iX, int iY, int iFlags, int iPrevETA, bool bBuildingR
 		}
 		else
 		{
-			if (!UpdatePathCache(pDestPlot, iFlags))
+			pPathPlot = m_kLastPath.GetFirstPlot();
+
+			//if the pathfinder inserted a stop node because the next plot is occupied
+			//we see that the expected moves are greater than what we have right now
+			//in that case don't execute the move
+			if (pPathPlot && m_kLastPath.front().m_iMoves>getMoves())
 			{
-				LOG_UNIT_MOVES_MESSAGE("Unable to Generate path");
+				finishMoves();
 				return 0;
 			}
 
-			pPathPlot = m_kLastPath.GetFirstPlot();
-
 			//the given target may be different from the actual target
-			if (iFlags & MOVEFLAG_APPROXIMATE_TARGET)
+			if ((iFlags & MOVEFLAG_APPROX_TARGET_RING1) || (iFlags & MOVEFLAG_APPROX_TARGET_RING2))
 			{
 				pDestPlot = m_kLastPath.GetFinalPlot();
 				//check if we are there yet
@@ -26587,14 +27548,14 @@ int CvUnit::UnitPathTo(int iX, int iY, int iFlags, int iPrevETA, bool bBuildingR
 			bRejectMove = true;
 		}
 		// if we should end our turn there this turn, but can't move into that tile
-		else if(kDestNode.m_iTurns == 1 && !canMoveInto(*pDestPlot))  
+		else if(kDestNode.m_iTurns == 1 && !canMoveInto(*pDestPlot,iFlags|MOVEFLAG_DESTINATION))  
 		{
 			// this is a bit tricky
 			// we want to see if this move would be a capture move
 			// Since we can't move into the tile, there may be an enemy unit there
 			// We can't move into tiles with enemy combat units, so getBestDefender should return null on the tile
 			// If there is no defender but we can attack move into the tile, then we know that it is a civilian unit and we should be able to move into it
-			const UnitHandle pDefender = pDestPlot->getBestDefender(NO_PLAYER, getOwner(), this, true);
+			const CvUnit* pDefender = pDestPlot->getBestDefender(NO_PLAYER, getOwner(), this, true);
 			if(!pDefender && !pDestPlot->isEnemyCity(*this) && canMoveInto(*pDestPlot, MOVEFLAG_ATTACK))
 			{
 				// Turn on ability to move into enemy units in this case so we can capture civilians
@@ -26618,8 +27579,9 @@ int CvUnit::UnitPathTo(int iX, int iY, int iFlags, int iPrevETA, bool bBuildingR
 		}
 	}
 
+	//todo: consider movement flags here. especially turn destination, not only path destination
 	bool bEndMove = (pPathPlot == pDestPlot);
-	bool bMoved = UnitMove(pPathPlot, iFlags & MOVEFLAG_IGNORE_STACKING, NULL, bEndMove);
+	bool bMoved = UnitMove(pPathPlot, IsCombatUnit(), NULL, bEndMove);
 
 	int iETA = 1;
 	if (!m_kLastPath.empty())
@@ -26628,7 +27590,12 @@ int CvUnit::UnitPathTo(int iX, int iY, int iFlags, int iPrevETA, bool bBuildingR
 
 		if (bMoved)
 		{
+			//this plot has now been consumed
 			m_kLastPath.pop_front();
+
+			//keep the cache in sync
+			m_uiLastPathCacheOrigin = plot()->GetPlotIndex();
+			m_uiLastPathLength = m_kLastPath.size();
 
 			//have we used up all plots for this turn?
 			if (!m_kLastPath.empty() && m_kLastPath.front().m_iTurns>1)
@@ -26910,7 +27877,7 @@ const char* CvUnit::GetMissionInfo()
 
 			if (m_eTacticalMove==NO_TACTICAL_MOVE)
 			{
-				m_strMissionInfoString =  homelandMoveNames[m_eHomelandMove];
+				m_strMissionInfoString = homelandMoveNames[m_eHomelandMove];
 				CvString strTemp0 = CvString::format(" (since %d)", GC.getGame().getGameTurn() - m_iHomelandMoveSetTurn);
 				m_strMissionInfoString += strTemp0;
 			}
@@ -26919,12 +27886,8 @@ const char* CvUnit::GetMissionInfo()
 	else
 	{
 		if (m_eGreatPeopleDirectiveType!=NO_GREAT_PEOPLE_DIRECTIVE_TYPE)
-		{
-			CvString strTemp0 = CvString::format(" // %s", directiveNames[m_eGreatPeopleDirectiveType.get()]);
-			m_strMissionInfoString += strTemp0;
-		}
-
-		if (isTrade())
+			m_strMissionInfoString += directiveNames[m_eGreatPeopleDirectiveType.get()];
+		else if (isTrade())
 		{
 			CvGameTrade* pTrade = GC.getGame().GetGameTrade();
 			int iTrIndex = pTrade->GetIndexFromUnitID(GetID(),getOwner());
@@ -26935,7 +27898,7 @@ const char* CvUnit::GetMissionInfo()
 				{
 					CvCity* pFromCity = GET_PLAYER(pTradeConnection->m_eOriginOwner).getCity(pTradeConnection->m_iOriginID);
 					CvCity* pToCity = GET_PLAYER(pTradeConnection->m_eDestOwner).getCity(pTradeConnection->m_iDestID);
-					CvString strTemp0 = CvString::format(" // %s from %s to %s, %d turns to go", 
+					CvString strTemp0 = CvString::format("%s from %s to %s, %d turns to go", 
 						pTradeConnection->m_eConnectionType<NUM_TRADE_CONNECTION_TYPES ? aTrTypes[pTradeConnection->m_eConnectionType] : "unknown",
 						pFromCity ? pFromCity->getName().c_str() : "unknown", pToCity ? pToCity->getName().c_str() : "unknown", 
 						pTradeConnection->m_iTurnRouteComplete-GC.getGame().getGameTurn());
@@ -27002,6 +27965,26 @@ void CvUnit::PushMission(MissionTypes eMission, int iData1, int iData2, int iFla
 {
 	VALIDATE_OBJECT
 
+	//potential deadlock in pathfinder, be careful
+	if (!GET_PLAYER(getOwner()).isTurnActive())
+		return;
+
+	if (eMission==CvTypes::getMISSION_MOVE_TO() || eMission==CvTypes::getMISSION_EMBARK() || eMission==CvTypes::getMISSION_DISEMBARK())
+	{
+		CvPlot* pToPlot = GC.getMap().plot(iData1, iData2);
+		if (HaveRepetition(pToPlot->GetPlotIndex(), GC.getGame().getGameTurn()))
+		{
+			OutputDebugString("warning, unit moving in a loop!\n");
+		}
+		PushPrevPlot( pToPlot->GetPlotIndex(), GC.getGame().getGameTurn() );
+	}
+	else
+	{
+		//any other mission resets the cache
+		PushPrevPlot( 0, GC.getGame().getGameTurn() );
+		PushPrevPlot( 0, GC.getGame().getGameTurn() );
+	}
+
 #if defined(MOD_BALANCE_CORE_MILITARY_LOGGING)
 	if (MOD_BALANCE_CORE_MILITARY_LOGGING && eMission==CvTypes::getMISSION_MOVE_TO())
 	{
@@ -27018,6 +28001,14 @@ void CvUnit::PushMission(MissionTypes eMission, int iData1, int iData2, int iFla
 			if ( ((iFromDanger<iToDanger) && (iToDanger>GetCurrHitPoints())) || iToDanger==INT_MAX)
 				OutputDebugString(CvString::format("%s %s moving into danger at %d,%d!\n", 
 					GET_PLAYER(getOwner()).getCivilizationAdjective(), getName().c_str(), iData1, iData2).c_str());
+		}
+
+		//if the target is not revealed, the pathfinder assumes it's passable although in fact it may be not
+		//it's acceptable to have such an "unknown invalid" target. otherwise take not of this.
+		if(!canMoveInto(*pToPlot,CvUnit::MOVEFLAG_DESTINATION) && pToPlot->isRevealed(getTeam()))
+		{
+			if (GC.getLogging() && GC.getAILogging())
+				OutputDebugString(CvString::format("Invalid target %d,%d for movement of %s %d",pToPlot->getX(),pToPlot->getY(),getName().c_str(),GetID()).c_str());
 		}
 	}
 #endif
@@ -27050,7 +28041,7 @@ void CvUnit::AutoMission()
 void CvUnit::UpdateMission()
 {
 	VALIDATE_OBJECT
-	CvUnitMission::UpdateMission(m_thisHandle);
+	CvUnitMission::UpdateMission(this);
 }
 
 //	--------------------------------------------------------------------------------
@@ -27116,12 +28107,15 @@ void CvUnit::ChangeMissionTimer(int iChange)
 
 //	--------------------------------------------------------------------------------
 /// Clear all queued missions
-void CvUnit::ClearMissionQueue(int iUnitCycleTimer)
+void CvUnit::ClearMissionQueue(bool bKeepPathCache, int iUnitCycleTimer)
 {
 	VALIDATE_OBJECT
 	CvAssert(getOwner() != NO_PLAYER);
 
-	CvUnitMission::ClearMissionQueue(this, iUnitCycleTimer);
+	//make sure to show the latest status in the GUI
+	PublishQueuedVisualizationMoves();
+	
+	CvUnitMission::ClearMissionQueue(this, bKeepPathCache, iUnitCycleTimer);
 }
 
 //	--------------------------------------------------------------------------------
@@ -27154,7 +28148,7 @@ const MissionData* CvUnit::GetMissionData(int iIndex)
 
 //	--------------------------------------------------------------------------------
 /// Retrieve the first mission in the queue (const correct version)
-const MissionQueueNode* CvUnit::HeadMissionQueueNode() const
+const MissionData* CvUnit::HeadMissionData() const
 {
 	VALIDATE_OBJECT
 	if(m_missionQueue.getLength() > 0)
@@ -27169,7 +28163,7 @@ const MissionQueueNode* CvUnit::HeadMissionQueueNode() const
 
 //	--------------------------------------------------------------------------------
 /// Retrieve the first mission in the queue
-MissionQueueNode* CvUnit::HeadMissionQueueNode()
+MissionData* CvUnit::HeadMissionData()
 {
 	VALIDATE_OBJECT
 	if(m_missionQueue.getLength() > 0)
@@ -27349,11 +28343,11 @@ bool CvUnit::IsEnemyInMovementRange(bool bOnlyFortified, bool bOnlyCities)
 {
 	VALIDATE_OBJECT
 	ReachablePlots plots;
-	TacticalAIHelpers::GetAllPlotsInReach(this,plot(),plots,true,true,false);
+	TacticalAIHelpers::GetAllPlotsInReachThisTurn(this,plot(),plots,true,true,false);
 
 	for (ReachablePlots::const_iterator it=plots.begin(); it!=plots.end(); ++it)
 	{
-		CvPlot* pPlot = GC.getMap().plotByIndexUnchecked(it->first);
+		CvPlot* pPlot = GC.getMap().plotByIndexUnchecked(it->iPlotIndex);
 		if(pPlot->isVisible(getTeam()) && (pPlot->isVisibleEnemyUnit(this) || pPlot->isEnemyCity(*this)))
 		{
 			if (canMoveInto(*pPlot, CvUnit::MOVEFLAG_ATTACK))
@@ -27385,65 +28379,34 @@ bool CvUnit::IsEnemyInMovementRange(bool bOnlyFortified, bool bOnlyCities)
 }
 
 // PATH-FINDING ROUTINES
+bool CvUnit::IsCachedPathValid()
+{
+	return m_uiLastPathLength != 0xFFFFFFFF;
+}
+
+bool CvUnit::HaveCachedPathTo(const CvPlot* pToPlot, int iFlags)
+{
+	return (
+		m_uiLastPathCacheOrigin == plot()->GetPlotIndex() &&
+		m_uiLastPathCacheDestination == pToPlot->GetPlotIndex() && 
+		m_uiLastPathFlags == iFlags &&
+		m_uiLastPathTurn == GC.getGame().getGameTurn() && 
+		(m_uiLastPathLength == m_kLastPath.size() || m_uiLastPathLength == 0xFFFFFFFF)
+		);
+}
 
 //	--------------------------------------------------------------------------------
 /// Use pathfinder to create a path
-bool CvUnit::GeneratePath(const CvPlot* pToPlot, int iFlags, int iMaxTurns, int* piPathTurns) const
+bool CvUnit::GeneratePath(const CvPlot* pToPlot, int iFlags, int iMaxTurns, int* piPathTurns)
 {
 	if(pToPlot == NULL)
 		return false;
 
-	SPathFinderUserData data(this,iFlags,iMaxTurns);
-	SPath newPath = GC.GetPathFinder().GetPath(getX(), getY(), pToPlot->getX(), pToPlot->getY(), data);
+	//can we re-use the old path?
+	bool bHavePath = HaveCachedPathTo(pToPlot, iFlags);
 
-	// Regardless of whether or not we made it there, keep track of the plot we tried to path to.  
-	// This helps in preventing us from trying to re-path to the same unreachable location.
-	m_uiLastPathCacheDest = pToPlot->GetPlotIndex();
-	m_uiLastPathFlags = iFlags;
-	m_uiLastPathTurn = GC.getGame().getGameTurn();
-
-	if (!newPath)
-		return false;
-
-	//now copy the new path
-	//but skip the first node, it's the current unit plot
-	//important: this means that an empty path is valid here!
-	m_kLastPath.clear();
-
-	CvPathNode nextNode;
-	for (size_t i=1; i<newPath.vPlots.size(); i++)
-	{
-		nextNode = newPath.vPlots[i];
-		m_kLastPath.push_back( nextNode );
-	}
-
-	if(!m_kLastPath.empty())
-	{
-		CvMap& kMap = GC.getMap();
-		TeamTypes eTeam = getTeam();
-
-		// Get the state of the plots in the path, they determine how much of the path is re-usable.
-		for (size_t iIndex = 0; iIndex<m_kLastPath.size(); iIndex++)
-		{
-			CvPathNode& kNode = m_kLastPath[iIndex];
-			CvPlot* pkPlot = kMap.plotCheckInvalid(kNode.m_iX, kNode.m_iY);
-			if (pkPlot && !pkPlot->isVisible(eTeam))
-			{
-				kNode.SetFlag(CvPathNode::PLOT_INVISIBLE);
-				if (iIndex > 0)
-					m_kLastPath[iIndex-1].SetFlag(CvPathNode::PLOT_ADJACENT_INVISIBLE);
-
-				// Also determine the destination visibility.  
-				// This will be checked in UnitPathTo to see if the destination's visibility has changed and do a re-evaluate again if it has.
-				// This will help a unit to stop early in its pathing if the destination is blocked.
-				CvPlot* pkPathDest = m_kLastPath.GetFinalPlot();
-				if (pkPathDest != NULL && !pkPathDest->isVisible(eTeam))
-					m_kLastPath.back().SetFlag(CvPathNode::PLOT_INVISIBLE);
-
-				break;	// Anything after is 'in the dark' and should be re-evaluated if trying to move a unit into it.
-			}
-		}
-	}
+	if (!bHavePath)
+		bHavePath = ComputePath(pToPlot, iFlags, iMaxTurns);
 
 	if(piPathTurns != NULL)
 	{
@@ -27462,11 +28425,11 @@ bool CvUnit::GeneratePath(const CvPlot* pToPlot, int iFlags, int iMaxTurns, int*
 				}
 			}
 		}
-		else //we're already there!
+		else if (bHavePath) //we're already there (at least approximately)!
 			*piPathTurns = 0;
 	}
 
-	return true;
+	return IsCachedPathValid();
 }
 
 //	--------------------------------------------------------------------------------
@@ -27482,8 +28445,11 @@ const CvPathNodeArray& CvUnit::GetPathNodeArray() const
 void CvUnit::ClearPathCache()
 {
 	m_kLastPath.clear();
-	m_uiLastPathCacheDest = 0xFFFFFFFF;
+	m_uiLastPathCacheOrigin = 0xFFFFFFFF;
+	m_uiLastPathCacheDestination = 0xFFFFFFFF;
 	m_uiLastPathFlags = 0xFFFFFFFF;
+	m_uiLastPathTurn = 0xFFFFFFFF;
+	m_uiLastPathLength = 0xFFFFFFFF;
 }
 
 //	--------------------------------------------------------------------------------
@@ -27523,7 +28489,7 @@ bool CvUnit::canAdvance(const CvPlot& plot, int iThreshold) const
 CvUnit* CvUnit::airStrikeTarget(CvPlot& targetPlot, bool bNoncombatAllowed) const
 {
 	VALIDATE_OBJECT
-	UnitHandle pDefender;
+	CvUnit* pDefender;
 
 	pDefender = targetPlot.getBestDefender(NO_PLAYER, getOwner(), this, true, false, false, bNoncombatAllowed);	// All defaults, except test for war, and allow noncombat units
 
@@ -27531,7 +28497,7 @@ CvUnit* CvUnit::airStrikeTarget(CvPlot& targetPlot, bool bNoncombatAllowed) cons
 	{
 		if(!pDefender->IsDead())
 		{
-			return pDefender.pointer();
+			return pDefender;
 		}
 	}
 
@@ -27542,6 +28508,10 @@ CvUnit* CvUnit::airStrikeTarget(CvPlot& targetPlot, bool bNoncombatAllowed) cons
 bool CvUnit::CanWithdrawFromMelee(CvUnit& attacker)
 {
 	VALIDATE_OBJECT
+
+	if (isEmbarked() && getDomainType() == DOMAIN_LAND)
+		return false;
+
 	int iWithdrawChance = getExtraWithdrawal();
 
 	// Does attacker have a speed greater than 1?
@@ -27898,11 +28868,11 @@ void CvUnit::AI_promote()
 		{
 			CvString szMsg;
 			if(iNumValidPromotions == 1)
-				szMsg.Format("--> Took Only Available Promotion, %s, Received by %s %d, X: %d, Y: %d, Damage: %d",
-								pkPromoInfo->GetDescription(), getName().GetCString(), GetID(), getX(), getY(), getDamage());
+				szMsg.Format("--> Took Only Available Promotion, %s, Received by %s, X: %d, Y: %d, Damage: %d",
+								pkPromoInfo->GetDescription(), getName().GetCString(), getX(), getY(), getDamage());
 			else
-				szMsg.Format("--> Chosen Promotion, %s, Received by %s %d, X: %d, Y: %d, Damage: %d",
-							 pkPromoInfo->GetDescription(), getName().GetCString(), GetID(), getX(), getY(), getDamage());
+				szMsg.Format("--> Chosen Promotion, %s, Received by %s, X: %d, Y: %d, Damage: %d",
+							 pkPromoInfo->GetDescription(), getName().GetCString(), getX(), getY(), getDamage());
 			GET_PLAYER(m_eOwner).GetTacticalAI()->LogTacticalMessage(szMsg, true /*bSkipLogDominanceZone*/);
 		}
 	}
@@ -27960,7 +28930,7 @@ int CvUnit::AI_promotionValue(PromotionTypes ePromotion)
 		iValue += iTemp + iFlavorOffense * 11;
 
 		//Raw power is better for mounted/armor units
-		const UnitCombatTypes unitCombatType = getUnitCombatType();
+		const UnitCombatTypes unitCombatType = (UnitCombatTypes)getUnitCombatType();
 		if(unitCombatType == (UnitCombatTypes)GC.getInfoTypeForString("UNITCOMBAT_MOUNTED", true))
 		{
 			iValue *= 3;
@@ -27986,7 +28956,7 @@ int CvUnit::AI_promotionValue(PromotionTypes ePromotion)
 		iValue += iTemp + iFlavorOffense * 11;
 
 		//Raw power is better for archer units than all others
-		const UnitCombatTypes unitCombatType = getUnitCombatType();
+		const UnitCombatTypes unitCombatType = (UnitCombatTypes)getUnitCombatType();
 		if(unitCombatType == (UnitCombatTypes)GC.getInfoTypeForString("UNITCOMBAT_ARCHER", true))
 		{
 			iValue *= 3;
@@ -28488,7 +29458,7 @@ int CvUnit::AI_promotionValue(PromotionTypes ePromotion)
 				}
 			}
 
-			iTemp = pkPromotionInfo->GetFeatureDefensePercent(iI);;
+			iTemp = pkPromotionInfo->GetFeatureDefensePercent(iI);
 			if(iTemp != 0)
 			{
 				iExtra = getExtraFeatureDefensePercent(eFeature);
@@ -28627,7 +29597,11 @@ int CvUnit::AI_promotionValue(PromotionTypes ePromotion)
 
 	if(iValue > 0)
 	{
+#if defined(MOD_CORE_REDUCE_RANDOMNESS)
+		iValue += GC.getGame().getSmallFakeRandNum(11, iValue);
+#else
 		iValue += GC.getGame().getJonRandNum(15, "AI Promote");
+#endif
 	}
 
 	return iValue;
@@ -28839,6 +29813,10 @@ bool CvUnit::IsWithinDistanceOfUnit(UnitTypes eOtherUnit, int iDistance, bool bI
 {
 	return plot()->IsWithinDistanceOfUnit(getOwner(), eOtherUnit, iDistance, bIsFriendly, bIsEnemy);
 }
+bool CvUnit::IsWithinDistanceOfCity(int iDistance, bool bIsFriendly, bool bIsEnemy) const
+{
+	return plot()->IsWithinDistanceOfCity(this, iDistance, bIsFriendly, bIsEnemy);
+}
 bool CvUnit::IsWithinDistanceOfUnitClass(UnitClassTypes eUnitClass, int iDistance, bool bIsFriendly, bool bIsEnemy) const
 {
 	return plot()->IsWithinDistanceOfUnitClass(getOwner(), eUnitClass, iDistance, bIsFriendly, bIsEnemy);
@@ -28948,6 +29926,23 @@ bool CvUnit::CanReachInXTurns(const CvPlot* pTarget, int iTurns, bool bIgnoreUni
 /// How many turns will it take a unit to get to a target plot (returns MAX_INT if can't reach at all; returns 0 if makes it in 1 turn and has movement left)
 int CvUnit::TurnsToReachTarget(const CvPlot* pTarget, bool bIgnoreUnits, bool bIgnoreStacking, int iTargetTurns)
 {
+	int iFlags = 0;
+
+	if(bIgnoreUnits)
+	{
+		iFlags |= CvUnit::MOVEFLAG_IGNORE_STACKING;
+		iFlags |= CvUnit::MOVEFLAG_IGNORE_ZOC;
+		iFlags |= CvUnit::MOVEFLAG_IGNORE_DANGER;
+	}
+
+	if(bIgnoreStacking) //ignore our own units
+		iFlags |= CvUnit::MOVEFLAG_IGNORE_STACKING;
+
+	return TurnsToReachTarget(pTarget,iFlags,iTargetTurns);
+}
+
+int CvUnit::TurnsToReachTarget(const CvPlot* pTarget, int iFlags, int iTargetTurns)
+{
 	if(!pTarget)
 		return INT_MAX;
 
@@ -29001,18 +29996,6 @@ int CvUnit::TurnsToReachTarget(const CvPlot* pTarget, bool bIgnoreUnits, bool bI
 	if(pTarget == plot())
 		return 0;
 
-	int iFlags = 0;
-
-	if(bIgnoreUnits)
-	{
-		iFlags |= CvUnit::MOVEFLAG_IGNORE_STACKING;
-		iFlags |= CvUnit::MOVEFLAG_IGNORE_ZOC;
-		iFlags |= CvUnit::MOVEFLAG_IGNORE_DANGER;
-	}
-
-	if(bIgnoreStacking) //ignore our own units
-		iFlags |= CvUnit::MOVEFLAG_IGNORE_STACKING;
-
 	//normal handling: use the path cache of the unit, so we can possibly re-use the path later
 	if (!GeneratePath(pTarget, iFlags, iTargetTurns, &rtnValue) )
 		return INT_MAX;
@@ -29034,10 +30017,193 @@ FDataStream& operator>>(FDataStream& loadFrom, CvUnit& writeTo)
 	return loadFrom;
 }
 //	--------------------------------------------------------------------------------
+#if defined(MOD_BALANCE_CORE)
+bool CvUnit::isConvertUnit() const
+{
+	VALIDATE_OBJECT
+	return getUnitInfo().IsConvertUnit();
+}
+bool CvUnit::isCultureFromExperienceDisbandUpgrade() const
+{
+	VALIDATE_OBJECT
+	return getUnitInfo().IsCultureFromExperienceDisbandUpgrade();
+}
+bool CvUnit::isFreeUpgrade() const
+{
+	VALIDATE_OBJECT
+	return getUnitInfo().IsFreeUpgrade();
+}
+bool CvUnit::isUnitEraUpgrade() const
+{
+	VALIDATE_OBJECT
+	return getUnitInfo().IsUnitEraUpgrade();
+}
+bool CvUnit::isConvertOnDamage() const
+{
+	VALIDATE_OBJECT
+	return getUnitInfo().IsConvertOnDamage();
+}
+bool CvUnit::isConvertOnFullHP() const
+{
+	VALIDATE_OBJECT
+	return getUnitInfo().IsConvertOnFullHP();
+}
+bool CvUnit::isConvertEnemyUnitToBarbarian() const
+{
+	VALIDATE_OBJECT
+	return getUnitInfo().IsConvertEnemyUnitToBarbarian();
+}
+bool CvUnit::isWLKTKDOnBirth() const
+{
+	VALIDATE_OBJECT
+	return getUnitInfo().IsWLTKDFromBirth();
+}
+bool CvUnit::isGoldenAgeOnBirth() const
+{
+	VALIDATE_OBJECT
+	return getUnitInfo().IsGoldenAgeFromBirth();
+}
+bool CvUnit::isCultureBoost() const
+{
+	VALIDATE_OBJECT
+	return getUnitInfo().IsCultureBoost();
+}
+bool CvUnit::isExtraAttackHealthOnKill() const
+{
+	VALIDATE_OBJECT
+	return getUnitInfo().IsExtraAttackHealthOnKill();
+}
+bool CvUnit::isHighSeaRaider() const
+{
+	VALIDATE_OBJECT
+	return getUnitInfo().IsHighSeaRaider();
+}
+#endif
 #if defined(MOD_GLOBAL_STACKING_RULES)
 int CvUnit::getNumberStackingUnits() const
 {
 	VALIDATE_OBJECT
 	return getUnitInfo().GetNumberStackingUnits();
+}
+bool CvUnit::IsStackingUnit() const
+{
+	VALIDATE_OBJECT
+	return getUnitInfo().GetNumberStackingUnits()>0;
+}
+bool CvUnit::IsCargoCombatUnit() const
+{
+	VALIDATE_OBJECT
+	return getUnitInfo().CargoCombat()>0;
+}
+//	--------------------------------------------------------------------------------
+#endif
+#if defined(MOD_CARGO_SHIPS)
+void CvUnit::DoCargoPromotions(CvUnit& cargounit)
+{
+	if(cargounit.IsCargoCombatUnit() && cargounit.hasCargo())
+	{
+		cargounit.SetBaseCombatStrength(cargounit.getUnitInfo().GetCombat() + ((cargounit.getUnitInfo().GetCombat() * cargounit.getUnitInfo().CargoCombat() * cargounit.getCargo()) / 100));
+		PromotionTypes ePromotionPrizeShips = (PromotionTypes) GC.getInfoTypeForString("PROMOTION_PRIZE_SHIPS", true);
+		PromotionTypes ePromotionArmySupport = (PromotionTypes) GC.getInfoTypeForString("PROMOTION_ARMY_SUPPORT", true);
+		if(cargounit.isHasPromotion(ePromotionPrizeShips))
+		{
+			cargounit.setHasPromotion(ePromotionArmySupport, true);
+		}
+		if(isCargo())
+		{
+			UnitCombatTypes eUnitCombatReconType = (UnitCombatTypes)GC.getInfoTypeForString("UNITCOMBAT_RECON", true);
+			PromotionTypes ePromotionEmbarkAllWater = (PromotionTypes) GC.getInfoTypeForString("PROMOTION_ALLWATER_EMBARKATION", true);
+			PromotionTypes ePromotionPolynesiaCargo = (PromotionTypes) GC.getInfoTypeForString("PROMOTION_POLYNESIA_CARGO", true);
+			PromotionTypes ePromotionScoutShip = (PromotionTypes) GC.getInfoTypeForString("PROMOTION_ARMY_SCOUT_SHIP", true);
+			PromotionTypes ePromotionArmyOnShip = (PromotionTypes) GC.getInfoTypeForString("PROMOTION_ARMY_ON_SHIP", true);
+			PromotionTypes ePromotionRangePenalty = (PromotionTypes) GC.getInfoTypeForString("PROMOTION_ARMY_RANGE_PENALTY", true);
+			setHasPromotion(ePromotionArmyOnShip, true);
+			if(isRanged())
+			{
+				setHasPromotion(ePromotionRangePenalty, true);
+			}
+			if(getUnitCombatType() == eUnitCombatReconType)
+			{
+				cargounit.setHasPromotion(ePromotionScoutShip, true);
+			}
+			else
+			{
+				cargounit.setHasPromotion(ePromotionScoutShip, false);
+			}
+			if(isHasPromotion(ePromotionEmbarkAllWater))
+			{
+				cargounit.setHasPromotion(ePromotionPolynesiaCargo, true);
+			}
+			else
+			{
+				cargounit.setHasPromotion(ePromotionPolynesiaCargo, false);
+			}
+		}
+	}
+}
+
+void CvUnit::RemoveCargoPromotions(CvUnit& cargounit)
+{
+	bool scoutcheck = false;
+	bool scoutPromcheck = false;
+	bool allembark = false;
+	bool allembarkProm = false;
+	if(isCargo())
+	{
+		UnitCombatTypes eUnitCombatReconType = (UnitCombatTypes)GC.getInfoTypeForString("UNITCOMBAT_RECON", true);
+		PromotionTypes ePromotionEmbarkAllWater = (PromotionTypes) GC.getInfoTypeForString("PROMOTION_ALLWATER_EMBARKATION", true);
+		if(getUnitCombatType() == eUnitCombatReconType)
+		{
+			scoutcheck = true;
+		}
+		if(isHasPromotion(ePromotionEmbarkAllWater))
+		{
+			allembark = true;
+		}
+	}
+	else if(!isCargo())
+	{
+		PromotionTypes ePromotionArmyOnShip = (PromotionTypes) GC.getInfoTypeForString("PROMOTION_ARMY_ON_SHIP", true);
+		PromotionTypes ePromotionRangePenalty = (PromotionTypes) GC.getInfoTypeForString("PROMOTION_ARMY_RANGE_PENALTY", true);
+		if(isHasPromotion(ePromotionArmyOnShip))
+		{
+			setHasPromotion(ePromotionArmyOnShip, false);
+		}
+		if(isHasPromotion(ePromotionRangePenalty))
+		{
+			setHasPromotion(ePromotionRangePenalty, false);
+		}
+	}
+	PromotionTypes ePromotionArmySupport = (PromotionTypes) GC.getInfoTypeForString("PROMOTION_ARMY_SUPPORT", true);
+	if(cargounit.getCargo() >= 0)
+	{
+		PromotionTypes ePromotionScoutShip = (PromotionTypes) GC.getInfoTypeForString("PROMOTION_ARMY_SCOUT_SHIP", true);
+		if(cargounit.isHasPromotion(ePromotionScoutShip))
+		{
+			scoutPromcheck = true;
+		}
+		if(!scoutcheck && scoutPromcheck)
+		{
+			cargounit.setHasPromotion(ePromotionScoutShip, false);
+		}
+		PromotionTypes ePromotionPolynesiaCargo = (PromotionTypes) GC.getInfoTypeForString("PROMOTION_POLYNESIA_CARGO", true);
+		if(cargounit.isHasPromotion(ePromotionPolynesiaCargo))
+		{
+			allembarkProm = true;
+		}
+		if(!allembark && allembarkProm)
+		{
+			cargounit.setHasPromotion(ePromotionPolynesiaCargo, false);
+		}
+		cargounit.SetBaseCombatStrength(cargounit.getUnitInfo().GetCombat() + ((cargounit.getUnitInfo().GetCombat() * cargounit.getUnitInfo().CargoCombat() * cargounit.getCargo()) / 100));
+	}
+	if(!cargounit.hasCargo())
+	{
+		if(cargounit.isHasPromotion(ePromotionArmySupport))
+		{
+			cargounit.setHasPromotion(ePromotionArmySupport, false);
+		}
+		cargounit.SetBaseCombatStrength(cargounit.getUnitInfo().GetCombat());
+	}
 }
 #endif

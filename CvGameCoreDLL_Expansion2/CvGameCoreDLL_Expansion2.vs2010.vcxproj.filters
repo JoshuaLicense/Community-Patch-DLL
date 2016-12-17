@@ -524,6 +524,12 @@
     <ClCompile Include="Lua\CvLuaArea.cpp">
       <Filter>Lua</Filter>
     </ClCompile>
+    <ClCompile Include="CvCorporationClasses.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="CvContractClasses.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="banned.h">
@@ -1064,6 +1070,12 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="HHMods.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="CvCorporationClasses.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="CvContractClasses.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>

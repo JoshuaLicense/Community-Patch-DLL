@@ -424,6 +424,27 @@ void CvMap::PrecalcNeighbors()
 	}
 }
 #endif
+
+//	--------------------------------------------------------------------------------
+CvPlot** CvMap::getNeighborsShuffled(const CvPlot* pPlot)
+{
+	if (!pPlot)
+		return NULL;
+
+	int aiShuffle[3][6] = {
+		{ 4, 5, 2, 1, 3, 0 },
+		{ 3, 0, 4, 1, 2, 5 },
+		{ 1, 2, 4, 5, 0, 3 } };
+
+	int iShuffleType = GC.getGame().getSmallFakeRandNum(3, *pPlot);
+	int iBaseIndex = plotNum(pPlot->getX(), pPlot->getY())*(NUM_DIRECTION_TYPES + 2);
+
+	for (int i = 0; i < NUM_DIRECTION_TYPES; i++)
+		m_apShuffledNeighbors[i] = m_pPlotNeighbors[iBaseIndex + aiShuffle[iShuffleType][i]];
+
+	return m_apShuffledNeighbors;
+}
+
 //	--------------------------------------------------------------------------------
 void CvMap::uninit()
 {
@@ -469,7 +490,7 @@ void CvMap::reset(CvMapInitData* pInitInfo)
 	// set grid size
 	// initially set in terrain cell units
 	//
-	m_iGridWidth = (CvPreGame::worldSize() != NO_WORLDSIZE) ?  getWorldInfo().getGridWidth(): 0;	//todotw:tcells wide
+	m_iGridWidth = (CvPreGame::worldSize() != NO_WORLDSIZE) ?  getWorldInfo().getGridWidth(): 0;
 	m_iGridHeight = (CvPreGame::worldSize() != NO_WORLDSIZE) ? getWorldInfo().getGridHeight(): 0;
 
 	// allow grid size override
@@ -480,6 +501,7 @@ void CvMap::reset(CvMapInitData* pInitInfo)
 	}
 
 	m_iGridSize = m_iGridHeight * m_iGridWidth;
+
 	m_iLandPlots = 0;
 	m_iOwnedPlots = 0;
 	m_iNumNaturalWonders = 0;
@@ -538,9 +560,7 @@ void CvMap::reset(CvMapInitData* pInitInfo)
 // Initializes all data that is not serialized but needs to be initialized after loading.
 void CvMap::setup()
 {
-	GC.GetPathFinder().Initialize(getGridWidth(), getGridHeight(), isWrapX(), isWrapY());
-	GC.GetInterfacePathFinder().Initialize(getGridWidth(), getGridHeight(), isWrapX(), isWrapY());
-	GC.GetStepFinder().Initialize(getGridWidth(), getGridHeight(), isWrapX(), isWrapY());
+	GC.InitializePathfinders(getGridWidth(), getGridHeight(), isWrapX(), isWrapY());
 }
 
 //////////////////////////////////////
@@ -1597,15 +1617,15 @@ void CvMap::calculateAreas()
 			boundaries.m_iSouthEdge = pLoopPlot->getY();
 
 			SPathFinderUserData data(NO_PLAYER, PT_AREA_CONNECTION);
-			ReachablePlots result = GC.GetStepFinder().GetPlotsInReach(pLoopPlot->getX(), pLoopPlot->getY(), data, 0);
+			ReachablePlots result = GC.GetStepFinder().GetPlotsInReach(pLoopPlot->getX(), pLoopPlot->getY(), data);
 
 			for (ReachablePlots::iterator it = result.begin(); it != result.end(); ++it)
 			{
-				CvPlot* pPlot = GC.getMap().plotByIndexUnchecked(it->first);
+				CvPlot* pPlot = GC.getMap().plotByIndexUnchecked(it->iPlotIndex);
 				pPlot->setArea(iArea);
 
-				boundaries.m_iEastEdge = MIN(boundaries.m_iEastEdge,pPlot->getX());
-				boundaries.m_iWestEdge = MAX(boundaries.m_iWestEdge,pPlot->getX());
+				boundaries.m_iWestEdge = MIN(boundaries.m_iWestEdge,pPlot->getX());
+				boundaries.m_iEastEdge = MAX(boundaries.m_iEastEdge,pPlot->getX());
 				boundaries.m_iSouthEdge = MIN(boundaries.m_iSouthEdge,pPlot->getY());
 				boundaries.m_iNorthEdge = MAX(boundaries.m_iNorthEdge,pPlot->getY());
 			}
@@ -1654,7 +1674,11 @@ void CvMap::DoPlaceNaturalWonders()
 	{
 		eFeature = (FeatureTypes) iFeatureLoop;
 		CvFeatureInfo* feature = GC.getFeatureInfo(eFeature);
+#if defined(MOD_PSEUDO_NATURAL_WONDER)
+		if(feature && feature->IsNaturalWonder(true))
+#else
 		if(feature && feature->IsNaturalWonder())
+#endif
 		{
 			eNWFeature = eFeature;
 
@@ -1849,7 +1873,11 @@ void CvMap::DoPlaceNaturalWonders()
 
 				if(pLoopPlot != NULL)
 				{
+#if defined(MOD_PSEUDO_NATURAL_WONDER)
+					if(pLoopPlot->IsNaturalWonder(true))
+#else
 					if(pLoopPlot->IsNaturalWonder())
+#endif
 					{
 						// Found a NW too close
 						bValid = false;
@@ -2236,11 +2264,11 @@ void CvMap::calculateLandmasses()
 			pLoopPlot->setLandmass(iLandmassID);
 
 			SPathFinderUserData data(NO_PLAYER, PT_LANDMASS_CONNECTION);
-			ReachablePlots result = GC.GetStepFinder().GetPlotsInReach(pLoopPlot->getX(), pLoopPlot->getY(), data, 0);
+			ReachablePlots result = GC.GetStepFinder().GetPlotsInReach(pLoopPlot->getX(), pLoopPlot->getY(), data);
 
 			for (ReachablePlots::iterator it = result.begin(); it != result.end(); ++it)
 			{
-				CvPlot* pPlot = GC.getMap().plotByIndexUnchecked(it->first);
+				CvPlot* pPlot = GC.getMap().plotByIndexUnchecked(it->iPlotIndex);
 				pPlot->setLandmass(iLandmassID);
 			}
 		}
@@ -2323,3 +2351,5 @@ int CvMap::GetAIMapHint()
 {
 	return m_iAIMapHints;
 }
+
+

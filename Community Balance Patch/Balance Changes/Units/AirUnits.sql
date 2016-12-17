@@ -68,7 +68,7 @@
 	-- Guided Missile range bump
 
 	UPDATE Units
-	SET Range = '6'
+	SET Range = '12'
 	WHERE Type = 'UNIT_GUIDED_MISSILE' AND EXISTS (SELECT * FROM COMMUNITY WHERE Type='COMMUNITY_CORE_BALANCE_UNITS' AND Value= 1 );
 
 	UPDATE Unit_Flavors
@@ -84,13 +84,13 @@
 
 	-- Fighters should obsolete with Jets, and Bombers with Stealth (helps AI make good late-game choices)
 
-	UPDATE Units
-	SET ObsoleteTech = 'TECH_LASERS'
-	WHERE Type = 'UNIT_FIGHTER' AND EXISTS (SELECT * FROM COMMUNITY WHERE Type='COMMUNITY_CORE_BALANCE_UNITS' AND Value= 1 );
+	--UPDATE Units
+	--SET ObsoleteTech = 'TECH_LASERS'
+	--WHERE Type = 'UNIT_FIGHTER' AND EXISTS (SELECT * FROM COMMUNITY WHERE Type='COMMUNITY_CORE_BALANCE_UNITS' AND Value= 1 );
 
-	UPDATE Units
-	SET ObsoleteTech = 'TECH_STEALTH'
-	WHERE Type = 'UNIT_BOMBER' AND EXISTS (SELECT * FROM COMMUNITY WHERE Type='COMMUNITY_CORE_BALANCE_UNITS' AND Value= 1 );
+	--UPDATE Units
+	--SET ObsoleteTech = 'TECH_STEALTH'
+	--WHERE Type = 'UNIT_BOMBER' AND EXISTS (SELECT * FROM COMMUNITY WHERE Type='COMMUNITY_CORE_BALANCE_UNITS' AND Value= 1 );
 
 	-- Tech Stuff
 

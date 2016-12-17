@@ -17,6 +17,7 @@
 #include "CvInfosSerializationHelper.h"
 
 #if defined(MOD_BALANCE_CORE)
+#include "CvTypes.h"
 	#include <algorithm>
 #endif
 
@@ -52,15 +53,15 @@ CvBuildingEntry::CvBuildingEntry(void):
 	m_bPuppetPurchaseOverride(false),
 	m_bAllowsPuppetPurchase(false),
 	m_iGetCooldown(0),
-	m_iFreeBuildingTradeTargetCity(NO_BUILDINGCLASS),
-	m_iCorporationID(0),
-	m_iCorporationHQID(0),
 	m_bTradeRouteInvulnerable(false),
 	m_iTRSpeedBoost(0),
 	m_iTRVisionBoost(0),
 	m_iVotesPerGPT(0),
 	m_bRequiresRail(false),
 	m_bDummy(false),
+	m_iResourceQuantityToPlace(0),
+	m_iLandmarksTourismPercentGlobal(0),
+	m_iGreatWorksTourismModifierGlobal(0),
 #endif
 	m_iSpecialistType(NO_SPECIALIST),
 	m_iSpecialistCount(0),
@@ -112,6 +113,7 @@ CvBuildingEntry::CvBuildingEntry(void):
 #if defined(MOD_BALANCE_CORE)
 	m_iLocalUnhappinessModifier(0),
 	m_iGlobalBuildingGoldMaintenanceMod(0),
+	m_iBuildingDefenseModifier(0),
 #endif
 	m_iHappinessPerCity(0),
 	m_iHappinessPerXPolicies(0),
@@ -184,6 +186,7 @@ CvBuildingEntry::CvBuildingEntry(void):
 	m_bWater(false),
 	m_bRiver(false),
 	m_bFreshWater(false),
+	m_bAnyWater(false),
 #if defined(MOD_API_EXTENSIONS)
 	m_bAddsFreshWater(false),
 	m_bPurchaseOnly(false),
@@ -197,6 +200,7 @@ CvBuildingEntry::CvBuildingEntry(void):
 	m_bIsReformation(false),
 	m_bBuildAnywhere(false),
 	m_iTradeReligionModifier(-1),
+	m_iFreeArtifacts(0),
 #endif
 #if defined(MOD_BALANCE_CORE_SPIES)
 	 m_iCannotFailSpies(-1),
@@ -243,6 +247,7 @@ CvBuildingEntry::CvBuildingEntry(void):
 	m_iLandTourism(0),
 	m_iSeaTourism(0),
 	m_iAlwaysHeal(0),
+	m_bIsCorp(false),
 #endif
 	m_bPlayerBorderObstacle(false),
 	m_bCapital(false),
@@ -293,6 +298,7 @@ CvBuildingEntry::CvBuildingEntry(void):
 	m_piYieldFromUnitProduction(NULL),
 	m_piYieldFromBorderGrowth(NULL),
 	m_piYieldFromPolicyUnlock(NULL),
+	m_piYieldFromUnitLevelUp(NULL),
 	m_piYieldFromPurchase(NULL),
 #endif
 	m_piYieldChange(NULL),
@@ -319,18 +325,20 @@ CvBuildingEntry::CvBuildingEntry(void):
 	m_piLocalFeatureAnds(NULL),
 	m_piResourceMonopolyAnds(NULL),
 	m_piResourceMonopolyOrs(NULL),
-	m_piCorporationYield(NULL),
-	m_piCorporationYieldModTrade(NULL),
-	m_piCorporationTradeRouteMod(NULL),
-	m_iCorporationGPChange(0),
-	m_iCorporationMaxFranchises(0),
-	m_piCorporationResourceQuantity(NULL),
+	m_iGPRateModifierPerXFranchises(0),
+	m_piResourceQuantityPerXFranchises(NULL),
+	m_piYieldPerFranchise(NULL),
 #endif
 	m_paiHurryModifier(NULL),
 	m_pbBuildingClassNeededInCity(NULL),
 #if defined(MOD_BALANCE_CORE)
+	m_paiHurryModifierLocal(NULL),
 	m_pbBuildingClassNeededAnywhere(NULL),
 	m_pbBuildingClassNeededNowhere(NULL),
+	m_piNumSpecFreeUnits(NULL),
+	m_piNumResourceToPlace(NULL),
+	m_piYieldPerFriend(NULL),
+	m_piYieldPerAlly(NULL),
 #endif
 	m_piNumFreeUnits(NULL),
 	m_bArtInfoEraVariation(false),
@@ -341,6 +349,8 @@ CvBuildingEntry::CvBuildingEntry(void):
 #if defined(MOD_BALANCE_CORE)
 	m_ppaiImprovementYieldChange(NULL),
 	m_ppaiImprovementYieldChangeGlobal(NULL),
+	m_ppaiSpecialistYieldChangeLocal(NULL),
+	m_paiResourceHappinessChange(NULL),
 #endif
 	m_ppaiSpecialistYieldChange(NULL),
 	m_ppaiResourceYieldModifier(NULL),
@@ -398,6 +408,7 @@ CvBuildingEntry::~CvBuildingEntry(void)
 	SAFE_DELETE_ARRAY(m_piYieldFromUnitProduction);
 	SAFE_DELETE_ARRAY(m_piYieldFromBorderGrowth);
 	SAFE_DELETE_ARRAY(m_piYieldFromPolicyUnlock);
+	SAFE_DELETE_ARRAY(m_piYieldFromUnitLevelUp);
 	SAFE_DELETE_ARRAY(m_piYieldFromPurchase);
 #endif
 	SAFE_DELETE_ARRAY(m_piYieldChange);
@@ -424,16 +435,20 @@ CvBuildingEntry::~CvBuildingEntry(void)
 	SAFE_DELETE_ARRAY(m_piLocalFeatureAnds);
 	SAFE_DELETE_ARRAY(m_piResourceMonopolyAnds);
 	SAFE_DELETE_ARRAY(m_piResourceMonopolyOrs);
-	SAFE_DELETE_ARRAY(m_piCorporationYield);
-	SAFE_DELETE_ARRAY(m_piCorporationYieldModTrade);
-	SAFE_DELETE_ARRAY(m_piCorporationTradeRouteMod);
-	SAFE_DELETE_ARRAY(m_piCorporationResourceQuantity);
+	SAFE_DELETE_ARRAY(m_piYieldPerFranchise);
+	SAFE_DELETE_ARRAY(m_piResourceQuantityPerXFranchises);
 #endif
 	SAFE_DELETE_ARRAY(m_paiHurryModifier);
 	SAFE_DELETE_ARRAY(m_pbBuildingClassNeededInCity);
 #if defined(MOD_BALANCE_CORE)
+	SAFE_DELETE_ARRAY(m_paiHurryModifierLocal);
 	SAFE_DELETE_ARRAY(m_pbBuildingClassNeededAnywhere);
 	SAFE_DELETE_ARRAY(m_pbBuildingClassNeededNowhere);
+	SAFE_DELETE_ARRAY(m_piNumSpecFreeUnits);
+	SAFE_DELETE_ARRAY(m_piNumResourceToPlace);
+	SAFE_DELETE_ARRAY(m_paiResourceHappinessChange);
+	SAFE_DELETE_ARRAY(m_piYieldPerFriend);
+	SAFE_DELETE_ARRAY(m_piYieldPerAlly);
 #endif
 	SAFE_DELETE_ARRAY(m_piNumFreeUnits);
 	SAFE_DELETE_ARRAY(m_paiBuildingClassHappiness);
@@ -446,6 +461,7 @@ CvBuildingEntry::~CvBuildingEntry(void)
 #if defined(MOD_BALANCE_CORE)
 	CvDatabaseUtility::SafeDelete2DArray(m_ppaiImprovementYieldChange);
 	CvDatabaseUtility::SafeDelete2DArray(m_ppaiImprovementYieldChangeGlobal);
+	CvDatabaseUtility::SafeDelete2DArray(m_ppaiSpecialistYieldChangeLocal);
 #endif
 	CvDatabaseUtility::SafeDelete2DArray(m_ppaiSpecialistYieldChange);
 	CvDatabaseUtility::SafeDelete2DArray(m_ppaiResourceYieldModifier);
@@ -475,6 +491,7 @@ bool CvBuildingEntry::CacheResults(Database::Results& kResults, CvDatabaseUtilit
 	m_bWater = kResults.GetBool("Water");
 	m_bRiver = kResults.GetBool("River");
 	m_bFreshWater = kResults.GetBool("FreshWater");
+	m_bAnyWater = kResults.GetBool("AnyWater");
 #if defined(MOD_API_EXTENSIONS)
 	m_bAddsFreshWater = kResults.GetBool("AddsFreshWater");
 	m_bPurchaseOnly = kResults.GetBool("PurchaseOnly");
@@ -487,6 +504,7 @@ bool CvBuildingEntry::CacheResults(Database::Results& kResults, CvDatabaseUtilit
 	m_bIsReformation = kResults.GetBool("IsReformation");
 	m_bBuildAnywhere = kResults.GetBool("BuildAnywhere");
 	m_iTradeReligionModifier = kResults.GetInt("TradeReligionModifier");
+	m_iFreeArtifacts = kResults.GetInt("FreeArtifacts");
 #endif
 #if defined(MOD_BALANCE_CORE_SPIES)
 	m_iCannotFailSpies = kResults.GetInt("CannotFailSpies");
@@ -532,6 +550,7 @@ bool CvBuildingEntry::CacheResults(Database::Results& kResults, CvDatabaseUtilit
 	m_iLandTourism = kResults.GetInt("FinishLandTRTourism");
 	m_iSeaTourism = kResults.GetInt("FinishSeaTRTourism");
 	m_iAlwaysHeal = kResults.GetInt("AlwaysHeal");
+	m_bIsCorp = kResults.GetBool("IsCorporation");
 #endif
 	m_bPlayerBorderObstacle = kResults.GetBool("PlayerBorderObstacle");
 	m_bCapital = kResults.GetBool("Capital");
@@ -582,6 +601,7 @@ bool CvBuildingEntry::CacheResults(Database::Results& kResults, CvDatabaseUtilit
 #if defined(MOD_BALANCE_CORE)
 	m_iLocalUnhappinessModifier = kResults.GetInt("LocalUnhappinessModifier");
 	m_iGlobalBuildingGoldMaintenanceMod = kResults.GetInt("GlobalBuildingGoldMaintenanceMod");
+	m_iBuildingDefenseModifier = kResults.GetInt("BuildingDefenseModifier");
 #endif
 	m_iHappinessPerCity = kResults.GetInt("HappinessPerCity");
 	m_iHappinessPerXPolicies = kResults.GetInt("HappinessPerXPolicies");
@@ -689,14 +709,6 @@ bool CvBuildingEntry::CacheResults(Database::Results& kResults, CvDatabaseUtilit
 	szTextVal = kResults.GetText("ThemingBonusHelp");
 	m_strThemingBonusHelp = szTextVal;
 
-#if defined(MOD_BALANCE_CORE)
-	szTextVal = kResults.GetText("CorporationHelper");
-	m_strCorporationHelper = szTextVal;
-
-	szTextVal = kResults.GetText("OfficeBenefitHelper");
-	m_strOfficeBenefitHelper = szTextVal;
-#endif
-
 	szTextVal = kResults.GetText("NearbyTerrainRequired");
 	m_iNearbyTerrainRequired = GC.getInfoTypeForString(szTextVal, true);
 
@@ -728,15 +740,15 @@ bool CvBuildingEntry::CacheResults(Database::Results& kResults, CvDatabaseUtilit
 
 #if defined(MOD_BALANCE_CORE)
 	szTextVal = kResults.GetText("FreeBuildingTradeTargetCity");
-	m_iFreeBuildingTradeTargetCity = GC.getInfoTypeForString(szTextVal, true);
-	m_iCorporationID = kResults.GetInt("CorporationID");
-	m_iCorporationHQID = kResults.GetInt("CorporationHQID");
 	m_bTradeRouteInvulnerable = kResults.GetBool("TradeRouteInvulnerable");
 	m_iTRSpeedBoost = kResults.GetInt("TRSpeedBoost");
 	m_iTRVisionBoost = kResults.GetInt("TRVisionBoost");
 	m_iVotesPerGPT = kResults.GetInt("VotesPerGPT");
 	m_bRequiresRail = kResults.GetBool("RequiresRail");
 	m_bDummy = kResults.GetBool("IsDummy");
+	m_iResourceQuantityToPlace = kResults.GetInt("ResourceQuantityToPlace");
+	m_iLandmarksTourismPercentGlobal = kResults.GetInt("GlobalLandmarksTourismPercent");
+	m_iGreatWorksTourismModifierGlobal = kResults.GetInt("GlobalGreatWorksTourismModifier");
 #endif
 	szTextVal = kResults.GetText("FreePromotion");
 	m_iFreePromotion = GC.getInfoTypeForString(szTextVal, true);
@@ -816,6 +828,7 @@ bool CvBuildingEntry::CacheResults(Database::Results& kResults, CvDatabaseUtilit
 	kUtility.SetYields(m_piYieldFromUnitProduction, "Building_YieldFromUnitProduction", "BuildingType", szBuildingType);
 	kUtility.SetYields(m_piYieldFromBorderGrowth, "Building_YieldFromBorderGrowth", "BuildingType", szBuildingType);
 	kUtility.SetYields(m_piYieldFromPolicyUnlock, "Building_YieldFromPolicyUnlock", "BuildingType", szBuildingType);
+	kUtility.SetYields(m_piYieldFromUnitLevelUp, "Building_YieldFromUnitLevelUp", "BuildingType", szBuildingType);
 	kUtility.SetYields(m_piYieldFromPurchase, "Building_YieldFromPurchase", "BuildingType", szBuildingType);
 #endif
 	kUtility.SetYields(m_piYieldChange, "Building_YieldChanges", "BuildingType", szBuildingType);
@@ -835,6 +848,10 @@ bool CvBuildingEntry::CacheResults(Database::Results& kResults, CvDatabaseUtilit
 	kUtility.PopulateArrayByValue(m_piResourceFaithChanges, "Resources", "Building_ResourceFaithChanges", "ResourceType", "BuildingType", szBuildingType, "FaithChange");
 
 	kUtility.PopulateArrayByValue(m_paiHurryModifier, "HurryInfos", "Building_HurryModifiers", "HurryType", "BuildingType", szBuildingType, "HurryCostModifier");
+#if defined(MOD_BALANCE_CORE)
+	kUtility.PopulateArrayByValue(m_paiHurryModifierLocal, "HurryInfos", "Building_HurryModifiersLocal", "HurryType", "BuildingType", szBuildingType, "HurryCostModifier");
+	kUtility.PopulateArrayByValue(m_paiResourceHappinessChange, "Resources", "Building_ResourceHappinessChange", "ResourceType", "BuildingType", szBuildingType, "HappinessChange");
+#endif
 
 	//kUtility.PopulateArrayByValue(m_piProductionTraits, "Traits", "Building_ProductionTraits", "TraitType", "BuildingType", szBuildingType, "Trait");
 
@@ -854,6 +871,8 @@ bool CvBuildingEntry::CacheResults(Database::Results& kResults, CvDatabaseUtilit
 	kUtility.PopulateArrayByExistence(m_pbBuildingClassNeededNowhere, "BuildingClasses", "Building_ClassNeededNowhere", "BuildingClassType", "BuildingType", szBuildingType);
 	kUtility.PopulateArrayByValue(m_paiBuildingClassLocalHappiness, "BuildingClasses", "Building_BuildingClassLocalHappiness", "BuildingClassType", "BuildingType", szBuildingType, "Happiness");
 	kUtility.PopulateArrayByValue(m_paiSpecificGreatPersonRateModifier, "Specialists", "Building_SpecificGreatPersonRateModifier", "SpecialistType", "BuildingType", szBuildingType, "Modifier");
+	kUtility.PopulateArrayByValue(m_piNumSpecFreeUnits, "Units", "Building_FreeSpecUnits", "UnitType", "BuildingType", szBuildingType, "NumUnits");
+	kUtility.PopulateArrayByValue(m_piNumResourceToPlace, "Resources", "Building_ResourcePlotsToPlace", "ResourceType", "BuildingType", szBuildingType, "NumPlots");
 #endif
 	//kUtility.PopulateArrayByExistence(m_piNumFreeUnits, "Units", "Building_FreeUnits", "UnitType", "BuildingType", szBuildingType);
 	kUtility.PopulateArrayByValue(m_piNumFreeUnits, "Units", "Building_FreeUnits", "UnitType", "BuildingType", szBuildingType, "NumUnits");
@@ -871,12 +890,13 @@ bool CvBuildingEntry::CacheResults(Database::Results& kResults, CvDatabaseUtilit
 	kUtility.PopulateArrayByExistence(m_piResourceMonopolyOrs, "Resources", "Building_ResourceMonopolyOrs", "ResourceType", "BuildingType", szBuildingType);
 	kUtility.PopulateArrayByExistence(m_piResourceMonopolyAnds, "Resources", "Building_ResourceMonopolyAnds", "ResourceType", "BuildingType", szBuildingType);
 
-	kUtility.PopulateArrayByValue(m_piCorporationResourceQuantity, "Resources", "Building_CorporationResourceQuantity", "ResourceType", "BuildingType", szBuildingType, "Quantity");
-	kUtility.SetYields(m_piCorporationYield, "Building_CorporationYield", "BuildingType", szBuildingType);
-	kUtility.SetYields(m_piCorporationYieldModTrade, "Building_CorporationYieldModTrade", "BuildingType", szBuildingType);
-	kUtility.SetYields(m_piCorporationTradeRouteMod, "Building_CorporationTradeRouteMod", "BuildingType", szBuildingType);
-	m_iCorporationGPChange = kResults.GetInt("CorporationGPChange");
-	m_iCorporationMaxFranchises = kResults.GetInt("CorporationMaxFranchises");
+	kUtility.PopulateArrayByValue(m_piResourceQuantityPerXFranchises, "Resources", "Building_ResourceQuantityPerXFranchises", "ResourceType", "BuildingType", szBuildingType, "NumFranchises");
+	kUtility.SetYields(m_piYieldPerFranchise, "Building_YieldPerFranchise", "BuildingType", szBuildingType);
+
+	kUtility.SetYields(m_piYieldPerFriend, "Building_YieldPerFriend", "BuildingType", szBuildingType);
+	kUtility.SetYields(m_piYieldPerAlly, "Building_YieldPerAlly", "BuildingType", szBuildingType);
+
+	m_iGPRateModifierPerXFranchises = kResults.GetInt("GPRateModifierPerXFranchises");
 #endif
 	//ResourceYieldChanges
 	{
@@ -1037,6 +1057,29 @@ bool CvBuildingEntry::CacheResults(Database::Results& kResults, CvDatabaseUtilit
 			const int yield = pResults->GetInt(2);
 
 			m_ppaiPlotYieldChange[PlotID][YieldID] = yield;
+		}
+	}
+
+	//SpecialistYieldChangesLocal
+	{
+		kUtility.Initialize2DArray(m_ppaiSpecialistYieldChangeLocal, "Specialists", "Yields");
+
+		std::string strKey("Building_SpecialistYieldChangesLocal");
+		Database::Results* pResults = kUtility.GetResults(strKey);
+		if(pResults == NULL)
+		{
+			pResults = kUtility.PrepareResults(strKey, "select Specialists.ID as SpecialistID, Yields.ID as YieldID, Yield from Building_SpecialistYieldChangesLocal inner join Specialists on Specialists.Type = SpecialistType inner join Yields on Yields.Type = YieldType where BuildingType = ?");
+		}
+
+		pResults->Bind(1, szBuildingType);
+
+		while(pResults->Step())
+		{
+			const int SpecialistID = pResults->GetInt(0);
+			const int YieldID = pResults->GetInt(1);
+			const int yield = pResults->GetInt(2);
+
+			m_ppaiSpecialistYieldChangeLocal[SpecialistID][YieldID] = yield;
 		}
 	}
 #endif
@@ -1392,21 +1435,6 @@ int CvBuildingEntry::GetFreeBuildingThisCity() const
 	return m_iFreeBuildingThisCity;
 }
 #if defined(MOD_BALANCE_CORE)
-/// Free building in the target city for a trade route
-int CvBuildingEntry::GetFreeBuildingTradeTargetCity() const
-{
-	return m_iFreeBuildingTradeTargetCity;
-}
-/// Corporation ID (for global calcs)
-int CvBuildingEntry::GetCorporationID() const
-{
-	return m_iCorporationID;
-}
-/// Corporation ID (for global calcs)
-int CvBuildingEntry::GetCorporationHQID() const
-{
-	return m_iCorporationHQID;
-}
 /// TRs are invulnerable!
 bool CvBuildingEntry::IsTradeRouteInvulnerable() const
 {
@@ -1434,6 +1462,18 @@ bool CvBuildingEntry::IsRequiresRail() const
 bool CvBuildingEntry::IsDummy() const
 {
 	return m_bDummy;
+}
+int CvBuildingEntry::GetResourceQuantityToPlace() const
+{
+	return m_iResourceQuantityToPlace;
+}
+int CvBuildingEntry::GetLandmarksTourismPercentGlobal() const
+{
+	return m_iLandmarksTourismPercentGlobal;
+}
+int CvBuildingEntry::GetGreatWorksTourismModifierGlobal() const
+{
+	return m_iGreatWorksTourismModifierGlobal;
 }
 #endif
 
@@ -1803,6 +1843,13 @@ bool CvBuildingEntry::IsAllowsRangeStrike() const
 {
 	return m_bAllowsRangeStrike;
 }
+#if defined(MOD_BALANCE_CORE)
+// This is an actual Modifier where as GetDefenseModifier is just building Hit Points
+int CvBuildingEntry::GetBuildingDefenseModifier() const
+{
+	return m_iBuildingDefenseModifier;
+}
+#endif
 
 /// Modifier to city defense
 int CvBuildingEntry::GetDefenseModifier() const
@@ -2150,6 +2197,10 @@ bool CvBuildingEntry::IsBorderObstacle() const
 	return m_bBorderObstacle;
 }
 #if defined(MOD_BALANCE_CORE)
+bool CvBuildingEntry::IsAnyBodyOfWater() const
+{
+	return m_bAnyWater;
+}
 /// Is this an obstacle for just the tiles around your city?
 int CvBuildingEntry::GetBorderObstacleCity() const
 {
@@ -2179,6 +2230,10 @@ int CvBuildingEntry::GetSeaTourismEnd() const
 int CvBuildingEntry::GetAlwaysHeal() const
 {
 	return m_iAlwaysHeal;
+}
+bool CvBuildingEntry::IsCorp() const
+{
+	return m_bIsCorp;
 }
 #endif
 /// Is this an obstacle at the edge of your empire (e.g. Great Wall) -- for just the owning player
@@ -2364,17 +2419,6 @@ CvString CvBuildingEntry::GetThemingBonusHelp() const
 {
 	return m_strThemingBonusHelp;
 }
-#if defined(MOD_BALANCE_CORE)
-CvString CvBuildingEntry::GetCorporationHelper() const
-{
-	return m_strCorporationHelper;
-}
-
-CvString CvBuildingEntry::GetOfficeBenefitHelper() const
-{
-	return m_strOfficeBenefitHelper;
-}
-#endif
 // ARRAYS
 
 #if defined(MOD_DIPLOMACY_CITYSTATES) || defined(MOD_BALANCE_CORE)
@@ -2536,6 +2580,19 @@ int* CvBuildingEntry::GetYieldFromPolicyUnlockArray() const
 {
 	return m_piYieldFromPolicyUnlock;
 }
+
+int CvBuildingEntry::GetYieldFromUnitLevelUp(int i) const
+{
+	CvAssertMsg(i < NUM_YIELD_TYPES, "Index out of bounds");
+	CvAssertMsg(i > -1, "Index out of bounds");
+	return m_piYieldFromUnitLevelUp[i];
+}
+/// Array of yield changes
+int* CvBuildingEntry::GetYieldFromUnitLevelUpArray() const
+{
+	return m_piYieldFromUnitLevelUp;
+}
+
 
 int CvBuildingEntry::GetYieldFromPurchase(int i) const
 {
@@ -2894,56 +2951,23 @@ int CvBuildingEntry::GetResourceMonopolyOr(int i) const
 	CvAssertMsg(i > -1, "Index out of bounds");
 	return m_piResourceMonopolyOrs ? m_piResourceMonopolyOrs[i] : -1;
 }
-/// Corporate building yield.
-int CvBuildingEntry::GetCorporationYieldChange(int i) const
+//Coroporation Stuff
+int CvBuildingEntry::GetGPRateModifierPerXFranchises() const
 {
-	CvAssertMsg(i < NUM_YIELD_TYPES, "Index out of bounds");
-	CvAssertMsg(i > -1, "Index out of bounds");
-	return m_piCorporationYield ? m_piCorporationYield[i] : -1;
-}
-/// Corporate building yield.
-int* CvBuildingEntry::GetCorporationYieldChangeArray() const
-{
-	return m_piCorporationYield;
-}
-/// Corporate building yield.
-int CvBuildingEntry::GetCorporationYieldModTrade(int i) const
-{
-	CvAssertMsg(i < NUM_YIELD_TYPES, "Index out of bounds");
-	CvAssertMsg(i > -1, "Index out of bounds");
-	return m_piCorporationYieldModTrade ? m_piCorporationYieldModTrade[i] : -1;
-}
-/// Corporate building yield.
-int* CvBuildingEntry::GetCorporationYieldModTradeArray() const
-{
-	return m_piCorporationYieldModTrade;
-}
-/// Corporate building yield.
-int CvBuildingEntry::GetCorporationTradeRouteMod(int i) const
-{
-	CvAssertMsg(i < NUM_YIELD_TYPES, "Index out of bounds");
-	CvAssertMsg(i > -1, "Index out of bounds");
-	return m_piCorporationTradeRouteMod ? m_piCorporationTradeRouteMod[i] : -1;
-}
-/// Corporate building yield.
-int* CvBuildingEntry::GetCorporationTradeRouteModArray() const
-{
-	return m_piCorporationTradeRouteMod;
-}
-int CvBuildingEntry::GetCorporationGPChange() const
-{
-	return m_iCorporationGPChange;
-}
-int CvBuildingEntry::GetCorporationMaxFranchises() const
-{
-	return m_iCorporationMaxFranchises;
+	return m_iGPRateModifierPerXFranchises;
 }
 /// Resources provided once constructed
-int CvBuildingEntry::GetCorporationResourceQuantity(int i) const
+int CvBuildingEntry::GetResourceQuantityPerXFranchises(int i) const
 {
 	CvAssertMsg(i < GC.getNumResourceInfos(), "Index out of bounds");
 	CvAssertMsg(i > -1, "Index out of bounds");
-	return m_piCorporationResourceQuantity ? m_piCorporationResourceQuantity[i] : -1;
+	return m_piResourceQuantityPerXFranchises ? m_piResourceQuantityPerXFranchises[i] : -1;
+}
+int CvBuildingEntry::GetYieldPerFranchise(int i) const
+{
+	CvAssertMsg(i < NUM_YIELD_TYPES, "Index out of bounds");
+	CvAssertMsg(i > -1, "Index out of bounds");
+	return m_piYieldPerFranchise ? m_piYieldPerFranchise[i] : -1;
 }
 #endif
 /// Modifier to Hurry cost
@@ -2953,6 +2977,15 @@ int CvBuildingEntry::GetHurryModifier(int i) const
 	CvAssertMsg(i > -1, "Index out of bounds");
 	return m_paiHurryModifier ? m_paiHurryModifier[i] : -1;
 }
+#if defined(MOD_BALANCE_CORE)
+/// Local Modifier to Hurry cost
+int CvBuildingEntry::GetHurryModifierLocal(int i) const
+{
+	CvAssertMsg(i < GC.getNumHurryInfos(), "Index out of bounds");
+	CvAssertMsg(i > -1, "Index out of bounds");
+	return m_paiHurryModifierLocal ? m_paiHurryModifierLocal[i] : -1;
+}
+#endif
 
 /// Can it only built if there is a building of this class in the city?
 bool CvBuildingEntry::IsBuildingClassNeededInCity(int i) const
@@ -2975,6 +3008,32 @@ bool CvBuildingEntry::IsBuildingClassNeededNowhere(int i) const
 	CvAssertMsg(i < GC.getNumBuildingClassInfos(), "Index out of bounds");
 	CvAssertMsg(i > -1, "Index out of bounds");
 	return m_pbBuildingClassNeededNowhere ? m_pbBuildingClassNeededNowhere[i] : false;
+}
+// Free units which appear near the capital, can be any UnitType of other civs or not
+int CvBuildingEntry::GetNumFreeSpecialUnits(int i) const
+{
+	CvAssertMsg(i < GC.getNumUnitInfos(), "Index out of bounds");
+	CvAssertMsg(i > -1, "Index out of bounds");
+	return m_piNumSpecFreeUnits ? m_piNumSpecFreeUnits[i] : -1;
+}
+int CvBuildingEntry::GetNumResourcesToPlace(int i) const
+{
+	CvAssertMsg(i < GC.getNumResourceInfos(), "Index out of bounds");
+	CvAssertMsg(i > -1, "Index out of bounds");
+	return m_piNumResourceToPlace ? m_piNumResourceToPlace[i] : -1;
+}
+int CvBuildingEntry::GetYieldPerFriend(int i) const
+{
+	CvAssertMsg(i < NUM_YIELD_TYPES, "Index out of bounds");
+	CvAssertMsg(i > -1, "Index out of bounds");
+	return m_piYieldPerFriend ? m_piYieldPerFriend[i] : -1;
+}
+
+int CvBuildingEntry::GetYieldPerAlly(int i) const
+{
+	CvAssertMsg(i < NUM_YIELD_TYPES, "Index out of bounds");
+	CvAssertMsg(i > -1, "Index out of bounds");
+	return m_piYieldPerAlly ? m_piYieldPerAlly[i] : -1;
 }
 #endif
 /// Free units which appear near the capital
@@ -3056,7 +3115,22 @@ int* CvBuildingEntry::GetImprovementYieldChangeGlobalArray(int i) const
 	CvAssertMsg(i > -1, "Index out of bounds");
 	return m_ppaiImprovementYieldChangeGlobal[i];
 }
-
+/// Change to specialist yield by type
+int CvBuildingEntry::GetSpecialistYieldChangeLocal(int i, int j) const
+{
+	CvAssertMsg(i < GC.getNumSpecialistInfos(), "Index out of bounds");
+	CvAssertMsg(i > -1, "Index out of bounds");
+	CvAssertMsg(j < NUM_YIELD_TYPES, "Index out of bounds");
+	CvAssertMsg(j > -1, "Index out of bounds");
+	return m_ppaiSpecialistYieldChangeLocal ? m_ppaiSpecialistYieldChangeLocal[i][j] : -1;
+}
+/// Array of changes to specialist yield
+int* CvBuildingEntry::GetSpecialistYieldChangeLocalArray(int i) const
+{
+	CvAssertMsg(i < GC.getNumSpecialistInfos(), "Index out of bounds");
+	CvAssertMsg(i > -1, "Index out of bounds");
+	return m_ppaiSpecialistYieldChangeLocal[i];
+}
 #endif
 
 /// Change to specialist yield by type
@@ -3187,6 +3261,12 @@ int CvBuildingEntry::GetSpecificGreatPersonRateModifier(int i) const
 	CvAssertMsg(i > -1, "Index out of bounds");
 	return m_paiSpecificGreatPersonRateModifier ? m_paiSpecificGreatPersonRateModifier[i] : -1;
 }
+int CvBuildingEntry::GetResourceHappiness(int i) const
+{
+	CvAssertMsg(i < GC.getNumResourceInfos(), "Index out of bounds");
+	CvAssertMsg(i > -1, "Index out of bounds");
+	return m_paiResourceHappinessChange ? m_paiResourceHappinessChange[i] : -1;
+}
 #endif
 /// Amount of extra Happiness per turn a BuildingClass provides
 int CvBuildingEntry::GetBuildingClassHappiness(int i) const
@@ -3225,6 +3305,11 @@ bool CvBuildingEntry::IsBuildAnywhere() const
 int CvBuildingEntry::GetTradeReligionModifier() const
 {
 	return m_iTradeReligionModifier;
+}
+// Creates free Artifacts for building, up to # indicated (or artifact slots in building).
+int CvBuildingEntry::GetNumFreeArtifacts() const
+{
+	return m_iFreeArtifacts;
 }
 #endif
 #if defined(MOD_BALANCE_CORE_SPIES)
@@ -3427,6 +3512,7 @@ CvCityBuildings::CvCityBuildings():
 	m_paiNumFreeBuilding(NULL),
 #if defined(MOD_BALANCE_CORE)
 	m_paiFirstTimeBuilding(NULL),
+	m_paiThemingBonusIndex(NULL),
 #endif
 	m_iNumBuildings(0),
 	m_iBuildingProductionModifier(0),
@@ -3480,6 +3566,9 @@ void CvCityBuildings::Init(CvBuildingXMLEntries* pPossibleBuildings, CvCity* pCi
 #if defined(MOD_BALANCE_CORE)
 	CvAssertMsg(m_paiFirstTimeBuilding==NULL, "about to leak memory, CvCityBuildings::m_paiFirstTimeBuilding");
 	m_paiFirstTimeBuilding = FNEW(int[iNumBuildings], c_eCiv5GameplayDLL, 0);
+
+	CvAssertMsg(m_paiThemingBonusIndex == NULL, "about to leak memory, CvCityBuildings::m_paiThemingBonusIndex");
+	m_paiThemingBonusIndex = FNEW(int[iNumBuildings], c_eCiv5GameplayDLL, 0);
 #endif
 
 	m_aBuildingYieldChange.clear();
@@ -3499,6 +3588,7 @@ void CvCityBuildings::Uninit()
 	SAFE_DELETE_ARRAY(m_paiNumFreeBuilding);
 #if defined(MOD_BALANCE_CORE)
 	SAFE_DELETE_ARRAY(m_paiFirstTimeBuilding);
+	SAFE_DELETE_ARRAY(m_paiThemingBonusIndex);
 #endif
 }
 
@@ -3528,6 +3618,7 @@ void CvCityBuildings::Reset()
 		m_paiNumFreeBuilding[iI] = 0;
 #if defined(MOD_BALANCE_CORE)
 		m_paiFirstTimeBuilding[iI] = 0;
+		m_paiThemingBonusIndex[iI] = -1;
 #endif
 	}
 
@@ -3565,6 +3656,7 @@ void CvCityBuildings::Read(FDataStream& kStream)
 	BuildingArrayHelpers::Read(kStream, m_paiNumFreeBuilding);
 #if defined(MOD_BALANCE_CORE)
 	BuildingArrayHelpers::Read(kStream, m_paiFirstTimeBuilding);
+	BuildingArrayHelpers::Read(kStream, m_paiThemingBonusIndex);
 #endif
 
 	kStream >> m_aBuildingYieldChange;
@@ -3614,6 +3706,7 @@ void CvCityBuildings::Write(FDataStream& kStream)
 	BuildingArrayHelpers::Write(kStream, m_paiNumFreeBuilding, iNumBuildings);
 #if defined(MOD_BALANCE_CORE)
 	BuildingArrayHelpers::Write(kStream, m_paiFirstTimeBuilding, iNumBuildings);
+	BuildingArrayHelpers::Write(kStream, m_paiThemingBonusIndex, iNumBuildings);
 #endif
 
 	kStream << m_aBuildingYieldChange;
@@ -3707,8 +3800,12 @@ bool CvCityBuildings::IsBuildingSellable(const CvBuildingEntry& kBuilding) const
 	{
 		return false;
 	}
-	//Spawns a permanent resource? Can't sell.
-	if(kBuilding.GetCorporationID() > 0)
+	if(kBuilding.GetResourceQuantityToPlace())
+	{
+		return false;
+	}
+	// Is a Corporation building?
+	if (kBuilding.GetBuildingClassInfo().getCorporationType() != NO_CORPORATION)
 	{
 		return false;
 	}
@@ -4637,66 +4734,63 @@ int CvCityBuildings::GetYieldFromGreatWorks(YieldTypes eYield) const
 		return 0;
 	}
 
-	int iWorkCount = 0;
+	int iRealWorkCount = 0;
+	int iStandardWorkCount = 0;
 	int iThemingBonusTotal = 0;
 	int iTypeBonuses = 0;
 	
-	GreatWorkClass eWritingClass = (GreatWorkClass)GC.getInfoTypeForString("GREAT_WORK_LITERATURE");
-	GreatWorkClass eArtClass = (GreatWorkClass)GC.getInfoTypeForString("GREAT_WORK_ART");
-	GreatWorkClass eArtifactsClass = (GreatWorkClass)GC.getInfoTypeForString("GREAT_WORK_ARTIFACT");
-	GreatWorkClass eMusicClass = (GreatWorkClass)GC.getInfoTypeForString("GREAT_WORK_MUSIC");
-
-	CvCivilizationInfo *pkCivInfo = GC.getCivilizationInfo(m_pCity->getCivilizationType());
-	if (pkCivInfo)
+	for(std::vector<BuildingTypes>::const_iterator iI=m_buildingsThatExistAtLeastOnce.begin(); iI!=m_buildingsThatExistAtLeastOnce.end(); ++iI)
 	{
-		for(std::vector<BuildingTypes>::const_iterator iI=m_buildingsThatExistAtLeastOnce.begin(); iI!=m_buildingsThatExistAtLeastOnce.end(); ++iI)
+		CvBuildingEntry *pkInfo = GC.getBuildingInfo(*iI);
+		if (pkInfo && pkInfo->GetGreatWorkCount() > 0)
 		{
-			CvBuildingEntry *pkInfo = GC.getBuildingInfo(*iI);
-			if (pkInfo && pkInfo->GetGreatWorkCount() > 0)
-			{
-				if ((MOD_GLOBAL_GREATWORK_YIELDTYPES && eYield == pkInfo->GetGreatWorkYieldType()) || (!MOD_GLOBAL_GREATWORK_YIELDTYPES && eYield == YIELD_CULTURE))
-				{
-					iWorkCount += GetNumGreatWorksInBuilding((BuildingClassTypes)pkInfo->GetBuildingClassType());
-				}
-				int iThemingBonus = m_pCity->GetCityCulture()->GetThemingBonus((BuildingClassTypes)pkInfo->GetBuildingClassType());
-				if (iThemingBonus > 0)
-				{
-					iThemingBonusTotal += pkInfo->GetThemingYieldBonus(eYield);
-				}
+			int iThisWork = GetNumGreatWorksInBuilding((BuildingClassTypes)pkInfo->GetBuildingClassType());
+			iRealWorkCount += iThisWork;
 
-				int iArt = GetNumGreatWorks(eArtClass);
-				if(iArt > 0)
-				{
-					iTypeBonuses += (GET_PLAYER(m_pCity->getOwner()).GetPlayerTraits()->GetArtYieldChanges(eYield) * iArt);
-				}
-				int iArtifact = GetNumGreatWorks(eArtifactsClass);
-				if(iArtifact > 0)
-				{
-					iTypeBonuses += (GET_PLAYER(m_pCity->getOwner()).GetPlayerTraits()->GetArtifactYieldChanges(eYield) * iArtifact);
-				}
-				int iLit = GetNumGreatWorks(eWritingClass);
-				if(iLit > 0)
-				{
-					iTypeBonuses += (GET_PLAYER(m_pCity->getOwner()).GetPlayerTraits()->GetLitYieldChanges(eYield) * iLit);
-				}
-				int iMusic = GetNumGreatWorks(eMusicClass);
-				if(iMusic > 0)
-				{
-					iTypeBonuses += (GET_PLAYER(m_pCity->getOwner()).GetPlayerTraits()->GetMusicYieldChanges(eYield) * iMusic);
-				}
+			int iThemingBonus = m_pCity->GetCityCulture()->GetThemingBonus((BuildingClassTypes)pkInfo->GetBuildingClassType());
+			if (iThemingBonus > 0)
+			{
+				iThemingBonusTotal += pkInfo->GetThemingYieldBonus(eYield);
+			}
+			
+			if ((MOD_GLOBAL_GREATWORK_YIELDTYPES && eYield == pkInfo->GetGreatWorkYieldType()) || (!MOD_GLOBAL_GREATWORK_YIELDTYPES && eYield == YIELD_CULTURE))
+			{
+				iStandardWorkCount += iThisWork;
 			}
 		}
 	}
+	
 	//No works? Abort!
-	if(iWorkCount <= 0)
+	if(iRealWorkCount <= 0)
 	{
 		return 0;
-	}	
+	}
+
+	int iArt = GetNumGreatWorks(CvTypes::getGREAT_WORK_SLOT_ART_ARTIFACT(), false, true);
+	if(iArt > 0)
+	{
+		iTypeBonuses += (GET_PLAYER(m_pCity->getOwner()).GetPlayerTraits()->GetArtYieldChanges(eYield) * iArt);
+	}
+	int iArtifact = GetNumGreatWorks(CvTypes::getGREAT_WORK_SLOT_ART_ARTIFACT(), true);
+	if(iArtifact > 0)
+	{
+		iTypeBonuses += (GET_PLAYER(m_pCity->getOwner()).GetPlayerTraits()->GetArtifactYieldChanges(eYield) * iArtifact);
+	}
+	int iLit = GetNumGreatWorks(CvTypes::getGREAT_WORK_SLOT_LITERATURE());
+	if(iLit > 0)
+	{
+		iTypeBonuses += (GET_PLAYER(m_pCity->getOwner()).GetPlayerTraits()->GetLitYieldChanges(eYield) * iLit);
+	}
+	int iMusic = GetNumGreatWorks(CvTypes::getGREAT_WORK_SLOT_MUSIC());
+	if(iMusic > 0)
+	{
+		iTypeBonuses += (GET_PLAYER(m_pCity->getOwner()).GetPlayerTraits()->GetMusicYieldChanges(eYield) * iMusic);
+	}
 	
 	//Now grab the base yields.
 	int iBaseYield = GC.getBASE_CULTURE_PER_GREAT_WORK();
-	iBaseYield += GET_PLAYER(m_pCity->getOwner()).GetGreatWorkYieldChange(eYield);
-	iBaseYield += GET_PLAYER(m_pCity->getOwner()).GetPlayerTraits()->GetGreatWorkYieldChanges(eYield);
+	int iSecondaryYield = GET_PLAYER(m_pCity->getOwner()).GetGreatWorkYieldChange(eYield);
+	iSecondaryYield += GET_PLAYER(m_pCity->getOwner()).GetPlayerTraits()->GetGreatWorkYieldChanges(eYield);
 
 	ReligionTypes eMajority = m_pCity->GetCityReligions()->GetReligiousMajority();
 	if(eMajority >= RELIGION_PANTHEON)
@@ -4708,13 +4802,14 @@ int CvCityBuildings::GetYieldFromGreatWorks(YieldTypes eYield) const
 			BeliefTypes eSecondaryPantheon = m_pCity->GetCityReligions()->GetSecondaryReligionPantheonBelief();
 			if (eSecondaryPantheon != NO_BELIEF)
 			{
-				iBaseYield += GC.GetGameBeliefs()->GetEntry(eSecondaryPantheon)->GetGreatWorkYieldChange(eYield);
+				iSecondaryYield += GC.GetGameBeliefs()->GetEntry(eSecondaryPantheon)->GetGreatWorkYieldChange(eYield);
 			}
 		}
 	}
 
 	//First add up yields x works in city.
-	int iRtnValue = (iWorkCount * iBaseYield);
+	int iRtnValue = (iStandardWorkCount * iBaseYield);
+	iRtnValue += (iRealWorkCount * iSecondaryYield);
 	//Then theming bonuses for the yield.
 #if defined(MOD_GLOBAL_GREATWORK_YIELDTYPES)
 	iRtnValue += GetThemingBonuses(eYield);
@@ -4785,10 +4880,17 @@ int CvCityBuildings::GetNumGreatWorks() const
 }
 
 /// Accessor: How many Great Works of specific slot type present in this city?
+#if defined(MOD_BALANCE_CORE)
+int CvCityBuildings::GetNumGreatWorks(GreatWorkSlotType eGreatWorkSlot, bool bArtifact, bool bArt) const
+#else
 int CvCityBuildings::GetNumGreatWorks(GreatWorkSlotType eGreatWorkSlot) const
+#endif
 {
 	int iRtnValue = 0;
-
+#if defined(MOD_BALANCE_CORE)
+	GreatWorkClass eArtifactsClass = (GreatWorkClass)GC.getInfoTypeForString("GREAT_WORK_ARTIFACT");
+	GreatWorkClass eArtClass = (GreatWorkClass)GC.getInfoTypeForString("GREAT_WORK_ART");
+#endif
 	CvCivilizationInfo *pkCivInfo = GC.getCivilizationInfo(m_pCity->getCivilizationType());
 	if (pkCivInfo)
 	{
@@ -4802,6 +4904,30 @@ int CvCityBuildings::GetNumGreatWorks(GreatWorkSlotType eGreatWorkSlot) const
 				CvBuildingEntry *pkInfo = GC.getBuildingInfo(eBuilding);
 				if (pkInfo)
 				{
+#if defined(MOD_BALANCE_CORE)
+					//Art/Artifact need distinction here, because they occupy the same slot!
+					if(bArtifact)
+					{
+						CvGreatWork work = GC.getGame().GetGameCulture()->m_CurrentGreatWorks[(*it).iGreatWorkIndex];
+
+						// Check Great Work class
+						if (work.m_eClassType == eArtifactsClass)
+						{
+							iRtnValue++;
+						}
+					}
+					else if(bArt)
+					{
+						CvGreatWork work = GC.getGame().GetGameCulture()->m_CurrentGreatWorks[(*it).iGreatWorkIndex];
+
+						// Check Great Work class
+						if (work.m_eClassType == eArtClass)
+						{
+							iRtnValue++;
+						}
+					}
+					else
+#endif
 					if (pkInfo->GetGreatWorkSlotType() == eGreatWorkSlot)
 					{
 						iRtnValue++;
@@ -4812,7 +4938,21 @@ int CvCityBuildings::GetNumGreatWorks(GreatWorkSlotType eGreatWorkSlot) const
 	}
 	return iRtnValue;
 }
-
+#if defined(MOD_BALANCE_CORE)
+int CvCityBuildings::GetThemingBonusIndex(BuildingTypes eBuilding) const
+{
+	return m_paiThemingBonusIndex[eBuilding];
+}
+void CvCityBuildings::SetThemingBonusIndex(BuildingTypes eBuilding, int iIndex)
+{
+	CvAssertMsg(eBuilding >= 0, "eBuilding expected to be >= 0");
+	CvAssertMsg(eBuilding < m_pBuildings->GetNumBuildings(), "eBuilding expected to be < m_pBuildings->GetNumBuildings()");
+	if (GetThemingBonusIndex(eBuilding) != iIndex)
+	{
+		m_paiThemingBonusIndex[eBuilding] = iIndex;
+	}
+}
+#endif
 /// Accessor: Get tourism converted from culture from Improvements and Wonders
 int CvCityBuildings::GetLandmarksTourismPercent() const
 {
@@ -4951,30 +5091,23 @@ int CvCityBuildings::GetCityStateTradeRouteProductionModifier() const
 	if (iCityStates==0)
 		return 0;
 
-	for(int iI = 0; iI < GC.getNumBuildingClassInfos(); iI++)
+	const std::vector<BuildingTypes>& vBuildings = GetAllBuildingsHere();
+	for (size_t iI = 0; iI < vBuildings.size(); iI++)
 	{
-		BuildingClassTypes eLoopBuildingClass = (BuildingClassTypes) iI;
-		CvCivilizationInfo *pkCivInfo = GC.getCivilizationInfo(m_pCity->getCivilizationType());
-		if (pkCivInfo)
+		BuildingTypes eBuilding = vBuildings[iI];
+		if (NO_BUILDING != eBuilding)
 		{
-			BuildingTypes eBuilding = (BuildingTypes)pkCivInfo->getCivilizationBuildings(eLoopBuildingClass);
-			if (NO_BUILDING != eBuilding)
+			CvBuildingEntry *pkEntry = GC.getBuildingInfo(eBuilding);
+			if (pkEntry)
 			{
-				if (GetNumBuilding(eBuilding) > 0)
+				int iProductionModifier = pkEntry->GetCityStateTradeRouteProductionModifier();
+				if (iProductionModifier > 0)
 				{
-					CvBuildingEntry *pkEntry = GC.getBuildingInfo(eBuilding);
-					if (pkEntry)
-					{
-						int iProductionModifier = pkEntry->GetCityStateTradeRouteProductionModifier();
-						if (iProductionModifier > 0)
-						{
 #if defined(MOD_BUGFIX_MINOR)
-							iRtnValue = iProductionModifier * iCityStates * GetNumBuilding(eBuilding);
+					iRtnValue = iProductionModifier * iCityStates * GetNumBuilding(eBuilding);
 #else
-							iRtnValue = iProductionModifier * iCityStates;
+					iRtnValue = iProductionModifier * iCityStates;
 #endif
-						}
-					}
 				}
 			}
 		}
@@ -5393,7 +5526,7 @@ void BuildingArrayHelpers::Write(FDataStream& kStream, int* paiBuildingArray, in
 		CvBuildingEntry* pkBuildingInfo = GC.getBuildingInfo(eBuilding);
 		if(pkBuildingInfo)
 		{
-			CvInfosSerializationHelper::WriteHashed(kStream, pkBuildingInfo);;
+			CvInfosSerializationHelper::WriteHashed(kStream, pkBuildingInfo);
 			kStream << paiBuildingArray[iI];
 		}
 		else

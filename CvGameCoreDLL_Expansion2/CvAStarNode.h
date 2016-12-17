@@ -19,16 +19,16 @@
 #define		CVASTARNODE_H
 #pragma		once
 
-#define ASNL_ADDOPEN		0
-#define ASNL_STARTOPEN		1
-#define ASNL_DELETEOPEN		2
-#define ASNL_ADDCLOSED		3
+#include <unordered_map>
 
-#define ASNC_INITIALADD		0
-#define ASNC_OPENADD_UP		1
-#define ASNC_CLOSEDADD_UP	2
-#define ASNC_PARENTADD_UP	3
-#define ASNC_NEWADD			4
+enum CvAStarNodeAddOp
+{
+	ASNC_INITIALADD,
+	ASNC_OPENADD_UP,
+	ASNC_CLOSEDADD_UP,
+	ASNC_PARENTADD_UP,
+	ASNC_NEWADD
+};
 
 enum CvAStarListType
 {
@@ -46,7 +46,8 @@ class CvPlot;
 enum PathType
 {
 	PT_UNIT_MOVEMENT,			//path for a particular unit (stacking,ZoC,danger handled via flag)
-	PT_UNIT_REACHABLE_PLOTS,	//all plots a unit can reach this turn
+	PT_UNIT_REACHABLE_PLOTS,	//all plots a unit can reach in N turns
+	PT_GENERIC_REACHABLE_PLOTS, //all plots that can be reached in N turns without knowning the particular unit
 	PT_GENERIC_SAME_AREA,		//plots must have the same area ID (ie only water or only land)
 	PT_GENERIC_ANY_AREA,		//plots can have any area ID, simply need to be passable
 	PT_GENERIC_SAME_AREA_WIDE,	//path must be 3 tiles wide (for armies)
@@ -57,9 +58,9 @@ enum PathType
 	PT_AREA_CONNECTION,			//assign area IDs to connected plots (hack)
 	PT_LANDMASS_CONNECTION,		//assign landmass IDs to connected plots (hack)
 	PT_CITY_INFLUENCE,			//which plot is next for a city to expand it's borders
-	PT_CITY_CONNECTION_LAND,			//is there a road or railroad between two points
-	PT_CITY_CONNECTION_WATER,		//is there a sea connection between two points
-	PT_CITY_CONNECTION_MIXED,		//is there a mixed land/sea connection between two points
+	PT_CITY_CONNECTION_LAND,	//is there a road or railroad between two points
+	PT_CITY_CONNECTION_WATER,	//is there a sea connection between two points
+	PT_CITY_CONNECTION_MIXED,	//is there a mixed land/sea connection between two points
 	PT_AIR_REBASE,				//for aircraft, only plots with cities and carriers are allowed
 };
 
@@ -77,8 +78,9 @@ struct CvPathNodeCacheData
 {
 	bool bIsRevealedToTeam:1;
 	bool bPlotVisibleToTeam:1;
-	bool bIsWater:1;
-	bool bCanEnterTerrain:1;
+	bool bIsNonNativeDomain:1;
+	bool bCanEnterTerrainIntermediate:1;
+	bool bCanEnterTerrainPermanent:1;
 	bool bCanEnterTerritory:1;
 	bool bContainsOtherFriendlyTeamCity:1;
 	bool bContainsEnemyCity:1;
@@ -88,7 +90,6 @@ struct CvPathNodeCacheData
 	bool bIsValidRoute:1;
 
 	int iMoveFlags;
-	int iPlotDanger;
 
 	//tells when to update the cache ...
 	unsigned short iGenerationID;
@@ -139,7 +140,7 @@ public:
 //-------------------------------------------------------------------------------------------------
 struct SPathFinderUserData
 {
-	SPathFinderUserData() : ePathType(PT_GENERIC_ANY_AREA), iFlags(0), ePlayer(NO_PLAYER), iUnitID(0), iTypeParameter(-1), iMaxTurns(INT_MAX), iMaxNormalizedDistance(INT_MAX) {}
+	SPathFinderUserData() : ePathType(PT_GENERIC_ANY_AREA), iFlags(0), ePlayer(NO_PLAYER), iUnitID(0), iTypeParameter(-1), iMaxTurns(INT_MAX), iMaxNormalizedDistance(INT_MAX), iMinMovesLeft(0), iStartMoves(60) {}
 	SPathFinderUserData(const CvUnit* pUnit, int iFlags=0, int iMaxTurns=INT_MAX);
 	SPathFinderUserData(PlayerTypes ePlayer, PathType ePathType, int iTypeParameter=-1, int iMaxTurns=INT_MAX);
 
@@ -155,6 +156,9 @@ struct SPathFinderUserData
 	int			iUnitID;			//optional
 	int			iMaxTurns;
 	int			iMaxNormalizedDistance;
+	int			iMinMovesLeft;
+	int			iStartMoves;
+	set<int>	plotsToIgnoreForZOC;
 };
 
 //-------------------------------------------------------------------------------------------------
@@ -173,18 +177,24 @@ struct SPathNode
 		turns = p ? p->m_iTurns : 0;
 		moves = p ? p->m_iMoves : 0;
 	}
+
+	bool operator==(const SPathNode& other)
+	{
+		return x==other.x && y==other.y && turns==other.turns && moves==other.moves;
+	}
 };
 
 struct SPath
 {
 	std::vector<SPathNode> vPlots;
+	int iTotalCost;
 	int iNormalizedDistance;
 	int iTotalTurns;
 	int iTurnGenerated;
 	SPathFinderUserData sConfig;
 
 	//constructor
-	SPath() : iNormalizedDistance(-1),iTotalTurns(-1),iTurnGenerated(-1) {}
+	SPath() : iTotalCost(-1),iNormalizedDistance(-1),iTotalTurns(-1),iTurnGenerated(-1) {}
 
 	//not quite a safe-bool, but good enough
 	inline bool operator!() const { return vPlots.empty(); }
@@ -192,9 +202,55 @@ struct SPath
 	//convenience
 	inline int length() const { return vPlots.size(); }
 	inline CvPlot* get(int i) const;
+
+	bool operator==(const SPath& other)
+	{
+		return iTotalCost==other.iTotalCost && iNormalizedDistance==other.iNormalizedDistance && 
+				iTotalTurns==other.iTotalTurns && vPlots.size()==other.vPlots.size();
+	}
 };
 
-typedef std::set<std::pair<int,int>> ReachablePlots; //(plot index, movement points left) - don't store pointers in a set, the ordering is unpredictable
+struct SMovePlot
+{
+	int iPlotIndex;
+	int iTurns;
+	int iMovesLeft;
+	int iNormalizedDistance;
+
+	SMovePlot(int iIndex) : iPlotIndex(iIndex), iTurns(0), iMovesLeft(0), iNormalizedDistance(0) {}
+	SMovePlot(int iIndex, int iTurns_, int iMovesLeft_, int iNormalizedDistance_) : 
+		iPlotIndex(iIndex), iTurns(iTurns_), iMovesLeft(iMovesLeft_), iNormalizedDistance(iNormalizedDistance_) {}
+
+	//this ignores the turns/moves so std::find with just a plot index should work
+	bool operator==(const SMovePlot& rhs) const { return iPlotIndex==rhs.iPlotIndex; }
+	bool operator<(const SMovePlot& rhs) const { return iPlotIndex<rhs.iPlotIndex; }
+};
+
+class ReachablePlots
+{
+public:
+	typedef std::vector<SMovePlot>::iterator iterator;
+	typedef std::vector<SMovePlot>::const_iterator const_iterator;
+	
+	ReachablePlots() {}
+	
+	iterator begin() { return storage.begin(); }
+	const_iterator begin() const { return storage.begin(); }
+	iterator end() { return storage.end(); }
+	const_iterator end() const { return storage.end(); }
+
+	size_t size() const { return storage.size(); }
+	bool empty() const { return storage.empty(); }
+	void clear() { storage.clear(); lookup.clear(); }
+
+	iterator find(int iPlotIndex);
+	const_iterator find(int iPlotIndex) const;
+	void insert(const SMovePlot& plot);
+
+protected:
+	std::tr1::unordered_map<int,size_t> lookup;
+	std::vector<SMovePlot> storage;
+};
 
 //++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 //

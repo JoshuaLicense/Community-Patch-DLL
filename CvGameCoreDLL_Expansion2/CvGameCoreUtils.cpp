@@ -26,6 +26,8 @@
 // must be included after all other headers
 #include "LintFree.h"
 
+int RING_PLOTS[6] = {RING0_PLOTS,RING1_PLOTS,RING2_PLOTS,RING3_PLOTS,RING4_PLOTS,RING5_PLOTS};
+
 int dxWrap(int iDX)
 {
 	const CvMap& kMap = GC.getMap();
@@ -82,13 +84,15 @@ int plotDistance(int iX1, int iY1, int iX2, int iY2)
 {
 	int iX1H = xToHexspaceX(iX1,iY1);
 	int iX2H = xToHexspaceX(iX2,iY2);
+
 	//reconstruct the Z coordinate
 	int iZ1H = -iX1H-iY1;
 	int iZ2H = -iX2H-iY2;
 
+	//todo: fixme. wrapping does not work correctly for large distances
 	int iDX = dxWrap(iX2H - iX1H);
 	int iDY = dyWrap(iY2 - iY1);
-	int iDZ = dxWrap(iZ2H - iZ1H); //this is by design, dx and dz have the same range
+	int iDZ = dxWrap(iZ2H - iZ1H); //x and z have same range
 
 	return (abs(iDX) + abs(iDY) + abs(iDZ)) / 2;
 }
@@ -464,16 +468,21 @@ bool isPromotionValid(PromotionTypes ePromotion, UnitTypes eUnit, bool bLeader, 
 		return true;
 	}
 
-	// If this isn't a combat Unit, no Promotion
+	// If this isn't a combat Unit, no Promotion if not valid
 	if(unitInfo->GetUnitCombatType() == NO_UNITCOMBAT)
 	{
-		return false;
+		if(!::IsPromotionValidForCivilianUnitType(ePromotion, eUnit))
+		{
+			return false;
+		}
 	}
-
 	// Is this a valid Promotion for the UnitCombatType?
-	if(!::IsPromotionValidForUnitCombatType(ePromotion, eUnit))
+	if(unitInfo->GetUnitCombatType() != NO_UNITCOMBAT)
 	{
-		return false;
+		if(!::IsPromotionValidForUnitCombatType(ePromotion, eUnit))
+		{
+			return false;
+		}
 	}
 
 	if(!bLeader && promotionInfo->IsLeader())

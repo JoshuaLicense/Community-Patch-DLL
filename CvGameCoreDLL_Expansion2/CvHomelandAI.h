@@ -22,11 +22,13 @@ enum AIHomelandTargetType
     AI_HOMELAND_TARGET_NONE,
     AI_HOMELAND_TARGET_CITY,
     AI_HOMELAND_TARGET_SENTRY_POINT,
+	AI_HOMELAND_TARGET_SENTRY_POINT_NAVAL,
     AI_HOMELAND_TARGET_FORT,
     AI_HOMELAND_TARGET_NAVAL_RESOURCE,
     AI_HOMELAND_TARGET_HOME_ROAD,
     AI_HOMELAND_TARGET_ANCIENT_RUIN,
 	AI_HOMELAND_TARGET_ANTIQUITY_SITE,
+	AI_HOMELAND_TARGET_UNASSIGNED,
 };
 
 // Object stored in the list of move priorities (m_MovePriorityList)
@@ -85,26 +87,6 @@ public:
 		return m_pTarget;
 	};
 
-#if defined(MOD_BALANCE_CORE_SETTLER)
-
-	void PushPrevPlot(int iIdx)
-	{
-		m_iPrevPlotIdx2 = m_iPrevPlotIdx1;
-		m_iPrevPlotIdx1 = iIdx;
-	}
-
-	int GetPrevPlot1() const
-	{
-		return m_iPrevPlotIdx1;
-	}
-
-	int GetPrevPlot2() const
-	{
-		return m_iPrevPlotIdx2;
-	}
-
-#endif
-
 	// Stores extra integer data
 	//   For potential upgradeable units stores the unit type since that's a convenient way to sort them
 	int GetAuxIntData() const
@@ -120,11 +102,6 @@ private:
 	int m_iID;
 	int m_iAuxData;
 	int m_iMovesToTarget;
-
-#if defined(MOD_BALANCE_CORE_SETTLER)
-	//to detect endless loops
-	int m_iPrevPlotIdx1, m_iPrevPlotIdx2;
-#endif
 
 	CvPlot* m_pTarget;
 };
@@ -273,16 +250,18 @@ public:
 	void Update();
 
 	// Public exploration routines
-	CvPlot* GetBestExploreTarget(const CvUnit* pUnit, int nMinCandidatesToCheck) const;
+	CvPlot* GetBestExploreTarget(const CvUnit* pUnit, int nMinCandidatesToCheck, int iMaxTurns) const;
 	bool ExecuteSpecialExploreMove(CvUnit* pUnit, CvPlot* pPlot);
 #if defined(MOD_BALANCE_CORE)
 	bool FindTestArchaeologistPlotPrimer(CvUnit* pUnit);
-	CvPlot* FindTestArchaeologistPlot(CvUnit* pUnit);
 #endif
 	// Public logging
 	void LogHomelandMessage(const CvString& strMsg);
 	void LogPatrolMessage(const CvString& strMsg, CvUnit* pPatrolUnit);
 
+#if defined(MOD_BALANCE_CORE)
+	bool MoveCivilianToGarrison(CvUnit* pUnit);
+#endif
 #if defined(MOD_AI_SECONDARY_WORKERS)
 	bool MoveCivilianToSafety(CvUnit* pUnit, bool bIgnoreUnits = false, bool bSecondary = false);
 #else
@@ -310,12 +289,19 @@ private:
 	void PlotOpportunisticSettlementMoves();
 #endif
 	void PlotSentryMoves();
+#if defined(MOD_BALANCE_CORE)
+	void PlotSentryNavalMoves();
+#endif
 #if defined(MOD_AI_SECONDARY_WORKERS)
 	void PlotWorkerMoves(bool bSecondary = false);
 #else
 	void PlotWorkerMoves();
 #endif
+#if defined(MOD_BALANCE_CORE)
+	void PlotWorkerSeaMoves(bool bSecondary = false);
+#else
 	void PlotWorkerSeaMoves();
+#endif
 	void PlotPatrolMoves();
 	void PlotUpgradeMoves();
 	void PlotAncientRuinMoves();
@@ -342,6 +328,9 @@ private:
 	void PlotArchaeologistMoves();
 	void PlotAirliftMoves();
 	void ReviewUnassignedUnits();
+#if defined(MOD_BALANCE_CORE)
+	void ExecuteUnassignedUnitMoves();
+#endif
 
 	// Routines to execute homeland moves
 	void ExecuteFirstTurnSettlerMoves();
@@ -357,10 +346,9 @@ private:
 	void ExecuteWorkerMoves();
 #endif
 	void ExecuteMovesToSafestPlot();
-	void ExecuteMoveToTarget(CvUnit* pUnit, CvPlot* pTarget, int iFlags);
+	void ExecuteMoveToTarget(CvUnit* pUnit, CvPlot* pTarget, int iFlags, bool bFinishMoves = false);
 
 	void ExecuteHeals();
-	void ExecutePatrolMoves();
 	void ExecuteWriterMoves();
 	void ExecuteArtistMoves();
 	void ExecuteMusicianMoves();
@@ -385,17 +373,28 @@ private:
 	void ExecuteAircraftMoves();
 	void ExecuteTradeUnitMoves();
 	void ExecuteArchaeologistMoves();
+	void ExecutePatrolMoves();
+#if defined(MOD_BALANCE_CORE)
+	void ExecuteAggressivePatrolMoves();
+#endif
 
 	// Internal low-level utility routines
 	void EliminateAdjacentSentryPoints();
+#if defined(MOD_BALANCE_CORE)
+	void EliminateAdjacentNavalSentryPoints();
+	void EliminateAdjacentUnassignedPoints();
+#endif
 	void EliminateAdjacentHomelandRoads();
 	bool FindUnitsForThisMove(AIHomelandMove eMove, bool bFirstTime);
 	CvUnit* GetBestUnitToReachTarget(CvPlot* pTarget, int iMaxTurns);
 
-	bool MoveToEmptySpaceNearTarget(CvUnit* pUnit, CvPlot* pTarget, bool bLand=true);
-	bool MoveToUsingSafeEmbark(UnitHandle pUnit, CvPlot* pTargetPlot, bool bMustBeSafeOnLandToo, int iFlags);
+	bool MoveToEmptySpaceNearTarget(CvUnit* pUnit, CvPlot* pTarget, DomainTypes eDomain, int iMaxTurns);
+	bool MoveToTargetButDontEndTurn(CvUnit* pUnit, CvPlot* pTargetPlot, int iFlags);
 
 	CvPlot* FindArchaeologistTarget(CvUnit *pUnit);
+#if defined(MOD_BALANCE_CORE)
+	CvPlot* FindUnassignedTarget(CvUnit *pUnit);
+#endif
 	void UnitProcessed(int iID);
 #if defined(MOD_AI_SECONDARY_WORKERS)
 	bool ExecuteWorkerMove(CvUnit* pUnit, bool bSecondary = false);
@@ -429,6 +428,10 @@ private:
 	std::vector<CvHomelandTarget> m_TargetedHomelandRoads;
 	std::vector<CvHomelandTarget> m_TargetedAncientRuins;
 	std::vector<CvHomelandTarget> m_TargetedAntiquitySites;
+#if defined(MOD_BALANCE_CORE)
+	std::vector<CvHomelandTarget> m_TargetedNavalSentryPoints;
+	std::vector<CvHomelandTarget> m_TargetedHomeUnassignedPlots;
+#endif
 
 	// Targeting ranges (pulled in from GlobalAIDefines.XML)
 	int m_iRandomRange;
@@ -449,7 +452,9 @@ bool CvHomelandUnitAuxIntReverseSort(const CvHomelandUnit& obj1, const CvHomelan
 
 int ScoreAirBase(CvPlot* pAirBasePlot, PlayerTypes ePlayer, int iRange);
 bool IsGoodUnitMix(CvPlot* pAirBasePlot, CvUnit* pUnit);
-CvPlot* GetPatrolTarget(CvPlot* pOriginPlot, PlayerTypes ePlayer, int iRange);
+std::vector<CvPlot*> GetPatrolTargets(PlayerTypes ePlayer, bool bWater, int nMaxTargets = 5);
+
+std::vector<CvPlot*> GetAggressivePatrolTargets(PlayerTypes ePlayer, bool bWater, int nMaxTargets = 5);
 
 }
 

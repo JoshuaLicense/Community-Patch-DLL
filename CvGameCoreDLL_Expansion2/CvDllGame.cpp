@@ -311,7 +311,7 @@ void CvDllGame::InitScoreCalculation()
 //------------------------------------------------------------------------------
 void CvDllGame::InitTacticalAnalysisMap(int iNumPlots)
 {
-	m_pGame->GetTacticalAnalysisMap()->Init(iNumPlots);
+	//handled in Tactical AI now ...
 }
 //------------------------------------------------------------------------------
 bool CvDllGame::IsCityScreenBlocked()
@@ -533,7 +533,7 @@ bool CvDllGame::CanMoveUnitTo(ICvUnit1* pUnit, ICvPlot1* pPlot) const
 	SPathFinderUserData data(pkUnit,CvUnit::MOVEFLAG_IGNORE_DANGER | CvUnit::MOVEFLAG_IGNORE_STACKING,1);
 
 	// can the unit actually walk there
-	return GC.GetInterfacePathFinder().DoesPathExist(pkUnit->getX(), pkUnit->getY(), pkPlot->getX(), pkPlot->getY(), data);
+	return GC.GetPathFinder().DoesPathExist(pkUnit->getX(), pkUnit->getY(), pkPlot->getX(), pkPlot->getY(), data);
 }
 
 //------------------------------------------------------------------------------

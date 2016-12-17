@@ -71,6 +71,21 @@
 			<Text>Flank attack bonus increased, and receives bonuses when embarked or attacking over rivers.</Text>
 		</Row>
 
+		<Row Tag="TXT_KEY_DESC_FIELD_GUN">
+			<Text>Field Gun</Text>
+		</Row>
+		<Row Tag="TXT_KEY_CIV5_FIELD_GUN_PEDIA">
+			<Text>A field gun is an artillery piece. The term was first used to describe smaller guns that could be taken with an army while marching. In battle the field gun could be quickly moved about the battlefield as needed. Guns installed in a fort, siege cannon and mortars were too large to be moved quickly, and would be used only in a long siege.</Text>
+		</Row>
+		<Row Tag="TXT_KEY_CIV5_FIELD_GUN_STRATEGY">
+			<Text>Field Guns have greater range and combat power than Cannons, albeit they lack the ability to see very far on their own. Use Field Guns to support your Industrial Era armies, but be careful about letting the enemy get near them!</Text>
+		</Row>
+		<Row Tag="TXT_KEY_CIV5_FIELD_GUN_HELP">
+			<Text>Powerful Industrial Era Siege Unit capable of firing up to 3 tiles away.</Text>
+		</Row>
+
+		
+
 		<Row Tag="TXT_KEY_PROMOTION_HONOR_BONUS">
 			<Text>Conscription</Text>
 		</Row>
@@ -82,7 +97,7 @@
 			<Text>Logistics</Text>
 		</Row>
 		<Row Tag="TXT_KEY_PROMOTION_KILL_HEAL_HELP">
-			<Text>Heal 20 points when you destoy an enemy unit.</Text>
+			<Text>Heal 10 points when you destoy an enemy unit.</Text>
 		</Row>
 
 		<Row Tag="TXT_KEY_PROMOTION_WOODLAND_TRAILBLAZER_I">
@@ -137,7 +152,7 @@
 			<Text>Guerilla Fighter</Text>
 		</Row>
 		<Row Tag="TXT_KEY_PROMOTION_ATTACK_BONUS_SWEDEN_HELP">
-			<Text>+10% [ICON_STRENGTH] Strength when attacking.</Text>
+			<Text>+15% [ICON_STRENGTH] Strength when attacking.</Text>
 		</Row>
 		<Row Tag="TXT_KEY_PROMOTION_ATTACK_BONUS_SWEDEN">
 			<Text>No Retreat</Text>
@@ -154,6 +169,14 @@
 		<Row Tag="TXT_KEY_PROMOTION_NAVAL_MISFIRE_HELP">
 			<Text>-25% [ICON_RANGE_STRENGTH] Ranged Strength vs. Naval units.</Text>
 		</Row>
+
+		<Row Tag="TXT_KEY_PROMOTION_SIEGE_INACCURACY">
+			<Text>Siege Inaccuracy</Text>
+		</Row>
+		<Row Tag="TXT_KEY_PROMOTION_SIEGE_INACCURACY_HELP">
+			<Text>-33% [ICON_RANGE_STRENGTH] Ranged Strength vs. Land units.</Text>
+		</Row>
+
 		<Row Tag="TXT_KEY_PROMOTION_MODERN_RANGED_PENALTY_I">
 			<Text>Covering Fire I</Text>
 		</Row>
@@ -245,49 +268,49 @@
 			<Text>Righteousness</Text>
 		</Row>
 		<Row Tag="TXT_KEY_PROMOTION_RIGHTEOUSNESS_HELP">
-			<Text>Attack Wounded Mod (15%). +10 HP if you destroy an enemy unit</Text>
+			<Text>Increased [ICON_STRENGTH] Combat Strength based on unit damage. Attack Wounded Mod (20%). +10 HP if you destroy an enemy unit</Text>
 		</Row>
 
 		<Row Tag="TXT_KEY_PROMOTION_COURAGE">
 			<Text>Courage</Text>
 		</Row>
 		<Row Tag="TXT_KEY_PROMOTION_COURAGE_HELP">
-			<Text>Attack Fortified Mod (15%). +10 HP if you destroy an enemy unit</Text>
+			<Text>Increased [ICON_STRENGTH] Combat Strength based on unit damage. Attack Mod (15%). +10 HP if you destroy an enemy unit</Text>
 		</Row>
 
 		<Row Tag="TXT_KEY_PROMOTION_BENEVOLENCE">
 			<Text>Benevolence</Text>
 		</Row>
 		<Row Tag="TXT_KEY_PROMOTION_BENEVOLENCE_HELP">
-			<Text>Units in adjacent tiles receive +5 HP when healing. +10 HP if you destroy an enemy unit</Text>
+			<Text>Increased [ICON_STRENGTH] Combat Strength based on unit damage. Units in adjacent tiles receive +5 HP when healing. +10 HP if you destroy an enemy unit</Text>
 		</Row>
 
 		<Row Tag="TXT_KEY_PROMOTION_RESPECT">
 			<Text>Respect</Text>
 		</Row>
 		<Row Tag="TXT_KEY_PROMOTION_RESPECT_HELP">
-			<Text>+15% [ICON_STRENGTH] Strength versus Melee and Gun units. +10 HP if you destroy an enemy unit</Text>
+			<Text>Increased [ICON_STRENGTH] Combat Strength based on unit damage. +15% [ICON_STRENGTH] Strength versus Melee and Gun units. +10 HP if you destroy an enemy unit</Text>
 		</Row>
 
 		<Row Tag="TXT_KEY_PROMOTION_SINCERITY">
 			<Text>Sincerity</Text>
 		</Row>
 		<Row Tag="TXT_KEY_PROMOTION_SINCERITY_HELP">
-			<Text>+25% Experience gained from combat. +10 HP if you destroy an enemy unit</Text>
+			<Text>Increased [ICON_STRENGTH] Combat Strength based on unit damage. +50% Experience gained from combat. +10 HP if you destroy an enemy unit</Text>
 		</Row>
 
 		<Row Tag="TXT_KEY_PROMOTION_BUSHIDO_HONOR">
 			<Text>Honor</Text>
 		</Row>
 		<Row Tag="TXT_KEY_PROMOTION_BUSHIDO_HONOR_HELP">
-			<Text>+15% [ICON_STRENGTH] Strength outside of friendly lands. +10 HP if you destroy an enemy unit</Text>
+			<Text>Increased [ICON_STRENGTH] Combat Strength based on unit damage. +15% [ICON_STRENGTH] Strength outside of friendly lands. +10 HP if you destroy an enemy unit</Text>
 		</Row>
 
 		<Row Tag="TXT_KEY_PROMOTION_LOYALTY">
 			<Text>Loyalty</Text>
 		</Row>
 		<Row Tag="TXT_KEY_PROMOTION_LOYALTY_HELP">
-			<Text>+15% [ICON_STRENGTH] Strength inside friendly lands. +10 HP if you destroy an enemy unit</Text>
+			<Text>Increased [ICON_STRENGTH] Combat Strength based on unit damage. +15% [ICON_STRENGTH] Strength inside friendly lands. +10 HP if you destroy an enemy unit</Text>
 		</Row>
 
 
@@ -295,7 +318,7 @@
 			<Text>Self Control</Text>
 		</Row>
 		<Row Tag="TXT_KEY_PROMOTION_SELF_CONTROL_HELP">
-			<Text>+15% [ICON_STRENGTH] Strength when defending. +10 HP if you destroy an enemy unit</Text>
+			<Text>Increased [ICON_STRENGTH] Combat Strength based on unit damage. +15% [ICON_STRENGTH] Strength when defending. +10 HP if you destroy an enemy unit</Text>
 		</Row>
 
 		<Row Tag="TXT_KEY_PROMOTION_ANTI_AIR_HELP">
@@ -328,10 +351,10 @@
 			<Text>Zeppelin</Text>
 		</Row>
 		<Row Tag="TXT_KEY_UNIT_ZEPPELIN_STRATEGY_CBP">
-			<Text>Zeppelins are a useful exploration unit that appears during the Industrial Era. They are fairly weak and, therefore, are easily defeated by contemporary military units. Their reconaissance abilities are unparalleled, especially due to their ability to hover.</Text>
+			<Text>Zeppelins are a useful ranged exploration unit that appears during the Industrial Era. They are fairly weak on defense and, therefore, are easily defeated by contemporary military units. Their reconaissance abilities are unparalleled, especially due to their ability to hover.</Text>
 		</Row>
 		<Row Tag="TXT_KEY_UNIT_HELP_ZEPPELIN_CBP">
-			<Text>Industrial-era exploration unit. Use these units to explore or to monitor your borders. It is capable of hovering over all terrain, however it takes damage if it ends its turn on a mountain.</Text>
+			<Text>Industrial-era ranged exploration unit. Use these units to explore or to monitor your borders. It is capable of hovering over all terrain, however it takes damage if it ends its turn on a mountain.</Text>
 		</Row>
 		<Row Tag="TXT_KEY_CIV5_ZEPPELIN_TEXT_CBP">
 			<Text>A Zeppelin was a type of rigid airship named after the German Count Ferdinand von Zeppelin who pioneered rigid airship development at the beginning of the 20th century. Zeppelin's ideas were first formulated in 1874 and developed in detail in 1893. They were patented in Germany in 1895 and in the United States in 1899. After the outstanding success of the Zeppelin design, the word zeppelin came to be commonly used to refer to all rigid airships. Zeppelins were first flown commercially in 1910 by Deutsche Luftschiffahrts-AG (DELAG), the world's first airline in revenue service. By mid-1914, DELAG had carried over 10,000 fare-paying passengers on over 1,500 flights. During World War I the German military made extensive use of Zeppelins as bombers and scouts, killing over 500 people in bombing raids in Britain.</Text>
@@ -387,7 +410,7 @@
 			<Text>Pioneer</Text>
 		</Row>
 		<Row Tag="TXT_KEY_UNIT_PIONEER_STRATEGY">
-			<Text>Use this unit to construct new cities. It cannot defend itself, so accompany it with a combat unit. When founded, cities built by Pioneers automatically receive a selection of buildings, start with 3 Citizens, and claim additional territory. As such, the costs of expansion, in terms of Happiness and Maintenance are much greater than Settlers. [NEWLINE][NEWLINE]Note: the bonuses for constructing buildings from the Progress and Industry policy branches do apply to the buildings constructed by Pioneers, so expect a large boost to your culture or income when you settle new lands with this unit!</Text>
+			<Text>Use this unit to construct new cities. It cannot defend itself, so accompany it with a combat unit. When founded, cities built by Pioneers start with 3 Citizens, claim additional territory, and automatically receive the following selection of buildings:[NEWLINE][NEWLINE][ICON_BULLET] Council[NEWLINE][ICON_BULLET] Granary[NEWLINE][ICON_BULLET] Market[NEWLINE][ICON_BULLET] Monument[NEWLINE][ICON_BULLET] Shrine[NEWLINE][ICON_BULLET] Barracks[NEWLINE][ICON_BULLET] Watermill (if applicable)[NEWLINE][ICON_BULLET] Library[NEWLINE][ICON_BULLET] Forge[NEWLINE][ICON_BULLET] Well (if applicable)[NEWLINE][NEWLINE]Note: the bonuses for constructing buildings from the Progress and Industry policy branches do apply to the buildings constructed by Pioneers, so expect a large boost to your culture or income when you settle new lands with this unit!</Text>
 		</Row>
 		<Row Tag="TXT_KEY_CIV5_PIONEER_TEXT">
 			<Text>
@@ -401,7 +424,7 @@
 			<Text>Colonist</Text>
 		</Row>
 		<Row Tag="TXT_KEY_UNIT_COLONIST_STRATEGY">
-			<Text>Use this unit to construct new cities. It cannot defend itself, so accompany it with a combat unit. When founded, cities built by Colonists  automatically receive a selection of buildings, start with 5 Citizens and claim additional territory. As such, the costs of expansion, in terms of Happiness and Maintenance are much greater than Pioneers. [NEWLINE][NEWLINE]Note: the bonuses for constructing buildings from the Progress and Industry policy branches do apply to the buildings constructed by Colonists, so expect a large boost to your Culture or income when you settle new lands with this unit!</Text>
+			<Text>Use this unit to construct new cities. It cannot defend itself, so accompany it with a combat unit. When founded, cities built by Colonists start with 5 Citizens, claim additional territory, and automatically receive the following selection of buildings:[NEWLINE][NEWLINE][ICON_BULLET] Council[NEWLINE][ICON_BULLET] Granary[NEWLINE][ICON_BULLET] Market[NEWLINE][ICON_BULLET] Monument[NEWLINE][ICON_BULLET] Shrine[NEWLINE][ICON_BULLET] Barracks[NEWLINE][ICON_BULLET] Watermill (if applicable)[NEWLINE][ICON_BULLET] Library[NEWLINE][ICON_BULLET] Forge[NEWLINE][ICON_BULLET] Well (if applicable)[NEWLINE][ICON_BULLET] Windmill[NEWLINE][ICON_BULLET] Harbor[NEWLINE][ICON_BULLET] Lighthouse[NEWLINE][ICON_BULLET] Amphitheater[NEWLINE][ICON_BULLET] Temple[NEWLINE][ICON_BULLET] Workshop[NEWLINE][NEWLINE]Note: the bonuses for constructing buildings from the Progress and Industry policy branches do apply to the buildings constructed by Colonists, so expect a large boost to your Culture or income when you settle new lands with this unit!</Text>
 		</Row>
 		<Row Tag="TXT_KEY_CIV5_COLONIST_TEXT">
 			<Text>
@@ -417,7 +440,7 @@
 			<Text>Flag Bearers</Text>
 		</Row>
 		<Row Tag="TXT_KEY_PROMOTION_RECON_BANDEIRANTES_HELP">
-			<Text>When you reveal tiles, gain [ICON_GOLD] Gold, [ICON_CULTURE] Culture towards Border Growth, and [ICON_GREAT_GENERAL] Great General Points in the nearest owned City.</Text>
+			<Text>When you reveal tiles, gain [ICON_GOLD] Gold, [ICON_CULTURE] Culture, and [ICON_RESEARCH] Science in the nearest owned City.</Text>
 		</Row>
 		<Row Tag="TXT_KEY_UNIT_BANDEIRANTES">
 			<Text>Bandeirantes</Text>
@@ -426,10 +449,75 @@
 			<Text>The Bandeirantes ("those who carry the flag") were 17th-century Portuguese settlers in Brazil and fortune hunters. They led expeditions called bandeiras ("flags") which penetrated the interior of Brazil far south and west of the Tordesillas Line of 1494, which officially divided the Castilian or later Spanish (west) domain from the Portuguese (east) domain in South America. Though they originally aimed to capture and force Indigenous Americans into slavery, the bandeirantes later began to focus their expeditions on finding gold, silver, and diamond mines. As they ventured into unmapped regions in search of profit and adventure, they expanded the effective borders of the Brazilian colony.</Text>
 		</Row>
 		<Row Tag="TXT_KEY_UNIT_BANDEIRANTES_STRATEGY">
-			<Text>Medieval-Era Unit that is unique to Brazil, replacing the Explorer. Is faster and stronger than the Explorer, and is available earlier. Generates Gold, Culture towards Border Growth, and Great General Points from exploring unrevealed tiles. These yields are added to the nearest owned city. Also has the ability to construct Fort Improvements in owned territory, and is stronger versus Barbarians. Use these units to explore, clear any remaining Barbarian Encampments, and generate valuable yields for your frontier cities.</Text>
+			<Text>Medieval-Era Unit that is unique to Brazil, replacing the Explorer. Is faster and stronger than the Explorer, and is available earlier. Generates Gold, Culture, and Science from exploring unrevealed tiles. These yields are added to the nearest owned city. Also has the ability to construct Fort Improvements in owned territory, and is stronger versus Barbarians. Use these units to explore, clear any remaining Barbarian Encampments, and generate valuable yields for your frontier cities.</Text>
 		</Row>
 		<Row Tag="TXT_KEY_UNIT_BANDEIRANTES_HELP">
-			<Text>Unique Brazilian Explorer. Generates [ICON_GOLD] Gold, [ICON_CULTURE] Culture towards Border Growth, and [ICON_GREAT_GENERAL] Great General Points in the nearest owned City whenever you reveal tiles with this Unit. Can also construct Forts in owned territory.</Text>
+			<Text>Unique Brazilian Explorer. Generates [ICON_GOLD] Gold, [ICON_CULTURE] Culture, and [ICON_RESEARCH] Science whenever you reveal tiles with this Unit. Can also construct Forts in owned territory.</Text>
+		</Row>
+		
+		<!-- New Tier 4 Promotions -->
+		<Row Tag="TXT_KEY_PROMOTION_SHOCK_4">
+			<Text>Overrun</Text>
+		</Row>
+		<Row Tag="TXT_KEY_PROMOTION_SHOCK_4_HELP">
+			<Text>+100% bonus to [COLOR_POSITIVE_TEXT]Flank Attack[ENDCOLOR] [ICON_STRENGTH] Combat Strength bonus.</Text>
+		</Row>
+		<Row Tag="TXT_KEY_PROMOTION_DRILL_4">
+			<Text>Stalwart</Text>
+		</Row>
+		<Row Tag="TXT_KEY_PROMOTION_DRILL_4_HELP">
+			<Text>+35% [ICON_STRENGTH] Combat Strength when defending.</Text>
+		</Row>
+		<Row Tag="TXT_KEY_PROMOTION_ACCURACY_4">
+			<Text>Snipers</Text>
+		</Row>
+		<Row Tag="TXT_KEY_PROMOTION_ACCURACY_4_HELP">
+			<Text>+25% [ICON_RANGE_STRENGTH] Ranged Combat Strength versus [COLOR_POSITIVE_TEXT]Wounded[ENDCOLOR] Units.</Text>
+		</Row>
+		<Row Tag="TXT_KEY_PROMOTION_BARRAGE_4">
+			<Text>Infiltrators</Text>
+		</Row>
+		<Row Tag="TXT_KEY_PROMOTION_BARRAGE_4_HELP">
+			<Text>Can Pillage without expending movement.</Text>
+		</Row>
+		<Row Tag="TXT_KEY_PROMOTION_TARGETING_4">
+			<Text>Slipstream</Text>
+		</Row>
+		<Row Tag="TXT_KEY_PROMOTION_TARGETING_4_HELP">
+			<Text>Ignores Zone of Control.</Text>
+		</Row>
+		<Row Tag="TXT_KEY_PROMOTION_BOMBARDMENT_4">
+			<Text>Broadside</Text>
+		</Row>
+		<Row Tag="TXT_KEY_PROMOTION_BOMBARDMENT_4_HELP">
+			<Text>+40% [ICON_RANGE_STRENGTH] Ranged Combat Strength versus [COLOR_POSITIVE_TEXT]Cities[ENDCOLOR].</Text>
+		</Row>
+		<Row Tag="TXT_KEY_PROMOTION_COASTAL_RAIDER_4">
+			<Text>Glory Hounds</Text>
+		</Row>
+		<Row Tag="TXT_KEY_PROMOTION_COASTAL_RAIDER_4_HELP">
+			<Text>Steal gold equal to 100% of the damage inflicted on a city.</Text>
+		</Row>
+		<Row Tag="TXT_KEY_PROMOTION_BOARDING_PARTY_4">
+			<Text>Pincer</Text>
+		</Row>
+		<Row Tag="TXT_KEY_PROMOTION_BOARDING_PARTY_4_HELP">
+			<Text>+50% bonus to [COLOR_POSITIVE_TEXT]Flank Attack[ENDCOLOR] [ICON_STRENGTH] Combat Strength bonus.</Text>
+		</Row>
+
+
+		<Row Tag="TXT_KEY_PROMOTION_SACRED_STEPS">
+			<Text>Sacred Steps</Text>
+		</Row>
+		<Row Tag="TXT_KEY_PROMOTION_SACRED_STEPS_HELP">
+			<Text>+2 [ICON_MOVES] Movement.</Text>
+		</Row>
+
+		<Row Tag="TXT_KEY_PROMOTION_EVERLASTING_YOUTH">
+			<Text>Everlasting Youth</Text>
+		</Row>
+		<Row Tag="TXT_KEY_PROMOTION_EVERLASTING_YOUTH_HELP">
+			<Text>Units heal for an additional +10 Hit Points.</Text>
 		</Row>
 	</Language_en_US>
 </GameData>

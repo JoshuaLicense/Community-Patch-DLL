@@ -292,7 +292,7 @@ void CvTreasury::DoUpdateCityConnectionGold()
 		{
 			if(pLoopCity != pCapitalCity)
 			{
-				if(HasCityConnectionRouteBetweenCities(pCapitalCity, pLoopCity))
+				if(pLoopCity->IsConnectedToCapital())
 				{
 					iNumGold += GetCityConnectionRouteGoldTimes100(pLoopCity);
 				}
@@ -358,24 +358,6 @@ void CvTreasury::ChangeCityConnectionTradeRouteGoldChange(int iChange)
 
 		DoUpdateCityConnectionGold();
 	}
-}
-
-/// Returns the route-type between two cities
-#if defined(MOD_EVENTS_CITY_CONNECTIONS)
-bool CvTreasury::HasCityConnectionRouteBetweenCities(CvCity* pFirstCity, CvCity* pSecondCity) const
-#else
-bool CvTreasury::HasCityConnectionRouteBetweenCities(CvCity* pFirstCity, CvCity* pSecondCity, bool bBestRoute) const
-#endif
-{
-	CvCityConnections* pCityConnections = m_pPlayer->GetCityConnections();
-	FASSERT(pCityConnections, "m_pCityConnections is null");
-	if(!pCityConnections)
-	{
-		// invalid value
-		return FALSE;
-	}
-
-	return pCityConnections->AreCitiesConnected(pFirstCity, pSecondCity, CvCityConnections::CONNECTION_ANY);
 }
 
 /// Gold per turn from international trade routes
@@ -726,6 +708,12 @@ int CvTreasury::CalculatePreInflatedCosts()
 	if (MOD_DIPLOMACY_CIV4_FEATURES) {
 		iTotalCosts += GetVassalGoldMaintenance();
 		iTotalCosts += GetExpensePerTurnFromVassalTaxes();
+	}
+#endif
+#if defined(MOD_BALANCE_CORE)
+	if(MOD_BALANCE_CORE_JFD)
+	{
+		iTotalCosts += GetContractGoldMaintenance();
 	}
 #endif
 
@@ -1165,7 +1153,13 @@ void TreasuryHelpers::AppendToLog(CvString& strHeader, CvString& strLog, CvStrin
 	str.Format("%.2f,", fValue);
 	strLog += str;
 }
-
+#if defined(MOD_BALANCE_CORE)
+int CvTreasury::GetContractGoldMaintenance()
+{
+	int iMaintenance = m_pPlayer->GetContracts()->GetContractGoldMaintenance();
+	return iMaintenance;
+}
+#endif
 #if defined(MOD_DIPLOMACY_CIV4_FEATURES)
 // What are our gold maintenance costs because of Vassals?
 int CvTreasury::GetVassalGoldMaintenance() const

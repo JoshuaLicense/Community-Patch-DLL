@@ -12,6 +12,8 @@
 #ifndef CIV5_GLOBALS_H
 #define CIV5_GLOBALS_H
 
+#include <vector>
+
 //
 // 'global' vars for Civ V.  singleton class.
 // All globals and global types should be contained in this class
@@ -20,9 +22,7 @@
 //
 class CvRandom;
 class CvGame;
-class CvPlayerAI;
-class CvAStar;
-class CvPathFinder;
+class CvStepFinder;
 class CvTwoLayerPathFinder;
 class CvInterface;
 class CvEngine;
@@ -80,6 +80,11 @@ class CvModEventInfo;
 class CvModEventChoiceInfo;
 class CvModCityEventInfo;
 class CvModEventCityChoiceInfo;
+
+class CvEventLinkingInfo;
+class CvEventChoiceLinkingInfo;
+class CvCityEventLinkingInfo;
+class CvCityEventChoiceLinkingInfo;
 #endif
 class CvMultiUnitFormationInfo;
 class CvEconomicAIStrategyXMLEntries;
@@ -137,7 +142,12 @@ class CvResolutionEntry;
 class CvResolutionXMLEntries;
 class CvDeal;
 class CvNetMessageHandler;
-class CvDiploModifierInfo;
+#if defined(MOD_BALANCE_CORE)
+class CvCorporationEntry;
+class CvCorporationXMLEntries;
+class CvContractEntry;
+class CvContractXMLEntries;
+#endif
 
 class CvDLLInterfaceIFaceBase;
 class ICvDLLDatabaseUtility1;
@@ -212,9 +222,9 @@ public:
 
 	CvRandom& getASyncRand();
 
+	void InitializePathfinders(int iX, int iY, bool bWx, bool bWy);
 	CvTwoLayerPathFinder& GetPathFinder();
-	CvTwoLayerPathFinder& GetInterfacePathFinder();
-	CvPathFinder& GetStepFinder();
+	CvStepFinder& GetStepFinder();
 
 	ICvDLLDatabaseUtility1* getDatabaseLoadUtility();
 
@@ -380,6 +390,22 @@ public:
 	std::vector<CvModEventCityChoiceInfo*>& getCityEventChoiceInfo();
 	_Ret_maybenull_ CvModEventCityChoiceInfo* getCityEventChoiceInfo(CityEventChoiceTypes e);
 
+	int getNumEventLinkingInfos();
+	std::vector<CvEventLinkingInfo*>& getEventLinkingInfo();
+	_Ret_maybenull_ CvEventLinkingInfo* getEventLinkingInfo(EventTypes e);
+
+	int getNumEventChoiceLinkingInfos();
+	std::vector<CvEventChoiceLinkingInfo*>& getEventChoiceLinkingInfo();
+	_Ret_maybenull_ CvEventChoiceLinkingInfo* getEventChoiceLinkingInfo(EventChoiceTypes e);
+
+	int getNumCityEventLinkingInfos();
+	std::vector<CvCityEventLinkingInfo*>& getCityEventLinkingInfo();
+	_Ret_maybenull_ CvCityEventLinkingInfo* getCityEventLinkingInfo(CityEventTypes e);
+
+	int getNumCityEventChoiceLinkingInfos();
+	std::vector<CvCityEventChoiceLinkingInfo*>& getCityEventChoiceLinkingInfo();
+	_Ret_maybenull_ CvCityEventChoiceLinkingInfo* getCityEventChoiceLinkingInfo(CityEventChoiceTypes e);
+	
 #endif
 
 	int getNumUnitCombatClassInfos();
@@ -535,6 +561,18 @@ public:
 	std::vector<CvReligionEntry*>& getReligionInfo();
 	_Ret_maybenull_ CvReligionEntry* getReligionInfo(ReligionTypes eReligionNum);
 	CvReligionXMLEntries* GetGameReligions() const;
+
+#if defined(MOD_BALANCE_CORE)
+	int getNumCorporationInfos();
+	std::vector<CvCorporationEntry*>& getCorporationInfo();
+	_Ret_maybenull_ CvCorporationEntry* getCorporationInfo(CorporationTypes eCorporationNum);
+	CvCorporationXMLEntries* GetGameCorporations() const;
+
+	int getNumContractInfos();
+	std::vector<CvContractEntry*>& getContractInfo();
+	_Ret_maybenull_ CvContractEntry* getContractInfo(ContractTypes eContract);
+	CvContractXMLEntries* GetGameContracts() const;
+#endif
 
 	int getNumBeliefInfos();
 	std::vector<CvBeliefEntry*>& getBeliefInfo();
@@ -853,6 +891,10 @@ public:
 	inline int getSTRATEGIC_RESOURCE_MONOPOLY_THRESHOLD()
 	{
 		return m_iSTRATEGIC_RESOURCE_MONOPOLY_THRESHOLD;
+	}
+	inline int getRELIGION_MIN_FAITH_SECOND_PROPHET()
+	{
+		return m_iRELIGION_MIN_FAITH_SECOND_PROPHET;
 	}
 #endif
 	inline int getAI_STRATEGY_EARLY_EXPLORATION_STARTING_WEIGHT()
@@ -1596,6 +1638,8 @@ public:
 	GD_INT_DEF(AI_CONFIG_MILITARY_MELEE_PER_AA)
 	GD_INT_DEF(AI_CONFIG_MILITARY_AIRCRAFT_PER_CARRIER_SPACE)
 	GD_INT_DEF(AI_CONFIG_MILITARY_TILES_PER_SHIP)
+	GD_INT_DEF(AI_HOMELAND_MOVE_PRIORITY_SECONDARY_SETTLER)
+	GD_INT_DEF(AI_HOMELAND_MOVE_PRIORITY_SECONDARY_WORKER)
 #endif
 #if defined(MOD_CONFIG_GAME_IN_XML)
 	GD_INT_DEF(RELIGION_LAST_FOUND_ERA)
@@ -1743,6 +1787,10 @@ public:
 	{
 		return m_iFRIENDSHIP_THRESHOLD_CAN_PLEDGE_TO_PROTECT;
 	}
+#if defined(MOD_CITY_STATE_SCALE)
+	GD_INT_DEF(FRIENDSHIP_THRESHOLD_MOD_MEDIEVAL)
+	GD_INT_DEF(FRIENDSHIP_THRESHOLD_MOD_INDUSTRIAL)
+#endif
 	inline int getMINOR_FRIENDSHIP_CLOSE_AMOUNT()
 	{
 		return m_iMINOR_FRIENDSHIP_CLOSE_AMOUNT;
@@ -5746,6 +5794,13 @@ public:
 	GD_INT_DEF(TRADE_ROUTE_CS_ALLY_GOLD)
 	GD_INT_DEF(TRADE_ROUTE_CS_FRIEND_GOLD)
 #endif
+#if defined(MOD_CIV6_ROADS)
+	GD_INT_DEF(TRADE_ROUTE_CREATE_RAILROADS_ERA)
+	GD_INT_DEF(TRADE_ROUTE_CREATE_RAILROADS_TECH_ID)
+#endif
+#if defined(MOD_CITY_STATE_SCALE)
+	GD_INT_DEF(CITY_STATE_SCALE_PER_CITY_MOD)
+#endif
 	inline int getTRADE_ROUTE_CAPITAL_POP_GOLD_MULTIPLIER()
 	{
 		return m_iTRADE_ROUTE_CAPITAL_POP_GOLD_MULTIPLIER;
@@ -7592,6 +7647,10 @@ public:
 	{
 		return m_iBALANCE_MOD_POLICY_BRANCHES_NEEDED_IDEOLOGY;
 	}
+	inline int getBALANCE_MOD_POLICIES_NEEDED_IDEOLOGY()
+	{
+		return m_iBALANCE_MOD_POLICIES_NEEDED_IDEOLOGY;
+	}
 	inline int getBUILDER_TASKING_BASELINE_ADDS_FOOD()
 	{
 		return m_iBUILDER_TASKING_BASELINE_ADDS_FOOD;
@@ -8846,6 +8905,9 @@ public:
 	{
 		return m_iTARGET_VASSAL_BACKUP_NEIGHBORS;
 	}
+#if defined(MOD_PROMOTIONS_AURA_CHANGE)
+	GD_INT_DEF(GREAT_GENERAL_MAX_RANGE)
+#endif
 #endif
 
 	////////////// END DEFINES //////////////////
@@ -8879,13 +8941,6 @@ public:
 
 	bool readEventTriggerInfoArray(FDataStream& kStream);
 	void writeEventTriggerInfoArray(FDataStream& kStream);
-
-	//
-	// additional accessors for initting globals
-	//
-	void SetPathFinder(CvTwoLayerPathFinder* pVal);
-	void SetInterfacePathFinder(CvTwoLayerPathFinder* pVal);
-	void SetStepFinder(CvPathFinder* pVal);
 
 	// So that CvEnums are moddable in the DLL
 	int getNumDirections() const;
@@ -8937,7 +8992,7 @@ protected:
 
 	CvTwoLayerPathFinder* m_pathFinder;
 	CvTwoLayerPathFinder* m_interfacePathFinder;
-	CvPathFinder* m_stepFinder;
+	CvStepFinder* m_stepFinder;
 	
 	ICvDLLDatabaseUtility1* m_pkDatabaseLoadUtility;
 	int m_aiPlotDirectionX[NUM_DIRECTION_TYPES+2];
@@ -9005,6 +9060,11 @@ protected:
 	std::vector<CvModEventChoiceInfo*> m_paEventChoiceInfo;
 	std::vector<CvModCityEventInfo*> m_paCityEventInfo;
 	std::vector<CvModEventCityChoiceInfo*> m_paCityEventChoiceInfo;
+	std::vector<CvEventLinkingInfo*> m_paEventLinkingInfo;
+	std::vector<CvEventChoiceLinkingInfo*> m_paEventChoiceLinkingInfo;
+	std::vector<CvCityEventLinkingInfo*> m_paCityEventLinkingInfo;
+	std::vector<CvCityEventChoiceLinkingInfo*> m_paCityEventChoiceLinkingInfo;
+	std::vector<CvContractEntry*> m_paContractInfo;
 #endif
 	std::vector<CvBaseInfo*> m_paUnitCombatClassInfo;
 	std::vector<CvBaseInfo*> m_paUnitAIInfos;
@@ -9051,6 +9111,10 @@ protected:
 	CvNotificationXMLEntries* m_pNotifications;
 #if defined(MOD_API_ACHIEVEMENTS) || defined(ACHIEVEMENT_HACKS)
 	CvAchievementXMLEntries* m_pAchievements;
+#endif
+#if defined(MOD_BALANCE_CORE)
+	CvCorporationXMLEntries* m_pCorporations;
+	CvContractXMLEntries* m_pContracts;
 #endif
 
 	//////////////////////////////////////////////////////////////////////////
@@ -9129,6 +9193,7 @@ protected:
 	int m_iBALANCE_HAPPINESS_THRESHOLD_PERCENTILE;
 	int m_iGLOBAL_RESOURCE_MONOPOLY_THRESHOLD;
 	int m_iSTRATEGIC_RESOURCE_MONOPOLY_THRESHOLD;
+	int m_iRELIGION_MIN_FAITH_SECOND_PROPHET;
 #endif
 	int m_iAI_STRATEGY_EARLY_EXPLORATION_STARTING_WEIGHT;
 	int m_iAI_STRATEGY_EARLY_EXPLORATION_EXPLORERS_WEIGHT_DIVISOR;
@@ -9322,6 +9387,8 @@ protected:
 	GD_INT_DECL(AI_CONFIG_MILITARY_MELEE_PER_AA);
 	GD_INT_DECL(AI_CONFIG_MILITARY_AIRCRAFT_PER_CARRIER_SPACE);
 	GD_INT_DECL(AI_CONFIG_MILITARY_TILES_PER_SHIP);
+	GD_INT_DECL(AI_HOMELAND_MOVE_PRIORITY_SECONDARY_SETTLER);
+	GD_INT_DECL(AI_HOMELAND_MOVE_PRIORITY_SECONDARY_WORKER);
 #endif
 #if defined(MOD_CONFIG_GAME_IN_XML)
 	GD_INT_DECL(RELIGION_LAST_FOUND_ERA);
@@ -9367,6 +9434,10 @@ protected:
 	int m_iFRIENDSHIP_THRESHOLD_MAX;
 	int m_iFRIENDSHIP_THRESHOLD_CAN_BULLY;
 	int m_iFRIENDSHIP_THRESHOLD_CAN_PLEDGE_TO_PROTECT;
+#if defined(MOD_CITY_STATE_SCALE)
+	GD_INT_DECL(FRIENDSHIP_THRESHOLD_MOD_MEDIEVAL);
+	GD_INT_DECL(FRIENDSHIP_THRESHOLD_MOD_INDUSTRIAL);
+#endif
 	int m_iMINOR_FRIENDSHIP_CLOSE_AMOUNT;
 	int m_iMINOR_CIV_SCIENCE_BONUS_MULTIPLIER;
 	int m_iFRIENDS_CULTURE_BONUS_AMOUNT_ANCIENT;
@@ -10406,6 +10477,13 @@ protected:
 	GD_INT_DECL(TRADE_ROUTE_CS_ALLY_GOLD);
 	GD_INT_DECL(TRADE_ROUTE_CS_FRIEND_GOLD);
 #endif
+#if defined(MOD_CIV6_ROADS)
+	GD_INT_DECL(TRADE_ROUTE_CREATE_RAILROADS_ERA);
+	GD_INT_DECL(TRADE_ROUTE_CREATE_RAILROADS_TECH_ID);
+#endif
+#if defined(MOD_CITY_STATE_SCALE)
+	GD_INT_DECL(CITY_STATE_SCALE_PER_CITY_MOD);
+#endif
 	int m_iTRADE_ROUTE_CAPITAL_POP_GOLD_MULTIPLIER;
 	int m_iTRADE_ROUTE_CITY_POP_GOLD_MULTIPLIER;
 	int m_iDEFICIT_UNIT_DISBANDING_THRESHOLD;
@@ -10927,6 +11005,7 @@ protected:
 	int m_iBALANCE_INFLUENCE_BOOST_PATRONAGE_POLICY;
 	int m_iBALANCE_INFLUENCE_BOOST_PROTECTION_MINOR;
 	int m_iBALANCE_MOD_POLICY_BRANCHES_NEEDED_IDEOLOGY;
+	int m_iBALANCE_MOD_POLICIES_NEEDED_IDEOLOGY;
 	int m_iBUILDER_TASKING_BASELINE_ADDS_FOOD;
 	int m_iBUILDER_TASKING_BASELINE_ADDS_GOLD;
 	int m_iBUILDER_TASKING_BASELINE_ADDS_FAITH;
@@ -11107,6 +11186,9 @@ protected:
 #if defined(MOD_PROMOTIONS_FLAGSHIP)
 	GD_INT_DECL(PROMOTION_FLAGSHIP);
 #endif
+#if defined(MOD_PROMOTIONS_AURA_CHANGE)
+	GD_INT_DECL(GREAT_GENERAL_MAX_RANGE);
+#endif
 	int m_iPROMOTION_OCEAN_IMPASSABLE_UNTIL_ASTRONOMY;
 	int m_iPROMOTION_OCEAN_IMPASSABLE;
 	int m_iAI_HANDICAP;
@@ -11265,9 +11347,10 @@ inline const Database::Connection* CvGlobals::GetGameDatabase() const
 	return m_pGameDatabase;
 }
 
+//cannot use GC.getGame().getActivePlayer() in observer mode
+PlayerTypes GetCurrentPlayer();
 
-#if defined(MOD_CORE_DEBUGGING)
-
+#ifdef STACKWALKER
 #include "Stackwalker/Stackwalker.h"
 
 class MyStackWalker : public StackWalker
@@ -11278,16 +11361,20 @@ public:
 protected:
 	virtual void OnSymInit(LPCSTR, DWORD, LPCSTR) { /*dummy*/ }
 	virtual void OnLoadModule(LPCSTR, LPCSTR, DWORD64, DWORD, DWORD, LPCSTR, LPCSTR, ULONGLONG) { /*dummy*/ }
-	virtual void OnOutput(LPCSTR szText) { if (m_pLog && strstr(szText,"ERROR")==NULL && strstr(szText,"not available")==NULL ) m_pLog->Msg(szText); }
+	virtual void OnOutput(LPCSTR szText) 
+	{ 
+		if (strstr(szText,"ERROR")==NULL && strstr(szText,"not available")==NULL) 
+		{
+			if (m_pLog)
+				m_pLog->Msg(szText);
+			else
+				OutputDebugString(szText);
+		}
+	}
 	FILogFile* m_pLog;
 };
 
-//cannot use GC.getGame().getActivePlayer() in observer mode
-PlayerTypes GetCurrentPlayer();
-
 extern MyStackWalker gStackWalker;
-
 #endif
 
-
-#endif
+#endif //CIV5_GLOBALS_H

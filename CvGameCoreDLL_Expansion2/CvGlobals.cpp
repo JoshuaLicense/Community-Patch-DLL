@@ -153,6 +153,7 @@ CvGlobals::CvGlobals() :
 	m_iBALANCE_HAPPINESS_THRESHOLD_PERCENTILE(50),
 	m_iGLOBAL_RESOURCE_MONOPOLY_THRESHOLD(50),
 	m_iSTRATEGIC_RESOURCE_MONOPOLY_THRESHOLD(25),
+	m_iRELIGION_MIN_FAITH_SECOND_PROPHET(600),
 #endif
 	m_iAI_STRATEGY_EARLY_EXPLORATION_STARTING_WEIGHT(100),
 	m_iAI_STRATEGY_EARLY_EXPLORATION_EXPLORERS_WEIGHT_DIVISOR(1),
@@ -346,6 +347,8 @@ CvGlobals::CvGlobals() :
 	GD_INT_INIT(AI_CONFIG_MILITARY_MELEE_PER_AA, 4),
 	GD_INT_INIT(AI_CONFIG_MILITARY_AIRCRAFT_PER_CARRIER_SPACE, 1),
 	GD_INT_INIT(AI_CONFIG_MILITARY_TILES_PER_SHIP, 5),
+	GD_INT_INIT(AI_HOMELAND_MOVE_PRIORITY_SECONDARY_SETTLER, 1),
+	GD_INT_INIT(AI_HOMELAND_MOVE_PRIORITY_SECONDARY_WORKER, 3),
 #endif
 #if defined(MOD_CONFIG_GAME_IN_XML)
 	// Don't sweat that these are hard-coded by ID, as they will be over-written by the values as set in the PostDefines table
@@ -392,6 +395,10 @@ CvGlobals::CvGlobals() :
 	m_iFRIENDSHIP_THRESHOLD_MAX(120),
 	m_iFRIENDSHIP_THRESHOLD_CAN_BULLY(-30),
 	m_iFRIENDSHIP_THRESHOLD_CAN_PLEDGE_TO_PROTECT(0),
+#if defined(MOD_CITY_STATE_SCALE)
+	GD_INT_INIT(FRIENDSHIP_THRESHOLD_MOD_MEDIEVAL, 100),
+	GD_INT_INIT(FRIENDSHIP_THRESHOLD_MOD_INDUSTRIAL, 100),
+#endif
 	m_iMINOR_FRIENDSHIP_CLOSE_AMOUNT(8),
 	m_iMINOR_CIV_SCIENCE_BONUS_MULTIPLIER(25),
 	m_iFRIENDS_CULTURE_BONUS_AMOUNT_ANCIENT(4),
@@ -1419,6 +1426,13 @@ CvGlobals::CvGlobals() :
 	GD_INT_INIT(TRADE_ROUTE_CS_ALLY_GOLD, 3),
 	GD_INT_INIT(TRADE_ROUTE_CS_FRIEND_GOLD, 2),
 #endif
+#if defined(MOD_CIV6_ROADS)
+	GD_INT_INIT(TRADE_ROUTE_CREATE_RAILROADS_ERA, 5),
+	GD_INT_INIT(TRADE_ROUTE_CREATE_RAILROADS_TECH_ID, 0),
+#endif
+#if defined(MOD_CITY_STATE_SCALE)
+	GD_INT_INIT(CITY_STATE_SCALE_PER_CITY_MOD, 0),
+#endif
 	m_iTRADE_ROUTE_CAPITAL_POP_GOLD_MULTIPLIER(0),
 	m_iTRADE_ROUTE_CITY_POP_GOLD_MULTIPLIER(125),
 	m_iDEFICIT_UNIT_DISBANDING_THRESHOLD(-5),
@@ -1915,7 +1929,8 @@ CvGlobals::CvGlobals() :
 	m_iBALANCE_CITY_PURCHASE_MOD(10),
 	m_iBALANCE_INFLUENCE_BOOST_PATRONAGE_POLICY(33),
 	m_iBALANCE_INFLUENCE_BOOST_PROTECTION_MINOR(15),
-	m_iBALANCE_MOD_POLICY_BRANCHES_NEEDED_IDEOLOGY(4),
+	m_iBALANCE_MOD_POLICY_BRANCHES_NEEDED_IDEOLOGY(3),
+	m_iBALANCE_MOD_POLICIES_NEEDED_IDEOLOGY(18),
 	m_iBUILDER_TASKING_BASELINE_ADDS_FOOD(100),
 	m_iBUILDER_TASKING_BASELINE_ADDS_GOLD(100), 
 	m_iBUILDER_TASKING_BASELINE_ADDS_FAITH(100),
@@ -2084,7 +2099,7 @@ CvGlobals::CvGlobals() :
 	m_iSTANDARD_CALENDAR(0),
 	m_iBARBARIAN_HANDICAP(1),
 	m_iBARBARIAN_CIVILIZATION(19),
-	m_iBARBARIAN_LEADER(19),
+	m_iBARBARIAN_LEADER(3),
 	m_iMINOR_CIV_HANDICAP(3),
 	m_iMINOR_CIVILIZATION(18),
 	m_iPROMOTION_EMBARKATION(76),
@@ -2135,7 +2150,9 @@ CvGlobals::CvGlobals() :
 	m_iESPIONAGE_INFLUENCE_LOST_FOR_RIGGED_ELECTION(0),
 	m_iESPIONAGE_SURVEILLANCE_SIGHT_RANGE(0),
 	m_iESPIONAGE_COUP_OTHER_PLAYERS_INFLUENCE_DROP(10),
-
+#if defined(MOD_PROMOTIONS_AURA_CHANGE)
+	GD_INT_INIT(GREAT_GENERAL_MAX_RANGE, 2),
+#endif
 #if defined(MOD_DIPLOMACY_CIV4_FEATURES)
 	m_fTECH_COST_ERA_EXPONENT(0.7f),
 	m_fVASSALAGE_VASSAL_CITY_POP_EXPONENT(0.6f),
@@ -2266,6 +2283,10 @@ CvGlobals::CvGlobals() :
 #if defined(MOD_API_ACHIEVEMENTS) || defined(ACHIEVEMENT_HACKS)
 	m_pAchievements(NULL),
 #endif
+#if defined(MOD_BALANCE_CORE)
+	m_pCorporations(NULL),
+	m_pContracts(NULL),
+#endif
 	m_pGameDatabase(NULL)
 {
 }
@@ -2275,9 +2296,9 @@ CvGlobals::~CvGlobals()
 	uninit();
 }
 
-#if defined(MOD_CORE_DEBUGGING)
-
+#ifdef STACKWALKER
 MyStackWalker gStackWalker;
+#endif
 
 //cannot use GC.getGame().getActivePlayer() in observer mode
 PlayerTypes GetCurrentPlayer()
@@ -2290,7 +2311,6 @@ PlayerTypes GetCurrentPlayer()
 	}
 	return NO_PLAYER;
 }
-#endif
 
 #if defined(MOD_DEBUG_MINIDUMP)
 /************************************************************************************************/
@@ -2304,9 +2324,7 @@ PlayerTypes GetCurrentPlayer()
 #pragma comment (lib, "dbghelp.lib")
 void CreateMiniDump(EXCEPTION_POINTERS *pep)
 {
-
-#if defined(MOD_CORE_DEBUGGING)
-	//if(MOD_CORE_DEBUGGING)
+#ifdef STACKWALKER
 	{
 		/* Try to log the callstack */
 		FILogFile* pLog=LOGFILEMGR.GetLog( "Callstack.log", FILogFile::kDontTimeStamp );
@@ -2494,7 +2512,7 @@ void CvGlobals::init()
 	};
 
 	CvAssertMsg(gDLL != NULL, "Civ app needs to set gDLL");
-	m_asyncRand = FNEW(CvRandom, c_eCiv5GameplayDLL, 0);
+	m_asyncRand = FNEW(CvRandom("UiRng"), c_eCiv5GameplayDLL, 0);
 
 	gDLL->InitGlobals();	// some globals need to be allocated outside the dll
 
@@ -2527,6 +2545,10 @@ void CvGlobals::init()
 #if defined(MOD_API_ACHIEVEMENTS) || defined(ACHIEVEMENT_HACKS)
 	m_pAchievements = FNEW(CvAchievementXMLEntries, c_eCiv5GameplayDLL, 0);
 #endif
+#if defined(MOD_BALANCE_CORE)
+	m_pCorporations = FNEW(CvCorporationXMLEntries, c_eCiv5GameplayDLL, 0);
+	m_pContracts = FNEW(CvContractXMLEntries, c_eCiv5GameplayDLL, 0);
+#endif
 
 	auto_ptr<ICvDLLDatabaseUtility1> pkLoader(getDatabaseLoadUtility());
 
@@ -2548,16 +2570,9 @@ void CvGlobals::init()
 	memcpy(m_aeTurnRightDirection, aeTurnRightDirection, sizeof(m_aeTurnRightDirection));
 	memcpy(m_aaiRingPlotIndex, aaiRingPlotIndex, sizeof(m_aaiRingPlotIndex));
 
-	SetPathFinder(FNEW(CvTwoLayerPathFinder, c_eCiv5GameplayDLL, 0));
-	SetInterfacePathFinder(FNEW(CvTwoLayerPathFinder, c_eCiv5GameplayDLL, 0));
-	SetStepFinder(FNEW(CvPathFinder, c_eCiv5GameplayDLL, 0));
-
-#if defined(MOD_BALANCE_CORE)
-	GetPathFinder().SetName("generic pf");
-	GetInterfacePathFinder().SetName("iface pf");
-	GetStepFinder().SetName("stepfinder");
-#endif
-
+	m_pathFinder = new CvTwoLayerPathFinder();
+	m_interfacePathFinder = new CvTwoLayerPathFinder();
+	m_stepFinder = new CvStepFinder();
 }
 
 //
@@ -2584,6 +2599,10 @@ void CvGlobals::uninit()
 	SAFE_DELETE(m_pTraits);
 	SAFE_DELETE(m_pReligions);
 	SAFE_DELETE(m_pBeliefs);
+#if defined(MOD_BALANCE_CORE)
+	SAFE_DELETE(m_pCorporations);
+	SAFE_DELETE(m_pContracts);
+#endif
 	SAFE_DELETE(m_pLeagueSpecialSessions);
 	SAFE_DELETE(m_pLeagueNames);
 	SAFE_DELETE(m_pLeagueProjects);
@@ -2593,7 +2612,6 @@ void CvGlobals::uninit()
 #if defined(MOD_API_ACHIEVEMENTS) || defined(ACHIEVEMENT_HACKS)
 	SAFE_DELETE(m_pAchievements);
 #endif
-
 	SAFE_DELETE(m_pImprovements); // player uses the improvement count in deallocating.
 	SAFE_DELETE(m_pTechs);        // improvements uses tech to deallocate. arrghh!
 
@@ -2678,21 +2696,35 @@ CvRandom& CvGlobals::getASyncRand()
 	return *m_asyncRand;
 }
 
+void CvGlobals::InitializePathfinders(int iX, int iY, bool bWx, bool bWy)
+{
+	if (m_pathFinder)
+	{
+		m_pathFinder->Initialize(iX, iY, bWx, bWy);
+		m_pathFinder->SetName("unit pf");
+	}
+	if (m_interfacePathFinder)
+	{
+		m_interfacePathFinder->Initialize(iX, iY, bWx, bWy);
+		m_interfacePathFinder->SetName("iface pf");
+	}
+	if (m_stepFinder)
+	{
+		m_stepFinder->Initialize(iX, iY, bWx, bWy);
+		m_stepFinder->SetName("stepfinder");
+	}
+}
+
 CvTwoLayerPathFinder& CvGlobals::GetPathFinder()
 {
-	return *m_pathFinder;
+	//important, avoid deadlocks
+	return gDLL->IsGameCoreThread() ? *m_pathFinder : *m_interfacePathFinder;
 }
 
-CvTwoLayerPathFinder& CvGlobals::GetInterfacePathFinder()
-{
-	return *m_interfacePathFinder;
-}
-
-CvPathFinder& CvGlobals::GetStepFinder()
+CvStepFinder& CvGlobals::GetStepFinder()
 {
 	return *m_stepFinder;
 }
-
 
 ICvDLLDatabaseUtility1* CvGlobals::getDatabaseLoadUtility()
 {
@@ -3340,6 +3372,86 @@ CvModEventCityChoiceInfo* CvGlobals::getCityEventChoiceInfo(CityEventChoiceTypes
 	CvAssert(e < GC.getNumCityEventChoiceInfos());
 	if(e > -1 && e < (int)m_paCityEventChoiceInfo.size())
 		return m_paCityEventChoiceInfo[e];
+	else
+		return NULL;
+}
+
+int CvGlobals::getNumEventLinkingInfos()
+{
+	return (int)m_paEventLinkingInfo.size();
+}
+
+std::vector<CvEventLinkingInfo*>& CvGlobals::getEventLinkingInfo()
+{
+	return m_paEventLinkingInfo;
+}
+
+CvEventLinkingInfo* CvGlobals::getEventLinkingInfo(EventTypes e)
+{
+	CvAssert(e > -1);
+	CvAssert(e < GC.getNumEventLinkingInfo());
+	if(e > -1 && e < (int)m_paEventLinkingInfo.size())
+		return m_paEventLinkingInfo[e];
+	else
+		return NULL;
+}
+
+int CvGlobals::getNumEventChoiceLinkingInfos()
+{
+	return (int)m_paEventChoiceLinkingInfo.size();
+}
+
+std::vector<CvEventChoiceLinkingInfo*>& CvGlobals::getEventChoiceLinkingInfo()
+{
+	return m_paEventChoiceLinkingInfo;
+}
+
+CvEventChoiceLinkingInfo* CvGlobals::getEventChoiceLinkingInfo(EventChoiceTypes e)
+{
+	CvAssert(e > -1);
+	CvAssert(e < GC.getNumEventChoiceLinkingInfo());
+	if(e > -1 && e < (int)m_paEventChoiceLinkingInfo.size())
+		return m_paEventChoiceLinkingInfo[e];
+	else
+		return NULL;
+}
+
+int CvGlobals::getNumCityEventLinkingInfos()
+{
+	return (int)m_paCityEventLinkingInfo.size();
+}
+
+std::vector<CvCityEventLinkingInfo*>& CvGlobals::getCityEventLinkingInfo()
+{
+	return m_paCityEventLinkingInfo;
+}
+
+CvCityEventLinkingInfo* CvGlobals::getCityEventLinkingInfo(CityEventTypes e)
+{
+	CvAssert(e > -1);
+	CvAssert(e < GC.getNumCityEventLinkingInfo());
+	if(e > -1 && e < (int)m_paCityEventLinkingInfo.size())
+		return m_paCityEventLinkingInfo[e];
+	else
+		return NULL;
+}
+
+int CvGlobals::getNumCityEventChoiceLinkingInfos()
+{
+	return (int)m_paCityEventChoiceLinkingInfo.size();
+}
+
+std::vector<CvCityEventChoiceLinkingInfo*>& CvGlobals::getCityEventChoiceLinkingInfo()
+{
+	return m_paCityEventChoiceLinkingInfo;
+}
+
+CvCityEventChoiceLinkingInfo* CvGlobals::getCityEventChoiceLinkingInfo(CityEventChoiceTypes e)
+{
+	CvAssert(e > -1);
+	CvAssert(e < GC.getNumCityEventChoiceLinkingInfo());
+	if(e > -1 && e < (int)m_paCityEventChoiceLinkingInfo.size())
+		return m_paCityEventChoiceLinkingInfo[e];
 	else
 		return NULL;
 }
@@ -4104,6 +4216,52 @@ CvBeliefXMLEntries* CvGlobals::GetGameBeliefs() const
 	return m_pBeliefs;
 }
 
+#if defined(MOD_BALANCE_CORE)
+int CvGlobals::getNumCorporationInfos()
+{
+	return (int)m_pCorporations->GetCorporationEntries().size();
+}
+
+std::vector<CvCorporationEntry*>& CvGlobals::getCorporationInfo()
+{
+	return m_pCorporations->GetCorporationEntries();
+}
+
+CvCorporationEntry* CvGlobals::getCorporationInfo(CorporationTypes eCorporationNum)
+{
+	CvAssert(eCorporationNum > -1);
+	CvAssert(eCorporationNum < GC.getNumCorporationInfos());
+	return m_pCorporations->GetCorporationEntries()[eCorporationNum];
+}
+
+CvCorporationXMLEntries* CvGlobals::GetGameCorporations() const
+{
+	return m_pCorporations;
+}
+
+int CvGlobals::getNumContractInfos()
+{
+	return (int)m_paContractInfo.size();
+}
+
+std::vector<CvContractEntry*>& CvGlobals::getContractInfo()
+{
+	return m_paContractInfo;
+}
+
+CvContractEntry* CvGlobals::getContractInfo(ContractTypes eContract)
+{
+	CvAssert(eContract > -1);
+	CvAssert(eContract < GC.getNumContractInfos());
+	return m_paContractInfo[eContract];
+}
+
+CvContractXMLEntries* CvGlobals::GetGameContracts() const
+{
+	return m_pContracts;
+}
+#endif
+
 int CvGlobals::getNumLeagueSpecialSessionInfos()
 {
 	return (int) m_pLeagueSpecialSessions->GetLeagueSpecialSessionEntries().size();
@@ -4477,7 +4635,7 @@ bool CvGlobals::GetHexDebugLayerString(CvPlot* pkPlot, const char* szLayerName, 
 		std::string strOut;
 
 		int iIndex = GC.getMap().plotNum(pkPlot->getX(), pkPlot->getY());
-		CvTacticalAnalysisMap* pTactMap = GC.getGame().GetTacticalAnalysisMap();
+		CvTacticalAnalysisMap* pTactMap = GET_PLAYER( GC.getGame().getActivePlayer() ).GetTacticalAI()->GetTacticalAnalysisMap();
 		CvTacticalAnalysisCell* pCell = pTactMap->GetCell(iIndex);
 
 		if(pCell->IsImpassableTerrain())
@@ -4500,11 +4658,8 @@ bool CvGlobals::GetHexDebugLayerString(CvPlot* pkPlot, const char* szLayerName, 
 				{
 					strOut += "V ";
 				}
-				if(pCell->IsEnemyCanMovePast())
-				{
-					strOut += "A+ ";
-				}
-				else if(pCell->IsNotVisibleToEnemy())
+
+				if(pCell->IsNotVisibleToEnemy())
 				{
 					strOut += "N ";
 				}
@@ -4515,18 +4670,6 @@ bool CvGlobals::GetHexDebugLayerString(CvPlot* pkPlot, const char* szLayerName, 
 				if(pCell->IsFriendlyTurnEndTile())
 				{
 					strOut += "E ";
-				}
-				if(pCell->IsWithinRangeOfTarget())
-				{
-					strOut += "T ";
-				}
-				if(pCell->IsHelpsProvidesFlankBonus())
-				{
-					strOut += "F ";
-				}
-				if(pCell->GetDefenseModifier() > 0)
-				{
-					strOut += "D ";
 				}
 				if(pCell->GetDominanceZone() != -1)
 				{
@@ -4620,6 +4763,7 @@ void CvGlobals::cacheGlobals()
 	m_iBALANCE_HAPPINESS_THRESHOLD_PERCENTILE = getDefineINT("BALANCE_HAPPINESS_THRESHOLD_PERCENTILE");
 	m_iGLOBAL_RESOURCE_MONOPOLY_THRESHOLD = getDefineINT("GLOBAL_RESOURCE_MONOPOLY_THRESHOLD");
 	m_iSTRATEGIC_RESOURCE_MONOPOLY_THRESHOLD = getDefineINT("STRATEGIC_RESOURCE_MONOPOLY_THRESHOLD");
+	m_iRELIGION_MIN_FAITH_SECOND_PROPHET = getDefineINT("RELIGION_MIN_FAITH_SECOND_PROPHET");
 #endif
 	m_iAI_STRATEGY_EARLY_EXPLORATION_STARTING_WEIGHT = getDefineINT("AI_STRATEGY_EARLY_EXPLORATION_STARTING_WEIGHT");
 	m_iAI_STRATEGY_EARLY_EXPLORATION_EXPLORERS_WEIGHT_DIVISOR = getDefineINT("AI_STRATEGY_EARLY_EXPLORATION_EXPLORERS_WEIGHT_DIVISOR");
@@ -4815,6 +4959,8 @@ void CvGlobals::cacheGlobals()
 	GD_INT_CACHE(AI_CONFIG_MILITARY_MELEE_PER_AA);
 	GD_INT_CACHE(AI_CONFIG_MILITARY_AIRCRAFT_PER_CARRIER_SPACE);
 	GD_INT_CACHE(AI_CONFIG_MILITARY_TILES_PER_SHIP);
+	GD_INT_CACHE(AI_HOMELAND_MOVE_PRIORITY_SECONDARY_SETTLER);
+	GD_INT_CACHE(AI_HOMELAND_MOVE_PRIORITY_SECONDARY_WORKER);
 #endif
 #if defined(MOD_CONFIG_GAME_IN_XML)
 	GD_INT_CACHE(RELIGION_LAST_FOUND_ERA);
@@ -4860,6 +5006,10 @@ void CvGlobals::cacheGlobals()
 	m_iFRIENDSHIP_THRESHOLD_MAX = getDefineINT("FRIENDSHIP_THRESHOLD_MAX");
 	m_iFRIENDSHIP_THRESHOLD_CAN_BULLY = getDefineINT("FRIENDSHIP_THRESHOLD_CAN_BULLY");
 	m_iFRIENDSHIP_THRESHOLD_CAN_PLEDGE_TO_PROTECT = getDefineINT("FRIENDSHIP_THRESHOLD_CAN_PLEDGE_TO_PROTECT");
+#if defined(MOD_CITY_STATE_SCALE)
+	GD_INT_CACHE(FRIENDSHIP_THRESHOLD_MOD_MEDIEVAL);
+	GD_INT_CACHE(FRIENDSHIP_THRESHOLD_MOD_INDUSTRIAL);
+#endif
 	m_iMINOR_FRIENDSHIP_CLOSE_AMOUNT = getDefineINT("MINOR_FRIENDSHIP_CLOSE_AMOUNT");
 	m_iMINOR_CIV_SCIENCE_BONUS_MULTIPLIER = getDefineINT("MINOR_CIV_SCIENCE_BONUS_MULTIPLIER");
 	m_iFRIENDS_CULTURE_BONUS_AMOUNT_ANCIENT = getDefineINT("FRIENDS_CULTURE_BONUS_AMOUNT_ANCIENT");
@@ -5902,6 +6052,13 @@ void CvGlobals::cacheGlobals()
 	GD_INT_CACHE(TRADE_ROUTE_CS_ALLY_GOLD)
 	GD_INT_CACHE(TRADE_ROUTE_CS_FRIEND_GOLD)
 #endif
+#if defined(MOD_CIV6_ROADS)
+	GD_INT_CACHE(TRADE_ROUTE_CREATE_RAILROADS_ERA)
+	GD_INT_CACHE(TRADE_ROUTE_CREATE_RAILROADS_TECH_ID)
+#endif
+#if defined(MOD_CITY_STATE_SCALE)
+	GD_INT_CACHE(CITY_STATE_SCALE_PER_CITY_MOD)
+#endif
 	m_iTRADE_ROUTE_CAPITAL_POP_GOLD_MULTIPLIER = getDefineINT("TRADE_ROUTE_CAPITAL_POP_GOLD_MULTIPLIER");
 	m_iTRADE_ROUTE_CITY_POP_GOLD_MULTIPLIER = getDefineINT("TRADE_ROUTE_CITY_POP_GOLD_MULTIPLIER");
 	m_iDEFICIT_UNIT_DISBANDING_THRESHOLD = getDefineINT("DEFICIT_UNIT_DISBANDING_THRESHOLD");
@@ -6397,6 +6554,7 @@ void CvGlobals::cacheGlobals()
 	m_iBALANCE_INFLUENCE_BOOST_PATRONAGE_POLICY = getDefineINT("BALANCE_INFLUENCE_BOOST_PATRONAGE_POLICY");
 	m_iBALANCE_INFLUENCE_BOOST_PROTECTION_MINOR = getDefineINT("BALANCE_INFLUENCE_BOOST_PROTECTION_MINOR");
 	m_iBALANCE_MOD_POLICY_BRANCHES_NEEDED_IDEOLOGY = getDefineINT("BALANCE_MOD_POLICY_BRANCHES_NEEDED_IDEOLOGY");
+	m_iBALANCE_MOD_POLICIES_NEEDED_IDEOLOGY = getDefineINT("BALANCE_MOD_POLICIES_NEEDED_IDEOLOGY");
 	m_iBUILDER_TASKING_BASELINE_ADDS_FOOD = getDefineINT("BUILDER_TASKING_BASELINE_ADDS_FOOD");
 	m_iBUILDER_TASKING_BASELINE_ADDS_GOLD = getDefineINT("BUILDER_TASKING_BASELINE_ADDS_GOLD");
 	m_iBUILDER_TASKING_BASELINE_ADDS_FAITH = getDefineINT("BUILDER_TASKING_BASELINE_ADDS_FAITH");
@@ -6751,6 +6909,11 @@ void CvGlobals::cacheGlobals()
 	{
 		m_iPOLICY_BRANCH_ORDER = NO_POLICY_BRANCH_TYPE;
 	}	
+#if defined(MOD_PROMOTIONS_AURA_CHANGE)
+	if (MOD_PROMOTIONS_AURA_CHANGE) {
+		GD_INT_CACHE(GREAT_GENERAL_MAX_RANGE);
+	}
+#endif
 }
 
 
@@ -6865,6 +7028,13 @@ void CvGlobals::deleteInfoArrays()
 	deleteInfoArray(m_paEventChoiceInfo);
 	deleteInfoArray(m_paCityEventInfo);
 	deleteInfoArray(m_paCityEventChoiceInfo);
+
+	deleteInfoArray(m_paEventLinkingInfo);
+	deleteInfoArray(m_paEventChoiceLinkingInfo);
+	deleteInfoArray(m_paCityEventLinkingInfo);
+	deleteInfoArray(m_paCityEventChoiceLinkingInfo);
+
+	deleteInfoArray(m_paContractInfo);
 #endif
 	deleteInfoArray(m_paHandicapInfo);
 	deleteInfoArray(m_paGameSpeedInfo);
@@ -7047,19 +7217,6 @@ bool CvGlobals::IsGraphicsInitialized() const
 void CvGlobals::SetGraphicsInitialized(bool bVal)
 {
 	m_bGraphicsInitialized = bVal;
-}
-
-void CvGlobals::SetPathFinder(CvTwoLayerPathFinder* pVal)
-{
-	m_pathFinder = pVal;
-}
-void CvGlobals::SetInterfacePathFinder(CvTwoLayerPathFinder* pVal)
-{
-	m_interfacePathFinder = pVal;
-}
-void CvGlobals::SetStepFinder(CvPathFinder* pVal)
-{
-	m_stepFinder = pVal;
 }
 
 void CvGlobals::setOutOfSyncDebuggingEnabled(bool isEnabled)

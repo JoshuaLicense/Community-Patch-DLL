@@ -78,6 +78,8 @@ public:
 	bool DoRemoveWorstCitizen(bool bRemoveForcedStatus = false, SpecialistTypes eDontChangeSpecialist = NO_SPECIALIST, int iCurrentCityPopulation = -1);
 #endif
 #if defined(MOD_BALANCE_CORE)
+	void SetBlockade(bool bValue);
+	bool IsBlockade();
 	void SetDirty(bool bValue);
 	bool IsDirty();
 	void DoReallocateCitizens(bool bForce = false);
@@ -160,6 +162,11 @@ public:
 
 	int GetSpecialistCount(SpecialistTypes eIndex) const;
 	int GetTotalSpecialistCount() const;
+#if defined(MOD_BALANCE_CORE)
+	int GetSpecialistSlots(SpecialistTypes eIndex) const;
+	void ChangeNumSpecialistSlots(SpecialistTypes eIndex, int iValue);
+	int GetSpecialistSlotsTotal() const;
+#endif
 
 	int GetBuildingGreatPeopleRateChanges(SpecialistTypes eSpecialist) const;
 	void ChangeBuildingGreatPeopleRateChanges(SpecialistTypes eSpecialist, int iChange);
@@ -167,7 +174,11 @@ public:
 	int GetSpecialistGreatPersonProgress(SpecialistTypes eIndex) const;
 	int GetSpecialistGreatPersonProgressTimes100(SpecialistTypes eIndex) const;
 	void ChangeSpecialistGreatPersonProgressTimes100(SpecialistTypes eIndex, int iChange);
+#if defined(MOD_BALANCE_CORE)
+	void DoResetSpecialistGreatPersonProgressTimes100(SpecialistTypes eIndex, int iAmountToRemove);
+#else
 	void DoResetSpecialistGreatPersonProgressTimes100(SpecialistTypes eIndex);
+#endif
 
 	int GetNumSpecialistsInBuilding(BuildingTypes eBuilding) const;
 	int GetNumForcedSpecialistsInBuilding(BuildingTypes eBuilding) const;
@@ -191,6 +202,7 @@ private:
 	bool m_bNoAutoAssignSpecialists;
 #if defined(MOD_BALANCE_CORE)
 	bool m_bIsDirty;
+	bool m_bIsBlockaded;
 #endif
 
 	int m_iNumUnassignedCitizens;
@@ -207,6 +219,9 @@ private:
 	int m_iNumDefaultSpecialists;
 	int m_iNumForcedDefaultSpecialists;
 	int* m_aiSpecialistCounts;
+#if defined(MOD_BALANCE_CORE)
+	int* m_aiSpecialistSlots;
+#endif
 	int* m_aiSpecialistGreatPersonProgressTimes100;
 	int* m_aiNumSpecialistsInBuilding;
 	int* m_aiNumForcedSpecialistsInBuilding;

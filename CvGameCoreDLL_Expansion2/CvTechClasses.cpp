@@ -76,6 +76,10 @@ CvTechEntry::CvTechEntry(void):
 #if defined(MOD_BALANCE_CORE)
 	m_iHappiness(0),
 	m_ppiTechYieldChanges(NULL),
+	m_bCorporationsEnabled(false),
+#endif
+#if defined(MOD_CIV6_EUREKA)
+	m_iEurekaPerMillion(0),
 #endif
 #if defined(MOD_DIPLOMACY_CIV4_FEATURES)
 	m_bVassalageTradingAllowed(false),
@@ -158,6 +162,10 @@ bool CvTechEntry::CacheResults(Database::Results& kResults, CvDatabaseUtility& k
 #endif
 #if defined(MOD_BALANCE_CORE)
 	m_iHappiness = kResults.GetInt("Happiness");
+	m_bCorporationsEnabled = kResults.GetBool("CorporationsEnabled");
+#endif
+#if defined(MOD_CIV6_EUREKA)
+	m_iEurekaPerMillion = kResults.GetInt("EurekaPerMillion");
 #endif
 
 	//References
@@ -622,7 +630,19 @@ int CvTechEntry::GetHappiness() const
 {
 	return m_iHappiness;
 }
+bool CvTechEntry::IsCorporationsEnabled() const
+{
+	return m_bCorporationsEnabled;
+}
 #endif
+
+#if defined(MOD_CIV6_EUREKA)
+int CvTechEntry::GetEurekaPerMillion() const
+{
+	return m_iEurekaPerMillion;
+}
+#endif
+
 //=====================================
 // CvTechXMLEntries
 //=====================================
@@ -1127,12 +1147,16 @@ void CvPlayerTechs::SetLocalePriorities()
 
 				if(pLoopPlot->getOwner() == pCity->getOwner() || (iDistance <= 2 && pLoopPlot->getOwner() == NO_PLAYER))
 				{
-#if defined (MOD_AI_SMART_TECH_LOCALE_PRIORITY_CHECK_ALL_RESOURCES)
+#if defined(MOD_AI_SMART_V3)
 					int multiplierValue = 1;
+#endif
+
+#if defined(MOD_AI_SMART_V3)
+					if(MOD_AI_SMART_V3 || !pLoopPlot->isWater())
 #else
 					if(!pLoopPlot->isWater())
-					{
 #endif
+					{
 						ResourceTypes eResource = pLoopPlot->getResourceType(m_pPlayer->getTeam());
 						if(eResource == NO_RESOURCE)
 						{
@@ -1151,27 +1175,37 @@ void CvPlayerTechs::SetLocalePriorities()
 							{
 								// If this is the improvement we're looking for
 								const ImprovementTypes eImprovement = (ImprovementTypes)pkBuildInfo->getImprovement();
-#if defined (MOD_AI_SMART_TECH_LOCALE_PRIORITY_CHECK_ALL_RESOURCES)
 								if(eImprovement != NO_IMPROVEMENT)
 								{
-									if(pLoopPlot->canHaveImprovement(eImprovement))
+#if defined(MOD_AI_SMART_V3)
+									if (MOD_AI_SMART_V3)
 									{
-										CvImprovementEntry* pkImprovementInfo = GC.getImprovementInfo(eImprovement);
-										if (pkImprovementInfo && pkImprovementInfo->IsImprovementResourceTrade(eResource))
+										if(pLoopPlot->canHaveImprovement(eImprovement))
 										{
-											multiplierValue = 2;
+											CvImprovementEntry* pkImprovementInfo = GC.getImprovementInfo(eImprovement);
+											if (pkImprovementInfo && pkImprovementInfo->IsImprovementResourceTrade(eResource))
+											{
+												multiplierValue = 2;
+											}
+										
+											eCorrectBuild = eBuild;
+											eCorrectImprovement = eImprovement;
+											break;
 										}
-#else
-								if(eImprovement != NO_IMPROVEMENT)
-								{
-									CvImprovementEntry* pkImprovementInfo = GC.getImprovementInfo(eImprovement);
-									if(pkImprovementInfo && pkImprovementInfo->IsImprovementResourceTrade(eResource))
+									}
+									else
 									{
 #endif
-										eCorrectBuild = eBuild;
-										eCorrectImprovement = eImprovement;
-										break;
+										CvImprovementEntry* pkImprovementInfo = GC.getImprovementInfo(eImprovement);
+										if(pkImprovementInfo && pkImprovementInfo->IsImprovementResourceTrade(eResource))
+										{
+											eCorrectBuild = eBuild;
+											eCorrectImprovement = eImprovement;
+											break;
+										}
+#if defined(MOD_AI_SMART_V3)
 									}
+#endif
 								}
 							}
 						}
@@ -1191,21 +1225,26 @@ void CvPlayerTechs::SetLocalePriorities()
 							CvAssert(iTech < m_pTechs->GetNumTechs());		// Just assert on a value off the top end, a -1 is ok to just skip silently
 							if (iTech >= 0 && iTech < m_pTechs->GetNumTechs())
 							{
-#if defined (MOD_AI_SMART_TECH_LOCALE_PRIORITY_CHECK_ALL_RESOURCES)
-								m_piLocaleTechPriority[iTech] += multiplierValue;
-								if (multiplierValue == 2)
+#if defined(MOD_AI_SMART_V3)
+								if (MOD_AI_SMART_V3)
 								{
-									m_peLocaleTechResources[iTech] = eResource;								
+									m_piLocaleTechPriority[iTech] += multiplierValue;
+									if (multiplierValue == 2)
+									{
+										m_peLocaleTechResources[iTech] = eResource;								
+									}
 								}
-#else
-								m_piLocaleTechPriority[iTech]++;
-								m_peLocaleTechResources[iTech] = eResource;
+								else
+								{
+#endif
+									m_piLocaleTechPriority[iTech]++;
+									m_peLocaleTechResources[iTech] = eResource;
+#if defined(MOD_AI_SMART_V3)
+								}
 #endif
 							}
 						}
-#if !defined (MOD_AI_SMART_TECH_LOCALE_PRIORITY_CHECK_ALL_RESOURCES)
 					}
-#endif
 				}
 			}
 		}
@@ -1269,11 +1308,36 @@ void CvPlayerTechs::SetGSPriorities()
 			if(pkBuildingInfo && pkBuildingInfo->GetPrereqAndTech() == iTechLoop)
 			{
 				int iTechGSValue = CityStrategyAIHelpers::GetBuildingGrandStrategyValue(NULL, eBuilding, m_pPlayer->GetID());
-				iTechGSValue /= 10;
-				
-				if(iTechGSValue > 0)
+				if (iTechGSValue > 0)
 				{
-					m_piGSTechPriority[iTechLoop] += iTechGSValue;
+					m_piGSTechPriority[iTechLoop]++;
+				}
+
+			}
+		}
+		//Let's look at grandstrategy values for units as well and add those in to techs.
+		for (int iUnitLoop = 0; iUnitLoop < GC.getNumUnitInfos(); iUnitLoop++)
+		{
+			UnitTypes eUnit = (UnitTypes)iUnitLoop;
+			CvUnitEntry* pkUnitInfo = GC.getUnitInfo(eUnit);
+
+			if (pkUnitInfo && pkUnitInfo->GetPrereqAndTech() == iTechLoop)
+			{
+				if (pkUnitInfo->GetCombat() > 0 || pkUnitInfo->GetRangedCombat() > 0)
+				{
+					m_piGSTechPriority[iTechLoop]++;
+					if (bSeekingConquestVictory)
+					{
+						m_piGSTechPriority[iTechLoop]++;
+					}
+				}
+				if (pkUnitInfo->IsFound() || pkUnitInfo->IsFoundAbroad() || pkUnitInfo->IsFoundMid() || pkUnitInfo->IsFoundLate())
+				{
+					m_piGSTechPriority[iTechLoop]++;
+				}
+				if (bSeekingScienceVictory && pkUnitInfo->GetSpaceshipProject() != NO_PROJECT)
+				{
+					m_piGSTechPriority[iTechLoop]++;
 				}
 
 			}
@@ -1312,7 +1376,15 @@ bool CvPlayerTechs::CanEverResearch(TechTypes eTech) const
 	{
 		return false;
 	}
-
+#if defined(MOD_ERA_RESTRICTION)
+	if(MOD_ERA_RESTRICTION)
+	{
+		if(GET_TEAM(m_pPlayer->getTeam()).GetCurrentEra() < pkTechInfo->GetEra())
+		{
+			return false;
+		}
+	}
+#endif
 	ICvEngineScriptSystem1* pkScriptSystem = gDLL->GetScriptSystem();
 	if(pkScriptSystem)
 	{
@@ -1692,6 +1764,13 @@ int CvPlayerTechs::GetResearchCost(TechTypes eTech) const
 	else
 		iResearchCost = (iResearchCost / 100);
 
+#if defined(MOD_BALANCE_CORE)
+	if(iResearchCost >= MAX_INT)
+	{
+		iResearchCost = (MAX_INT - 1);
+	}
+#endif
+
 	return iResearchCost;
 }
 
@@ -1765,9 +1844,9 @@ void CvPlayerTechs::AddFlavorAsStrategies(int iPropagatePercent)
 	}
 
 	// Now populate the AI with the current flavor information
-#if defined (MOD_AI_SMART_TECH_GAME_PROGRESS_UPDATED_WITH_DIFFICULTY)
+#if defined(MOD_AI_SMART_V3)
 	int iDifficultyBonus = (200 - ((GC.getGame().getHandicapInfo().getAIGrowthPercent() + GC.getGame().getHandicapInfo().getAITrainPercent()) / 2));
-	int estimatedTurnsWithDiff = (GC.getGame().getDefaultEstimateEndTurn() * 90) / iDifficultyBonus;
+	int estimatedTurnsWithDiff = MOD_AI_SMART_V3 ? (GC.getGame().getDefaultEstimateEndTurn() * 90) / iDifficultyBonus : GC.getGame().getDefaultEstimateEndTurn();
 	int iGameProgressFactor = (GC.getGame().getElapsedGameTurns() * 1000) / estimatedTurnsWithDiff;
 #else
 	int iGameProgressFactor = (GC.getGame().getElapsedGameTurns() * 1000) / GC.getGame().getDefaultEstimateEndTurn();
@@ -1780,21 +1859,26 @@ void CvPlayerTechs::AddFlavorAsStrategies(int iPropagatePercent)
 		// Scale the current to the same scale as the personality
 		iCurrentFlavorValue = (iCurrentFlavorValue * 10) / iBiggestFlavor;
 
+#if defined(MOD_AI_SMART_V3)
+		int iPersonalityFlavorValue = m_pPlayer->GetGrandStrategyAI()->GetPersonalityAndGrandStrategy((FlavorTypes) iFlavor, MOD_AI_SMART_V3 /*bBoostGSMainFlavor*/);
+#else
 		int iPersonalityFlavorValue = m_pPlayer->GetGrandStrategyAI()->GetPersonalityAndGrandStrategy((FlavorTypes) iFlavor);
+#endif
 
 		// this should give a more even blend between the personality and long term strategy and the more fickle current needs
 		// in the beginning of the game it will be responsive to current events, but later it should try to go for the goal more strongly
 		int iFlavorValue = ((iCurrentFlavorValue * (1000 - iGameProgressFactor)) + (iPersonalityFlavorValue * iGameProgressFactor)) / 1000;
 
-#if defined (MOD_AI_SMART_TECH_FLAVOR_MINIMUM_VALUES)
+#if defined(MOD_AI_SMART_V3)
 		// Try always give a significant flavor, as is easily zeroed with previous computations...
-		if (iFlavorValue < 10)
+		if (MOD_AI_SMART_V3 && iFlavorValue < 10)
 		{
 			int flavorDivisor = (iGameProgressFactor > 500) ? 8 : 4;
 			int boostValue = (10 - iFlavorValue) / flavorDivisor;
 			iFlavorValue += boostValue;
 		}
 #endif
+
 		if(iFlavorValue > 0)
 		{
 			m_pTechAI->AddFlavorWeights((FlavorTypes)iFlavor, iFlavorValue, iPropagatePercent);
@@ -1860,6 +1944,9 @@ CvTeamTechs::CvTeamTechs():
 	m_pabHasTech(NULL),
 	m_pabNoTradeTech(NULL),
 	m_paiResearchProgress(NULL),
+#if defined(MOD_CIV6_EUREKA)
+	m_paiEurekaCounter(NULL),
+#endif
 	m_paiTechCount(NULL)
 {
 }
@@ -1883,6 +1970,10 @@ void CvTeamTechs::Init(CvTechXMLEntries* pTechs, CvTeam* pTeam)
 	m_pabNoTradeTech = FNEW(bool[m_pTechs->GetNumTechs()], c_eCiv5GameplayDLL, 0);
 	CvAssertMsg(m_paiResearchProgress==NULL, "about to leak memory, CvTeamTechs::m_paiResearchProgress");
 	m_paiResearchProgress = FNEW(int [m_pTechs->GetNumTechs()], c_eCiv5GameplayDLL, 0);
+#if defined(MOD_CIV6_EUREKA)
+	CvAssertMsg(m_paiEurekaCounter == NULL, "about to leak memory, CvTeamTechs::m_paiEurekaCounter");
+	m_paiEurekaCounter = FNEW(int[m_pTechs->GetNumTechs()], c_eCiv5GameplayDLL, 0);
+#endif
 	CvAssertMsg(m_paiTechCount==NULL, "about to leak memory, CvTeamTechs::m_paiTechCount");
 	m_paiTechCount = FNEW(int [m_pTechs->GetNumTechs()], c_eCiv5GameplayDLL, 0);
 
@@ -1895,6 +1986,9 @@ void CvTeamTechs::Uninit()
 	SAFE_DELETE_ARRAY(m_pabHasTech);
 	SAFE_DELETE_ARRAY(m_pabNoTradeTech);
 	SAFE_DELETE_ARRAY(m_paiResearchProgress);
+#if defined(MOD_CIV6_EUREKA)
+	SAFE_DELETE_ARRAY(m_paiEurekaCounter);
+#endif
 	SAFE_DELETE_ARRAY(m_paiTechCount);
 }
 
@@ -1910,6 +2004,9 @@ void CvTeamTechs::Reset()
 		m_pabHasTech[iI] = false;
 		m_pabNoTradeTech[iI] = false;
 		m_paiResearchProgress[iI] = 0;
+#if defined(MOD_CIV6_EUREKA)
+		m_paiEurekaCounter[iI] = 0;
+#endif
 		m_paiTechCount[iI] = 0;
 	}
 }
@@ -1941,6 +2038,9 @@ void CvTeamTechs::Read(FDataStream& kStream)
 		CvInfosSerializationHelper::ReadAndRemapDataArray(kStream, iNumSavedTechs, m_pabHasTech, iNumActiveTechs, paTechIDs);
 		CvInfosSerializationHelper::ReadAndRemapDataArray(kStream, iNumSavedTechs, m_pabNoTradeTech, iNumActiveTechs, paTechIDs);
 		CvInfosSerializationHelper::ReadAndRemapDataArray(kStream, iNumSavedTechs, m_paiResearchProgress, iNumActiveTechs, paTechIDs);
+#if defined(MOD_CIV6_EUREKA)
+		CvInfosSerializationHelper::ReadAndRemapDataArray(kStream, iNumSavedTechs, m_paiEurekaCounter, iNumActiveTechs, paTechIDs);
+#endif
 		CvInfosSerializationHelper::ReadAndRemapDataArray(kStream, iNumSavedTechs, m_paiTechCount, iNumActiveTechs, paTechIDs);
 
 		_freea(paTechIDs);
@@ -1970,6 +2070,9 @@ void CvTeamTechs::Write(FDataStream& kStream)
 		kStream << ArrayWrapper<bool>(iNumTechs, m_pabHasTech);
 		kStream << ArrayWrapper<bool>(iNumTechs, m_pabNoTradeTech);
 		kStream << ArrayWrapper<int>(iNumTechs, m_paiResearchProgress);
+#if defined(MOD_CIV6_EUREKA)
+		kStream << ArrayWrapper<int>(iNumTechs, m_paiEurekaCounter);
+#endif
 		kStream << ArrayWrapper<int>(iNumTechs, m_paiTechCount);
 	}
 	else
@@ -2267,8 +2370,26 @@ int CvTeamTechs::GetResearchCost(TechTypes eTech) const
 	iCost *= std::max(0, ((GC.getTECH_COST_EXTRA_TEAM_MEMBER_MODIFIER() * (m_pTeam->getNumMembers() - 1)) + 100));
 	iCost /= 100;
 
+#if defined(MOD_CIV6_EUREKA)
+	iCost *= std::max(0, (1000000 - (pkTechInfo->GetEurekaPerMillion() * m_paiEurekaCounter[eTech]) / max(1, m_pTeam->getNumMembers())) / 10000);
+	iCost /= 100;
+#endif
+
 	return std::max(1, iCost);
 }
+
+#if defined(MOD_CIV6_EUREKA)
+int CvTeamTechs::GetEurekaDiscount(TechTypes eTech) const
+{
+	CvAssertMsg(eTech != NO_TECH, "Tech is not assigned a valid value");
+	CvTechEntry* pkTechInfo = GC.getTechInfo(eTech);
+	if (pkTechInfo == NULL)
+	{
+		return 0;
+	}
+	return std::max(0, (1000000 - pkTechInfo->GetEurekaPerMillion() * m_paiEurekaCounter[eTech]) / 10000);
+}
+#endif
 
 /// Accessor: how many beakers of research to go for this tech?
 int CvTeamTechs::GetResearchLeft(TechTypes eTech) const
@@ -2346,6 +2467,28 @@ int CvTeamTechs::GetMaxResearchOverflow(TechTypes eTech, PlayerTypes ePlayer) co
 
 	return iReturnValue;
 }
+
+
+#if defined(MOD_CIV6_EUREKA)
+int CvTeamTechs::GetEurekaCounter(TechTypes eTech) const
+{
+	if (eTech != NO_TECH)
+	{
+		return m_paiEurekaCounter[eTech];
+	}
+	else
+	{
+		return 0;
+	}
+}
+void CvTeamTechs::SetEurekaCounter(TechTypes eTech, int newEurakaCount)
+{
+	if (eTech != NO_TECH)
+	{
+		m_paiEurekaCounter[eTech] = newEurakaCount;
+	}
+}
+#endif
 
 #if defined(MOD_DIPLOMACY_CIV4_FEATURES)
 /// Can you permit vassalage to be traded?

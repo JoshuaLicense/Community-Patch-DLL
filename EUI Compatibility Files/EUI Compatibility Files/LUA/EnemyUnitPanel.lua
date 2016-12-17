@@ -479,7 +479,13 @@ function UpdateCombatOddsUnitVsCity(pMyUnit, pCity)
 				controlTable.Text:LocalizeAndSetText( "TXT_KEY_EUPANEL_CITY_SAPPED" );
 				controlTable.Value:SetText( GetFormattedText(strText, iModifier, true, true) );
 			end
-
+			-- Conquest of the World
+			iModifier = pMyPlayer:GetTraitConquestOfTheWorldCityAttackMod(pPlot);
+			if (iModifier ~= 0 and pMyPlayer:IsGoldenAge()) then
+				controlTable = g_MyCombatDataIM:GetInstance();
+				controlTable.Text:LocalizeAndSetText(  "TXT_KEY_EUPANEL_BONUS_CONQUEST_OF_WORLD" );
+				controlTable.Value:SetText( GetFormattedText(strText, iModifier, true, true) );
+			end
 			-- Blockaded
 			if (pCity:IsBlockadedTest()) then
 				iModifier = (GameDefines["SAPPED_CITY_ATTACK_MODIFIER"] / 2);
@@ -496,7 +502,15 @@ function UpdateCombatOddsUnitVsCity(pMyUnit, pCity)
 
 			-- COMMUNITY (Bushido)
 			if (pMyPlayer:GetWoundedUnitDamageMod() ~= 0) then
-			   iModifier = (pMyUnit:GetDamage() / 10);
+				iModifier = pMyUnit:GetDamage() / 5;
+			    if (iModifier ~= 0) then
+				   controlTable = g_MyCombatDataIM:GetInstance();
+				   controlTable.Text:LocalizeAndSetText( "TXT_KEY_EUPANEL_BUSHIDO" );
+				   controlTable.Value:SetText( GetFormattedText(strText, iModifier, true, true) );
+				end
+			end
+			if (pMyUnit:IsStrongerDamaged()) then
+				iModifier = pMyUnit:GetDamage() / 3;
 			    if (iModifier ~= 0) then
 				   controlTable = g_MyCombatDataIM:GetInstance();
 				   controlTable.Text:LocalizeAndSetText( "TXT_KEY_EUPANEL_BUSHIDO" );
@@ -557,6 +571,14 @@ function UpdateCombatOddsUnitVsCity(pMyUnit, pCity)
 					controlTable.Value:SetText( GetFormattedText(strText, iModifier, true, true) );
 				end
 			end
+
+			-- Attack Modifier
+			iModifier = pMyUnit:GetAttackModifier();
+			if (iModifier ~= 0) then
+				controlTable = g_MyCombatDataIM:GetInstance();
+				controlTable.Text:LocalizeAndSetText( "TXT_KEY_EUPANEL_ATTACK_MOD_BONUS" );
+				controlTable.Value:SetText( GetFormattedText(strText, iModifier, true, true) );
+			end
 			
 			-- Great General bonus
 			if (pMyUnit:IsNearGreatGeneral()) then
@@ -601,7 +623,13 @@ function UpdateCombatOddsUnitVsCity(pMyUnit, pCity)
 				controlTable.Text:LocalizeAndSetText( "TXT_KEY_EUPANEL_IMPROVEMENT_NEAR" );
 				controlTable.Value:SetText( GetFormattedText(strText, iModifier, true, true) );
 			end
-
+			-- Nearby UnitClass modifier
+			if (pMyUnit:GetNearbyUnitClassModifierFromUnitClass(pFromPlot) ~= 0) then
+				iModifier = pMyUnit:GetNearbyUnitClassModifierFromUnitClass(pFromPlot);
+				controlTable = g_MyCombatDataIM:GetInstance();
+				controlTable.Text:LocalizeAndSetText( "TXT_KEY_EUPANEL_UNITCLASS_NEAR" );
+				controlTable.Value:SetText( GetFormattedText(strText, iModifier, true, true) );
+			end
 			-- Empire Unhappy
 			iModifier = pMyUnit:GetUnhappinessCombatPenalty();
 			if (iModifier ~= 0) then
@@ -940,6 +968,13 @@ function UpdateCombatOddsUnitVsUnit(pMyUnit, pTheirUnit)
 				controlTable.Text:LocalizeAndSetText( "TXT_KEY_EUPANEL_IMPROVEMENT_NEAR" );
 				controlTable.Value:SetText( GetFormattedText(strText, iModifier, true, true) );
 			end
+			-- Nearby UnitClass modifier
+			if (pMyUnit:GetNearbyUnitClassModifierFromUnitClass(pFromPlot) ~= 0) then
+				iModifier = pMyUnit:GetNearbyUnitClassModifierFromUnitClass(pFromPlot);
+				controlTable = g_MyCombatDataIM:GetInstance();
+				controlTable.Text:LocalizeAndSetText( "TXT_KEY_EUPANEL_UNITCLASS_NEAR" );
+				controlTable.Value:SetText( GetFormattedText(strText, iModifier, true, true) );
+			end
 			
 			-- Policy Attack bonus
 			local iTurns = pMyPlayer:GetAttackBonusTurns();
@@ -977,7 +1012,15 @@ function UpdateCombatOddsUnitVsUnit(pMyUnit, pTheirUnit)
 
 			-- COMMUNITY (Bushido)
 			if (pMyPlayer:GetWoundedUnitDamageMod() ~= 0) then
-			   iModifier = (pMyUnit:GetDamage() / 10);
+			   iModifier =  pMyUnit:GetDamage() / 5;
+			    if (iModifier ~= 0) then
+				   controlTable = g_MyCombatDataIM:GetInstance();
+				   controlTable.Text:LocalizeAndSetText( "TXT_KEY_EUPANEL_BUSHIDO" );
+				   controlTable.Value:SetText( GetFormattedText(strText, iModifier, true, true) );
+				end
+			end
+			if (pMyUnit:IsStrongerDamaged()) then
+			   iModifier = pMyUnit:GetDamage() / 3;
 			    if (iModifier ~= 0) then
 				   controlTable = g_MyCombatDataIM:GetInstance();
 				   controlTable.Text:LocalizeAndSetText( "TXT_KEY_EUPANEL_BUSHIDO" );
@@ -1418,8 +1461,16 @@ function UpdateCombatOddsUnitVsUnit(pMyUnit, pTheirUnit)
 
 			-- COMMUNITY (Bushido)
 				if (pTheirPlayer:GetWoundedUnitDamageMod() ~= 0) then
-				   iModifier = (pTheirUnit:GetDamage() / 10);
+				   iModifier = pTheirUnit:GetDamage() / 5;
 				   if (iModifier ~= 0) then
+					   controlTable = g_TheirCombatDataIM:GetInstance();
+					   controlTable.Text:LocalizeAndSetText( "TXT_KEY_EUPANEL_BUSHIDO" );
+					   controlTable.Value:SetText( GetFormattedText(strText, iModifier, false, true) );
+					end
+				end
+				if (pTheirUnit:IsStrongerDamaged()) then
+				   iModifier =  pTheirUnit:GetDamage() / 3;
+					if (iModifier ~= 0) then
 					   controlTable = g_TheirCombatDataIM:GetInstance();
 					   controlTable.Text:LocalizeAndSetText( "TXT_KEY_EUPANEL_BUSHIDO" );
 					   controlTable.Value:SetText( GetFormattedText(strText, iModifier, false, true) );
@@ -1534,6 +1585,13 @@ function UpdateCombatOddsUnitVsUnit(pMyUnit, pTheirUnit)
 					controlTable = g_TheirCombatDataIM:GetInstance();
 					controlTable.Text:LocalizeAndSetText( "TXT_KEY_EUPANEL_IMPROVEMENT_NEAR" );
 					controlTable.Value:SetText( GetFormattedText(strText, iModifier, false, true) );
+				end
+				-- Nearby UnitClass modifier
+				if (pTheirUnit:GetNearbyUnitClassModifierFromUnitClass(pToPlot) ~= 0) then
+					iModifier = pTheirUnit:GetNearbyUnitClassModifierFromUnitClass(pToPlot);
+					controlTable = g_TheirCombatDataIM:GetInstance();
+					controlTable.Text:LocalizeAndSetText( "TXT_KEY_EUPANEL_UNITCLASS_NEAR" );
+					controlTable.Value:SetText( GetFormattedText(strText, iModifier, true, true) );
 				end
 				
 				-- Flanking bonus
@@ -1939,7 +1997,7 @@ function UpdateCombatOddsCityVsUnit(myCity, theirUnit)
 		
 		local theirPlayerID = theirUnit:GetOwner();
 		local theirPlayer = Players[theirPlayerID];
-		
+		local myPlot = myCity:Plot();
 		local theirPlot = theirUnit:GetPlot();
 		
 		-- Empire Unhappy
@@ -2218,7 +2276,15 @@ function UpdateCombatOddsCityVsUnit(myCity, theirUnit)
 			controlTable.Text:LocalizeAndSetText( "TXT_KEY_EUPANEL_CITY_SAPPED" );
 			controlTable.Value:SetText( GetFormattedText(strText, iModifier, false, true) );
 		end
-		
+		-- Conquest of the World
+		if myPlot ~= nil then
+			iModifier = theirPlayer:GetTraitConquestOfTheWorldCityAttackMod(myPlot);
+			if (iModifier ~= 0 and theirPlayer:IsGoldenAge()) then
+				controlTable = g_MyCombatDataIM:GetInstance();
+				controlTable.Text:LocalizeAndSetText(  "TXT_KEY_EUPANEL_BONUS_CONQUEST_OF_WORLD" );
+				controlTable.Value:SetText( GetFormattedText(strText, iModifier, true, true) );
+			end
+		end
 		-- Civ Trait Bonus
 		iModifier = theirPlayer:GetTraitGoldenAgeCombatModifier();
 		if (iModifier ~= 0 and theirPlayer:IsGoldenAge()) then

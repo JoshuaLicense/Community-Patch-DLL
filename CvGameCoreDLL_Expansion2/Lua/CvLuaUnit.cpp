@@ -197,6 +197,9 @@ void CvLuaUnit::PushMethods(lua_State* L, int t)
 	Method(CanBuildRoute);
 	Method(GetBuildType);
 	Method(WorkRate);
+#if defined(MOD_CIV6_WORKER)
+	Method(GetBuilderStrength);
+#endif
 
 	Method(IsNoBadGoodies);
 	Method(IsOnlyDefensive);
@@ -210,7 +213,11 @@ void CvLuaUnit::PushMethods(lua_State* L, int t)
 	Method(IsWork);
 	Method(IsGoldenAge);
 	Method(CanCoexistWithEnemyUnit);
-
+#if defined(MOD_BALANCE_CORE)
+	Method(IsContractUnit);
+	Method(IsSpecificContractUnit);
+	Method(GetContractUnit);
+#endif
 	Method(IsGreatPerson);
 
 	Method(IsFighting);
@@ -315,6 +322,9 @@ void CvLuaUnit::PushMethods(lua_State* L, int t)
 #if defined(MOD_API_LUA_EXTENSIONS) && defined(MOD_PROMOTIONS_CROSS_ICE)
 	Method(CanCrossIce);
 #endif
+#if defined(MOD_API_LUA_EXTENSIONS) && defined(MOD_PROMOTIONS_GG_FROM_BARBARIANS)
+	Method(IsGGFromBarbarians);
+#endif
 	Method(IsNeverInvisible);
 	Method(IsInvisible);
 	Method(IsNukeImmune);
@@ -352,6 +362,7 @@ void CvLuaUnit::PushMethods(lua_State* L, int t)
 	Method(UnitCombatModifier);
 #if defined(MOD_BALANCE_CORE)
 	Method(IsMounted);
+	Method(IsStrongerDamaged);
 	Method(BarbarianCombatBonus);
 #endif
 	Method(DomainModifier);
@@ -493,9 +504,14 @@ void CvLuaUnit::PushMethods(lua_State* L, int t)
 	Method(IsIgnoreGreatGeneralBenefit);
 	Method(GetReverseGreatGeneralModifier);
 	Method(GetGreatGeneralCombatModifier);
+#if defined(MOD_API_LUA_EXTENSIONS) && defined(MOD_PROMOTIONS_AURA_CHANGE)
+	Method(GetAuraRange);
+	Method(GetAuraEffect);
+#endif
 	Method(IsNearSapper);
 #if defined(MOD_BALANCE_CORE)
 	Method(IsHalfNearSapper);
+	Method(GetNearbyUnitClassModifierFromUnitClass);
 #endif
 	Method(GetNearbyImprovementModifier);
 	Method(IsFriendlyUnitAdjacent);
@@ -1439,15 +1455,11 @@ int CvLuaUnit::lGetCombatVersusOtherReligionOwnLands(lua_State* L)
 	if(pkUnit && pkOtherUnit)
 	{
 		CvGameReligions* pReligions = GC.getGame().GetGameReligions();
-		ReligionTypes eFoundedReligion = GC.getGame().GetGameReligions()->GetFounderBenefitsReligion(pkUnit->getOwner());
-		if(eFoundedReligion == NO_RELIGION)
-		{
-			eFoundedReligion = GET_PLAYER(pkUnit->getOwner()).GetReligions()->GetReligionCreatedByPlayer();
-		}
+		ReligionTypes eFoundedReligion = GET_PLAYER(pkUnit->getOwner()).GetReligions()->GetReligionCreatedByPlayer();
 		ReligionTypes eTheirReligion = GC.getGame().GetGameReligions()->GetFounderBenefitsReligion(pkOtherUnit->getOwner());
 		if(eTheirReligion == NO_RELIGION)
 		{
-			eTheirReligion = GET_PLAYER(pkOtherUnit->getOwner()).GetReligions()->GetReligionCreatedByPlayer();
+			eTheirReligion = GET_PLAYER(pkOtherUnit->getOwner()).GetReligions()->GetReligionInMostCities();
 		} 
 		if(eFoundedReligion != NO_RELIGION && eTheirReligion != NO_RELIGION)
 		{
@@ -2054,7 +2066,7 @@ int CvLuaUnit::lGetUnitCombatType(lua_State* L)
 {
 	CvUnit* pkUnit = GetInstance(L);
 
-	const UnitCombatTypes eResult = pkUnit->getUnitCombatType();
+	const UnitCombatTypes eResult = (UnitCombatTypes)pkUnit->getUnitCombatType();
 	lua_pushinteger(L, eResult);
 	return 1;
 }
@@ -2262,6 +2274,18 @@ int CvLuaUnit::lWorkRate(lua_State* L)
 	lua_pushinteger(L, iResult);
 	return 1;
 }
+#if defined(MOD_CIV6_WORKER)
+//------------------------------------------------------------------------------
+//int getBuilderStrength();
+int CvLuaUnit::lGetBuilderStrength(lua_State* L)
+{
+	CvUnit* pkUnit = GetInstance(L);
+
+	const int iResult = pkUnit->getBuilderStrength();
+	lua_pushinteger(L, iResult);
+	return 1;
+}
+#endif
 //------------------------------------------------------------------------------
 //bool isNoBadGoodies();
 int CvLuaUnit::lIsNoBadGoodies(lua_State* L)
@@ -2355,6 +2379,37 @@ int CvLuaUnit::lCanCoexistWithEnemyUnit(lua_State* L)
 	lua_pushboolean(L, bResult);
 	return 1;
 }
+#if defined(MOD_BALANCE_CORE)
+//------------------------------------------------------------------------------
+//bool IsContractUnit
+int CvLuaUnit::lIsContractUnit(lua_State* L)
+{
+	CvUnit* pkUnit = GetInstance(L);
+	const bool bResult = pkUnit->isContractUnit();
+
+	lua_pushboolean(L, bResult);
+	return 1;
+}
+//------------------------------------------------------------------------------
+//bool IsSpecificContractUnit
+int CvLuaUnit::lIsSpecificContractUnit(lua_State* L)
+{
+	CvUnit* pkUnit = GetInstance(L);
+	ContractTypes eContract = (ContractTypes)lua_tointeger(L, 2);
+	const bool bResult = (pkUnit->getContract() == eContract);
+
+	lua_pushboolean(L, bResult);
+	return 1;
+}
+//------------------------------------------------------------------------------
+int CvLuaUnit::lGetContractUnit(lua_State* L)
+{
+	CvUnit* pkUnit = GetInstance(L);
+	const ContractTypes eResult = pkUnit->getContract();
+	lua_pushinteger(L, eResult);
+	return 1;
+}
+#endif
 //------------------------------------------------------------------------------
 //bool IsGreatPerson();
 int CvLuaUnit::lIsGreatPerson(lua_State* L)
@@ -3018,7 +3073,7 @@ int CvLuaUnit::lIsRanged(lua_State* L)
 //------------------------------------------------------------------------------
 int CvLuaUnit::lIsMustSetUpToRangedAttack(lua_State* L)
 {
-	return BasicLuaMethod(L, &CvUnit::isMustSetUpToRangedAttack);
+	return BasicLuaMethod(L, &CvUnit::isSlowInEnemyLand); //note that this promotion has been redefined
 }
 //------------------------------------------------------------------------------
 int CvLuaUnit::lCanSetUpForRangedAttack(lua_State* L)
@@ -3214,6 +3269,18 @@ int CvLuaUnit::lCanCrossIce(lua_State* L)
 {
 	CvUnit* pkUnit = GetInstance(L);
 	const bool bResult = pkUnit->canCrossIce();
+
+	lua_pushboolean(L, bResult);
+	return 1;
+}
+#endif
+#if defined(MOD_API_LUA_EXTENSIONS) && defined(MOD_PROMOTIONS_GG_FROM_BARBARIANS)
+//------------------------------------------------------------------------------
+//bool isGGFromBarbarians();
+int CvLuaUnit::lIsGGFromBarbarians(lua_State* L)
+{
+	CvUnit* pkUnit = GetInstance(L);
+	const bool bResult = pkUnit->isGGFromBarbarians();
 
 	lua_pushboolean(L, bResult);
 	return 1;
@@ -3573,6 +3640,16 @@ int CvLuaUnit::lIsMounted(lua_State* L)
 	lua_pushboolean(L, bResult);
 	return 1;
 }	
+//------------------------------------------------------------------------------
+int CvLuaUnit::lIsStrongerDamaged(lua_State* L)
+{
+	CvUnit* pkUnit = GetInstance(L);
+
+	const bool bResult = pkUnit->IsStrongerDamaged();
+
+	lua_pushboolean(L, bResult);
+	return 1;
+}
 #endif
 //------------------------------------------------------------------------------
 //int domainModifier(int /*DomainTypes*/ eDomain);
@@ -4740,9 +4817,17 @@ int CvLuaUnit::lIsNearGreatGeneral(lua_State* L)
 {
 	CvUnit* pkUnit = GetInstance(L);
 
+#if defined(MOD_PROMOTIONS_AURA_CHANGE)
+	int iAuraEffectChange = 0;
+	const bool bResult = pkUnit->IsNearGreatGeneral(iAuraEffectChange);
+	lua_pushboolean(L, bResult);
+	lua_pushinteger(L, iAuraEffectChange);
+	return 2;
+#else
 	const bool bResult = pkUnit->IsNearGreatGeneral();
 	lua_pushboolean(L, bResult);
 	return 1;
+#endif
 }
 //------------------------------------------------------------------------------
 //bool IsStackedGreatGeneral();
@@ -4784,6 +4869,30 @@ int CvLuaUnit::lGetGreatGeneralCombatModifier(lua_State* L)
 	lua_pushinteger(L, bResult);
 	return 1;
 }
+#if defined(MOD_API_LUA_EXTENSIONS) && defined(MOD_PROMOTIONS_AURA_CHANGE)
+//------------------------------------------------------------------------------
+//int GetAuraRange();
+int CvLuaUnit::lGetAuraRange(lua_State* L)
+{
+	CvUnit* pkUnit = GetInstance(L);
+
+	const int iResult = GC.getGREAT_GENERAL_RANGE() + pkUnit->GetAuraRangeChange();
+	lua_pushinteger(L, iResult);
+	return 1;
+}
+//------------------------------------------------------------------------------
+//int GetAuraEffect();
+int CvLuaUnit::lGetAuraEffect(lua_State* L)
+{
+	CvUnit* pkUnit = GetInstance(L);
+
+	CvPlayerAI& kPlayer = GET_PLAYER(pkUnit->getOwner());
+
+	const int iResult = kPlayer.GetGreatGeneralCombatBonus() + kPlayer.GetPlayerTraits()->GetGreatGeneralExtraBonus() + pkUnit->GetAuraEffectChange();
+	lua_pushinteger(L, iResult);
+	return 1;
+}
+#endif
 //------------------------------------------------------------------------------
 //bool IsNearSapper(CvCity* pTargetCity);
 int CvLuaUnit::lIsNearSapper(lua_State* L)
@@ -4805,6 +4914,14 @@ int CvLuaUnit::lIsHalfNearSapper(lua_State* L)
 
 	const bool bResult = pkUnit->IsHalfNearSapper(pkCity);
 	lua_pushboolean(L, bResult);
+	return 1;
+}
+//bool GetNearbyUnitClassModifierFromUnitClass();
+int CvLuaUnit::lGetNearbyUnitClassModifierFromUnitClass(lua_State* L)
+{
+	CvUnit* pkUnit = GetInstance(L);
+	const int bResult = pkUnit->GetNearbyUnitClassModifierFromUnitClass(pkUnit->plot());
+	lua_pushinteger(L, bResult);
 	return 1;
 }
 #endif
@@ -4848,7 +4965,7 @@ int CvLuaUnit::lGetNumEnemyUnitsAdjacent(lua_State* L)
 int CvLuaUnit::lGetTransportUnit(lua_State* L)
 {
 	CvUnit* pkUnit = GetInstance(L);
-	UnitHandle pkTransportUnit = pkUnit->getTransportUnit();
+	CvUnit* pkTransportUnit = pkUnit->getTransportUnit();
 
 	CvLuaUnit::Push(L, pkTransportUnit);
 	return 1;
@@ -5217,35 +5334,7 @@ int CvLuaUnit::lSetSpreadsLeft(lua_State* L)
 int CvLuaUnit::lGetTourismBlastStrength(lua_State* L)
 {
 	CvUnit* pkUnit = GetInstance(L);
-#if defined(MOD_BALANCE_CORE)
-	if(MOD_BALANCE_CORE_NEW_GP_ATTRIBUTES && pkUnit && pkUnit->GetTourismBlastStrength() > 0)
-	{
-		CvPlayer &kUnitOwner = GET_PLAYER(pkUnit->getOwner());
-		PlayerTypes eOwner = pkUnit->plot()->getOwner();
 
-		if (eOwner != NO_PLAYER)
-		{
-			InfluenceLevelTypes eLevel = kUnitOwner.GetCulture()->GetInfluenceLevel(eOwner);
-			if(eLevel <= INFLUENCE_LEVEL_EXOTIC)
-			{
-				int iTourismNeededForFamiliar = GC.getCULTURE_LEVEL_FAMILIAR() + 2;
-				int iInfluenceOn = kUnitOwner.GetCulture()->GetInfluenceOn(eOwner);
-				int iLifetimeCulture = GET_PLAYER(eOwner).GetJONSCultureEverGenerated();
-				int iTourismDifference = 0;
-
-				//Get % needed for Familiarity
-				if (iTourismNeededForFamiliar > 0)
-				{
-					iTourismDifference = (iLifetimeCulture * iTourismNeededForFamiliar) / 100;
-				}
-				//Subtract existing %
-				iTourismDifference -= iInfluenceOn;
-				lua_pushinteger(L, iTourismDifference);
-				return 1;
-			}
-		}
-	}
-#endif
 	int iStrength = pkUnit->GetTourismBlastStrength();
 
 	lua_pushinteger(L, iStrength);
@@ -5653,7 +5742,14 @@ int CvLuaUnit::lGetAIOperationInfo(lua_State* L)
 		}
 	}
 
-	lua_pushstring(L, "no operation");
+	if (pUnit->IsCombatUnit())
+	{
+		CvString msg = pUnit->getTacticalZoneInfo();
+		lua_pushstring(L, msg.c_str());
+	}
+	else
+		lua_pushstring(L, "");
+
 	return 1;
 }
 

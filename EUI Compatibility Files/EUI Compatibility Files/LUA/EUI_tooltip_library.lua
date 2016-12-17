@@ -487,6 +487,19 @@ local function GetHelpTextForUnit( unitID ) -- isIncludeRequirementsInfo )
 	return AddPreWrittenHelpTextAndConcat( tips, unit )
 end
 
+-- ===========================================================================
+-- Help text for Corp
+-- ===========================================================================
+local function GetHelpTextForCorp( corpID )
+	local corp = GameInfo.Corporations[ corpID ]
+
+	-- Name
+	local tips = table( Locale_ToUpper( corp.Description ), "----------------" )
+
+	-- Pre-written Help text
+	return AddPreWrittenHelpTextAndConcat( tips, corp )
+end
+
 
 -------------------------------------------------
 -- Help text for Buildings
@@ -705,9 +718,8 @@ local function GetHelpTextForBuilding( buildingID, bExcludeName, bExcludeHeader,
 					
 				yieldChange = yieldChange + city:GetReligionBuildingYieldRateModifier(buildingClassID, yieldID)
 				
-				local corporatechange = Game.GetBuildingCorporateYieldChange( buildingID, yieldID )
-				if (corporatechange > 0) then
-					corporatechange = city:GetCorporationYieldChange(yieldID)
+				if (city) then
+					local corporatechange = city:GetBuildingYieldChangeFromCorporationFranchises(buildingClassID, yieldID)
 					if(corporatechange > 0) then
 						yieldChange = yieldChange + corporatechange
 					end
@@ -841,9 +853,11 @@ local function GetHelpTextForBuilding( buildingID, bExcludeName, bExcludeHeader,
 
 -- CBP -- Global Average Modifiers
 	if(tips and Game and buildingID) then
-		local iCorpGPChange = building.CorporationGPChange;
-		if iCorpGPChange ~=0 then
-			tips:insert( L( "TXT_KEY_PEDIA_CORP_GP_CHANGE", iCorpGPChange))
+		if(city and building.GPRateModifierPerXFranchises ~= 0) then
+			local iCorpGPChange = city:GetGPRateModifierPerXFranchises();
+			if iCorpGPChange ~=0 then
+				tips:insert( L( "TXT_KEY_PEDIA_CORP_GP_CHANGE", iCorpGPChange))
+			end
 		end
 		
 		local iGetPovertyHappinessChangeBuilding = Game.GetPovertyHappinessChangeBuilding( buildingID)
@@ -1000,9 +1014,9 @@ local function GetHelpTextForBuilding( buildingID, bExcludeName, bExcludeHeader,
 			tips:insertIf( resource and (row.Quantity or 0)~=0 and S("%s: %+i%s", L(resource.Description), row.Quantity, tostring(resource.IconString) ) )
 		end
 -- CBP
-		for row in GameInfo.Building_CorporationResourceQuantity( thisBuildingType ) do
+		for row in GameInfo.Building_ResourceQuantityPerXFranchises( thisBuildingType ) do
 			local resource = GameInfo.Resources[ row.ResourceType ]
-			local amount = city:GetCorporationResourceQuantity(resource)
+			local amount = city:GetResourceQuantityPerXFranchises(resource)
 			tips:insertIf( resource and (amount)~=0 and S("%s: %+i%s", L(resource.Description), tonumber(amount), tostring(resource.IconString) ) )
 		end
 -- END
@@ -1820,7 +1834,7 @@ local function GetYieldTooltip( city, yieldID, baseYield, totalYield, yieldIconS
 	tips:insertLocalizedBulletIfNonZero( "TXT_KEY_YIELD_FROM_CS_ALLIANCE", city:GetBaseYieldRateFromCSAlliance( yieldID ), yieldIconString)
 
 	-- Yield Increase from Corporations
-	tips:insertLocalizedBulletIfNonZero( "TXT_KEY_YIELD_FROM_CORPORATIONS", city:GetCorporationYieldChange( yieldID ), yieldIconString)
+	tips:insertLocalizedBulletIfNonZero( "TXT_KEY_YIELD_FROM_CORPORATIONS", city:GetYieldChangeFromCorporationFranchises( yieldID ), yieldIconString)
 
 	-- Yield Increase from Piety
 	tips:insertLocalizedBulletIfNonZero( "TXT_KEY_YIELD_FROM_PIETY", city:GetReligionYieldRateModifier( yieldID ), yieldIconString)
@@ -1853,9 +1867,11 @@ local function GetYieldTooltip( city, yieldID, baseYield, totalYield, yieldIconS
 	tips:insertLocalizedBulletIfNonZero( "TXT_KEY_YIELD_FROM_EVENTS", city:GetEventCityYield(yieldID), yieldIconString)
 -- END CBP
 -- Base Yield from League Art (CSD)
-	local iYieldFromLeague = city:GetBaseYieldRateFromLeague(YieldTypes.YIELD_SCIENCE);
-	if (iYieldFromLeague ~= 0) then
-		tips:insertLocalizedBulletIfNonZero( "TXT_KEY_SCIENCE_YIELD_FROM_LEAGUE_ART", iYieldFromLeague, yieldIconString)
+	if(yieldID == YieldTypes.YIELD_SCIENCE) then
+		local iYieldFromLeague = city:GetBaseYieldRateFromLeague(yieldID);
+		if (iYieldFromLeague ~= 0) then
+			tips:insertLocalizedBulletIfNonZero( "TXT_KEY_SCIENCE_YIELD_FROM_LEAGUE_ART", iYieldFromLeague, yieldIconString)
+		end
 	end
 -- END
 
@@ -2189,6 +2205,8 @@ local function GetCultureTooltip( city )
 	tips:insertLocalizedBulletIfNonZero( "TXT_KEY_CULTURE_FROM_TRAITS", cultureFromTraits )
 	-- CP EVENT
 	tips:insertLocalizedBulletIfNonZero( "TXT_KEY_CULTURE_FROM_EVENTS", city:GetEventCityYield(YieldTypes.YIELD_CULTURE) )
+
+	tips:insertLocalizedBulletIfNonZero( "TXT_KEY_CULTURE_FROM_CORPORATIONS", city:GetYieldChangeFromCorporationFranchises(YieldTypes.YIELD_CULTURE))
 	-- END
 	-- Base Total
 	if baseCulturePerTurn ~= culturePerTurn then
@@ -2220,7 +2238,7 @@ local function GetCultureTooltip( city )
 -- CBP -- Resource Monopoly
 		tips:insertLocalizedBulletIfNonZero( "TXT_KEY_CULTURE_FROM_RESOURCE_MONOPOLY", city:GetCityYieldModFromMonopoly(YieldTypes.YIELD_CULTURE))
 		
-		tips:insertLocalizedBulletIfNonZero( "TXT_KEY_CULTURE_FROM_CORPORATION", city:GetCorporationYieldModChange(YieldTypes.YIELD_CULTURE))
+		tips:insertLocalizedBulletIfNonZero( "TXT_KEY_CULTURE_FROM_CORPORATION", city:GetTradeRouteCityMod(YieldTypes.YIELD_CULTURE))
 -- END
 	end
 
@@ -2469,7 +2487,17 @@ local function GetReligionTooltip(city)
 							beliefs = {Players[city:GetOwner()]:GetBeliefInPantheon()}
 						end
 						for _,beliefID in pairs( beliefs or {} ) do
-							religionTip = religionTip .. "[NEWLINE][ICON_BULLET]"..L(GameInfo.Beliefs[ beliefID ].Description)
+							if(GameInfo.Beliefs[beliefID].Pantheon) then
+								religionTip = religionTip .. "[NEWLINE][ICON_BULLET] ".. L("TXT_KEY_RO_BELIEF_TYPE_PANTHEON") .. ": " .. L(GameInfo.Beliefs[ beliefID ].Description)
+							elseif(GameInfo.Beliefs[beliefID].Founder) then
+								religionTip = religionTip .. "[NEWLINE][ICON_BULLET] ".. L("TXT_KEY_RO_BELIEF_TYPE_FOUNDER") .. ": " .. L(GameInfo.Beliefs[ beliefID ].Description)
+							elseif(GameInfo.Beliefs[beliefID].Follower) then
+								religionTip = religionTip .. "[NEWLINE][ICON_BULLET] ".. L("TXT_KEY_RO_BELIEF_TYPE_FOLLOWER") .. ": " .. L(GameInfo.Beliefs[ beliefID ].Description)
+							elseif(GameInfo.Beliefs[beliefID].Enhancer) then
+								religionTip = religionTip .. "[NEWLINE][ICON_BULLET] ".. L("TXT_KEY_RO_BELIEF_TYPE_ENHANCER") .. ": " .. L(GameInfo.Beliefs[ beliefID ].Description)
+							elseif(GameInfo.Beliefs[beliefID].Reformation) then
+								religionTip = religionTip .. "[NEWLINE][ICON_BULLET] ".. L("TXT_KEY_RO_BELIEF_TYPE_REFORMATION") .. ": " .. L(GameInfo.Beliefs[ beliefID ].Description)
+							end
 						end
 						tips:insert( 1, religionTip )
 					else
@@ -2546,6 +2574,8 @@ local function GetFaithTooltip( city )
 
 		--CP EVENTS
 		tips:insertLocalizedBulletIfNonZero( "TXT_KEY_FAITH_FROM_EVENTS", city:GetEventCityYield(YieldTypes.YIELD_FAITH) )
+
+		tips:insertLocalizedBulletIfNonZero( "TXT_KEY_FAITH_FROM_CORPORATIONS", city:GetYieldChangeFromCorporationFranchises(YieldTypes.YIELD_FAITH))
 		--END
 
 		-- Puppet modifier
@@ -3184,6 +3214,7 @@ function TT.GetYieldTooltipHelper( ... ) return select(2, pcall( GetYieldTooltip
 function TT.GetYieldTooltip( ... ) return select(2, pcall( GetYieldTooltip, ... ) ) end
 function TT.GetMoodInfo( ... ) return select(2, pcall( GetMoodInfo, ... ) ) end
 --CBP
+function TT.GetHelpTextForCorp( ... ) return select(2, pcall( GetHelpTextForCorp, ... ) ) end
 function TT.GetCityHappinessTooltip( ... ) return select(2, pcall( GetCityHappinessTooltip, ... ) ) end
 --END
 

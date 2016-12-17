@@ -36,7 +36,7 @@ CvDangerPlots::CvDangerPlots(void)
 	m_fMajorAfraidMod = GC.getAI_DANGER_MAJOR_APPROACH_AFRAID();
 	m_fMajorFriendlyMod = GC.getAI_DANGER_MAJOR_APPROACH_FRIENDLY();
 	m_fMajorNeutralMod = GC.getAI_DANGER_MAJOR_APPROACH_NEUTRAL();
-	m_fMinorNeutralrMod = GC.getAI_DANGER_MINOR_APPROACH_NEUTRAL();
+	m_fMinorNeutralMinorMod = GC.getAI_DANGER_MINOR_APPROACH_NEUTRAL();
 	m_fMinorFriendlyMod = GC.getAI_DANGER_MINOR_APPROACH_FRIENDLY();
 	m_fMinorBullyMod = GC.getAI_DANGER_MINOR_APPROACH_BULLY();
 	m_fMinorConquestMod = GC.getAI_DANGER_MINOR_APPROACH_CONQUEST();
@@ -89,22 +89,23 @@ bool CvDangerPlots::UpdateDangerSingleUnit(CvUnit* pLoopUnit, bool bIgnoreVisibi
 
 	//for ranged every plot we can enter with movement left is a base for attack
 	int iMinMovesLeft = pLoopUnit->IsCanAttackRanged() ? 1 : 0;
-	if (pLoopUnit->isMustSetUpToRangedAttack())
-		iMinMovesLeft += GC.getMOVE_DENOMINATOR();
 
 	//specialty for barbarian who won't leave camp
 	if (pLoopUnit->isBarbarian() && pLoopUnit->plot()->getImprovementType()==(ImprovementTypes)GC.getBARBARIAN_CAMP_IMPROVEMENT())
 		iMinMovesLeft = pLoopUnit->getMoves();
 
 	//use the worst case assumption here, no ZOC (all intervening units have been killed)
+	//the IGNORE_DANGER flag is extremely important here, otherwise we can get into endless loops
+	//(when the pathfinder does a lazy danger update)
 	ReachablePlots reachablePlots;
-	TacticalAIHelpers::GetAllPlotsInReach(pLoopUnit,pLoopUnit->plot(),reachablePlots,true,false,false,iMinMovesLeft);
+	int iFlags = CvUnit::MOVEFLAG_IGNORE_STACKING | CvUnit::MOVEFLAG_IGNORE_ZOC | CvUnit::MOVEFLAG_NO_EMBARK | CvUnit::MOVEFLAG_IGNORE_DANGER;
+	TacticalAIHelpers::GetAllPlotsInReachThisTurn(pLoopUnit,pLoopUnit->plot(),reachablePlots,iFlags,iMinMovesLeft,-1,set<int>());
 
 	if (pLoopUnit->IsCanAttackRanged())
 	{
 		//for ranged every tile we can enter with movement left is a base for attack
 		std::set<int> attackableTiles;
-		TacticalAIHelpers::GetPlotsUnderRangedAttackFrom(pLoopUnit,reachablePlots,attackableTiles);
+		TacticalAIHelpers::GetPlotsUnderRangedAttackFrom(pLoopUnit,reachablePlots,attackableTiles,false,false);
 
 		for (std::set<int>::iterator attackTile=attackableTiles.begin(); attackTile!=attackableTiles.end(); ++attackTile)
 		{
@@ -117,7 +118,7 @@ bool CvDangerPlots::UpdateDangerSingleUnit(CvUnit* pLoopUnit, bool bIgnoreVisibi
 		//for melee every tile we can move into can be attacked
 		for (ReachablePlots::iterator moveTile=reachablePlots.begin(); moveTile!=reachablePlots.end(); ++moveTile)
 		{
-			CvPlot* pMoveTile = GC.getMap().plotByIndexUnchecked(moveTile->first);
+			CvPlot* pMoveTile = GC.getMap().plotByIndexUnchecked(moveTile->iPlotIndex);
 			AssignUnitDangerValue(pLoopUnit, pMoveTile);
 		}
 	}
@@ -277,11 +278,11 @@ void CvDangerPlots::UpdateDanger(bool bPretendWarWithAllCivs, bool bIgnoreVisibi
 				CvPlot* pEvalPlot = plotXYWithRangeCheck(pLoopCity->getX(), pLoopCity->getY(), iX, iY, iEvalRange);
 				if (pEvalPlot)
 				{
-					const UnitHandle pEnemy = pEvalPlot->getBestDefender(NO_PLAYER, thisPlayer.GetID(), NULL, true);
+					const CvUnit* pEnemy = pEvalPlot->getBestDefender(NO_PLAYER, thisPlayer.GetID(), NULL, true);
 					if (pEnemy)
 					{
 						int iAttackerDamage = 0; //to be ignored
-						iThreatValue += TacticalAIHelpers::GetSimulatedDamageFromAttackOnCity(pLoopCity,pEnemy.pointer(),iAttackerDamage);
+						iThreatValue += TacticalAIHelpers::GetSimulatedDamageFromAttackOnCity(pLoopCity,pEnemy,pEnemy->plot(),iAttackerDamage);
 					}
 				}
 			}
@@ -326,30 +327,6 @@ int CvDangerPlots::GetDanger(const CvPlot& pPlot, const CvUnit* pUnit, AirAction
 	if (pUnit)
 	{
 		return m_DangerPlots[idx].GetDanger(pUnit, iAirAction);
-	}
-	return m_DangerPlots[idx].GetDanger(NO_PLAYER);
-}
-
-/// Returns if the tile is in danger
-bool CvDangerPlots::IsUnderImmediateThreat(const CvPlot& pPlot, PlayerTypes ePlayer)
-{
-	if(!m_bArrayAllocated)
-		return 0;
-
-	const int idx = pPlot.getX() + pPlot.getY() * GC.getMap().getGridWidth();
-	return m_DangerPlots[idx].IsUnderImmediateThreat(ePlayer);
-}
-
-/// Returns if the unit is in immediate danger
-bool CvDangerPlots::IsUnderImmediateThreat(const CvPlot& pPlot, const CvUnit* pUnit)
-{
-	if(!m_bArrayAllocated)
-		return 0;
-
-	const int idx = pPlot.getX() + pPlot.getY() * GC.getMap().getGridWidth();
-	if (pUnit)
-	{
-		return m_DangerPlots[idx].GetDanger(pUnit) > 0;
 	}
 	return m_DangerPlots[idx].GetDanger(NO_PLAYER);
 }
@@ -445,7 +422,7 @@ bool CvDangerPlots::IsDangerByRelationshipZero(PlayerTypes ePlayer, CvPlot* pPlo
 		switch(GET_PLAYER(m_ePlayer).GetDiplomacyAI()->GetMinorCivApproach(ePlayer))
 		{
 		case MINOR_CIV_APPROACH_IGNORE:
-			bResultMultiplierIsZero = m_fMinorNeutralrMod == 0.f;
+			bResultMultiplierIsZero = m_fMinorNeutralMinorMod == 0.f;
 			bIgnoreInFriendlyTerritory = true;
 			break;
 		case MINOR_CIV_APPROACH_FRIENDLY:
@@ -528,7 +505,7 @@ bool CvDangerPlots::ShouldIgnorePlayer(PlayerTypes ePlayer)
 /// Should this unit be ignored when creating the danger plots?
 bool CvDangerPlots::ShouldIgnoreUnit(CvUnit* pUnit, bool bIgnoreVisibility)
 {
-	if(!m_bArrayAllocated || m_ePlayer==NO_PLAYER)
+	if(!m_bArrayAllocated || m_ePlayer==NO_PLAYER || !pUnit)
 		return true;
 
 	if(!pUnit->IsCanAttack())
@@ -571,14 +548,6 @@ bool CvDangerPlots::ShouldIgnoreUnit(CvUnit* pUnit, bool bIgnoreVisibility)
 		return true;
 	}
 #endif // AUI_DANGER_PLOTS_SHOULD_IGNORE_UNIT_MAJORS_SEE_BARBARIANS_IN_FOG
-
-	CvPlot* pPlot = pUnit->plot();
-	CvAssertMsg(pPlot, "Plot is null?")
-
-	if(NULL != pPlot && !pPlot->isVisibleOtherUnit(m_ePlayer) && !bIgnoreVisibility)
-	{
-		return true;
-	}
 
 	return false;
 }
@@ -897,9 +866,10 @@ int CvDangerPlotContents::GetDanger(const CvUnit* pUnit, AirActionType iAirActio
 		return GetAirUnitDamage(pUnit, iAirAction);
 
 	//simple caching for speedup
-	SUnitStats unitStats(pUnit);
-	if (unitStats==m_lastUnit)
-		return m_lastResult;
+	SUnitInfo unitStats(pUnit);
+	for (size_t i=0; i<m_lastResults.size(); i++)
+		if ( unitStats == m_lastResults[i].first )
+			return m_lastResults[i].second;
 
 	//otherwise calculate from scratch
 	int iPlotDamage = 0;
@@ -921,7 +891,7 @@ int CvDangerPlotContents::GetDanger(const CvUnit* pUnit, AirActionType iAirActio
 		{
 			CvUnit* pAttacker = GET_PLAYER(it->first).getUnit(it->second);
 
-			if ( pAttacker && !pAttacker->isDelayedDeath() && !pAttacker->IsDead())
+			if ( pAttacker && !pAttacker->isDelayedDeath() && !pAttacker->IsDead() )
 			{
 				// If in a city and the city can be captured, we are in highest danger
 				if (pFriendlyCity)
@@ -968,7 +938,14 @@ int CvDangerPlotContents::GetDanger(const CvUnit* pUnit, AirActionType iAirActio
 					else if (pBestDefender==NULL)
 					{
 						//Civilian could be captured on this tile
-						return MAX_INT;
+						if (pAttacker->isNativeDomain(m_pPlot))
+							return MAX_INT;
+						else
+						{
+							int iAttackerDamage = 0; //ignore this
+							if (pAttacker->plot() != m_pPlot)
+								iPlotDamage += TacticalAIHelpers::GetSimulatedDamageFromAttackOnUnit(pUnit,pAttacker,m_pPlot,pAttacker->plot(),iAttackerDamage);
+						}
 					}
 				}
 			}
@@ -989,8 +966,10 @@ int CvDangerPlotContents::GetDanger(const CvUnit* pUnit, AirActionType iAirActio
 		}
 
 		//update cache
-		m_lastUnit = unitStats;
-		m_lastResult = iPlotDamage;
+		m_lastResults.push_back( std::make_pair(unitStats,iPlotDamage) );
+		if (m_lastResults.size()==DANGER_MAX_CACHE_SIZE)
+			m_lastResults.erase(m_lastResults.begin());
+
 		return iPlotDamage;
 	}
 
@@ -998,7 +977,7 @@ int CvDangerPlotContents::GetDanger(const CvUnit* pUnit, AirActionType iAirActio
 	if (pFriendlyCity)
 	{
 		int iCityDanger = GetDanger(pFriendlyCity, (pUnit->getDomainType() == DOMAIN_LAND ? pUnit : NULL));
-		if (iCityDanger + pFriendlyCity->getDamage() < pFriendlyCity->GetMaxHitPoints())
+		if (iCityDanger + pFriendlyCity->getDamage() < pFriendlyCity->GetMaxHitPoints() + 50) //add a margin for error
 		{
 			if (pUnit->CanGarrison())
 			{
@@ -1017,8 +996,6 @@ int CvDangerPlotContents::GetDanger(const CvUnit* pUnit, AirActionType iAirActio
 		}
 	}
 
-	CvPlot* pAttackerPlot = NULL;
-	CvUnit* pInterceptor = NULL;
 	// Damage from units
 	// EXTREMELY IMPORTANT THAT NO RNG IS USED FOR PREDICTION!
 	// Otherwise a tooltip or similar can change the game state
@@ -1028,42 +1005,9 @@ int CvDangerPlotContents::GetDanger(const CvUnit* pUnit, AirActionType iAirActio
 		if (!pAttacker || pAttacker->isDelayedDeath() || pAttacker->IsDead())
 			continue;
 
-		pAttackerPlot = NULL;
+		int iAttackerDamage = 0; //ignore this
 		if (pAttacker->plot() != m_pPlot)
-		{				
-			if (pAttacker->IsCanAttackRanged())
-			{
-				if (pAttacker->getDomainType() == DOMAIN_AIR)
-				{
-					pInterceptor = pAttacker->GetBestInterceptor(*m_pPlot, pUnit);
-					int iInterceptDamage = 0;
-					if (pInterceptor)
-					{
-						// Always assume interception is successful
-						iInterceptDamage = pInterceptor->GetInterceptionDamage(pUnit, false);
-					}
-					iPlotDamage += pAttacker->GetAirCombatDamage(pUnit, NULL, false, iInterceptDamage, m_pPlot);
-				}
-				else
-				{
-					iPlotDamage += pAttacker->GetRangeCombatDamage(pUnit, NULL, false, 0, m_pPlot);
-				}
-			}
-			else
-			{
-				if (plotDistance(m_iX, m_iY, pUnit->getX(), pUnit->getY()) == 1)
-				{
-					pAttackerPlot = pAttacker->plot();
-				}
-				iPlotDamage += pAttacker->getCombatDamage(
-					pAttacker->GetMaxAttackStrength(pAttackerPlot, m_pPlot, pUnit),
-					pUnit->GetMaxDefenseStrength(m_pPlot, pAttacker), pAttacker->getDamage(), false, false, false);
-				if (pAttacker->isRangedSupportFire())
-				{
-					iPlotDamage += pAttacker->GetRangeCombatDamage(pUnit, NULL, false, 0, m_pPlot, pAttackerPlot);
-				}
-			}
-		}
+			iPlotDamage += TacticalAIHelpers::GetSimulatedDamageFromAttackOnUnit(pUnit,pAttacker,m_pPlot,pAttacker->plot(),iAttackerDamage);
 	}
 
 	// Damage from cities
@@ -1081,107 +1025,12 @@ int CvDangerPlotContents::GetDanger(const CvUnit* pUnit, AirActionType iAirActio
 	iPlotDamage += m_bFlatPlotDamage ? m_pPlot->getTurnDamage(pUnit->ignoreTerrainDamage(), pUnit->ignoreFeatureDamage(), pUnit->extraTerrainDamage(), pUnit->extraFeatureDamage()) : 0;
 
 	//update cache
-	m_lastUnit = unitStats;
-	m_lastResult = iPlotDamage;
+	m_lastResults.push_back( std::make_pair(unitStats,iPlotDamage) );
+	if (m_lastResults.size()==DANGER_MAX_CACHE_SIZE)
+		m_lastResults.erase(m_lastResults.begin());
 
 	//done
 	return iPlotDamage;
-}
-
-// Can this tile be attacked by an enemy unit or city next turn?
-bool CvDangerPlotContents::IsUnderImmediateThreat(PlayerTypes ePlayer)
-{
-	if (!m_pPlot)
-		return false;
-
-	// Terrain damage
-	if (m_bFlatPlotDamage)
-		return true;
-
-	// Cities in range
-	for (DangerCityVector::iterator it = m_apCities.begin(); it < m_apCities.end(); ++it)
-	{
-		CvCity* pCity = GET_PLAYER(it->first).getCity(it->second);
-
-		if (pCity && pCity->getTeam() != GET_PLAYER(ePlayer).getTeam())
-		{
-			return true;
-		}
-	}
-
-	// Units in range
-	for (DangerUnitVector::iterator it = m_apUnits.begin(); it < m_apUnits.end(); ++it)
-	{
-		CvUnit* pUnit = GET_PLAYER(it->first).getUnit(it->second);
-
-		if (pUnit && !pUnit->isDelayedDeath() && !pUnit->IsDead())
-		{
-			return true;
-		}
-	}
-
-	// Citadel etc in range
-	if (GetDamageFromFeatures(ePlayer) > 0)
-	{
-		return true;
-	}
-
-	return false;
-}
-
-// Can this tile be attacked by an enemy unit or city next turn?
-bool CvDangerPlotContents::IsUnderImmediateThreat(const CvUnit* pUnit)
-{
-	if (!m_pPlot || !pUnit)
-		return false;
-
-	// Air units operate off of intercepts instead of units/cities that can attack them
-	if (pUnit->getDomainType() == DOMAIN_AIR)
-	{
-		if (pUnit->GetBestInterceptor(*m_pPlot))
-		{
-			return true;
-		}
-	}
-	else
-	{
-		// Cities in range
-		for (DangerCityVector::iterator it = m_apCities.begin(); it < m_apCities.end(); ++it)
-		{
-			CvCity* pCity = GET_PLAYER(it->first).getCity(it->second);
-
-			if (pCity && pCity->getTeam() != pUnit->getTeam())
-			{
-				return true;
-			}
-		}
-
-		// Units in range
-		for (DangerUnitVector::iterator it = m_apUnits.begin(); it < m_apUnits.end(); ++it)
-		{
-			CvUnit* pUnit = GET_PLAYER(it->first).getUnit(it->second);
-			if (pUnit && !pUnit->isDelayedDeath() && !pUnit->IsDead())
-			{
-				return true;
-			}
-		}
-
-		// Citadel etc in range
-		if (GetDamageFromFeatures(pUnit->getOwner()) > 0)
-		{
-			return true;
-		}
-	}
-
-	// Terrain damage is greater than heal rate
-	int iMinimumDamage = m_bFlatPlotDamage ? m_pPlot->getTurnDamage(pUnit->ignoreTerrainDamage(), pUnit->ignoreFeatureDamage(), pUnit->extraTerrainDamage(), pUnit->extraFeatureDamage()) : 0;
-
-	if (pUnit->canHeal(m_pPlot))
-	{
-		iMinimumDamage -= pUnit->healRate(m_pPlot);
-	}
-
-	return (iMinimumDamage > 0);
 }
 
 // Get the maximum damage city could receive this turn if it were in this plot

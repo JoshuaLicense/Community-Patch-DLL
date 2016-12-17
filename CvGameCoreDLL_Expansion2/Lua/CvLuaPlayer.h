@@ -56,6 +56,8 @@ protected:
 #if defined(MOD_BALANCE_CORE_RESOURCE_MONOPOLIES)
 	static int lGetResourceMonopolyPlayer(lua_State* L);
 	static int lGetMonopolyPercent(lua_State* L);
+	static int lHasGlobalMonopoly(lua_State* L);
+	static int lHasStrategicMonopoly(lua_State* L);
 #endif
 	static int lDisbandUnit(lua_State* L);
 	static int lAddFreeUnit(lua_State* L);
@@ -157,7 +159,10 @@ protected:
 	static int lCalculateUnitSupply(lua_State* L);
 
 	static int lGetNumMaintenanceFreeUnits(lua_State* L);
-
+#if defined(MOD_BALANCE_CORE)
+	static int lGetBaseBuildingMaintenance(lua_State* L);
+	static int lGetBaseUnitMaintenance(lua_State* L);
+#endif
 	static int lGetBuildingGoldMaintenance(lua_State* L);
 	static int lSetBaseBuildingGoldMaintenance(lua_State* L);
 	static int lChangeBaseBuildingGoldMaintenance(lua_State* L);
@@ -404,6 +409,9 @@ protected:
 	LUAAPIEXTN(GetMajorCivOpinion, int);
 	LUAAPIEXTN(GetMajorityReligion, int);
 	//JFD
+	LUAAPIEXTN(GetNumNationalWonders, int);
+	LUAAPIEXTN(GetNumInternationalTradeRoutes, int);
+	LUAAPIEXTN(GetNumInternalTradeRoutes, int);
 	LUAAPIEXTN(GetStateReligion, int);
 	LUAAPIEXTN(SetStateReligion, int);
 	LUAAPIEXTN(GetNumCitiesWithStateReligion, int);
@@ -467,6 +475,19 @@ protected:
 
 	LUAAPIEXTN(SetProsperityScore, int);
 	LUAAPIEXTN(GetProsperityScore, int);
+
+	//JFD Contracts
+	LUAAPIEXTN(PlayerHasContract, int);
+	LUAAPIEXTN(PlayerHasAnyContract, int);
+	LUAAPIEXTN(GetContractTurnsRemaining, int);
+	LUAAPIEXTN(GetContractGoldMaintenance, int);
+	LUAAPIEXTN(ChangeContractTurns, int);
+	LUAAPIEXTN(StartContract, int);
+	LUAAPIEXTN(EndContract, int);
+	LUAAPIEXTN(UnitIsActiveContractUnit, int);
+	LUAAPIEXTN(GetNumActivePlayerContracts, int);
+	LUAAPIEXTN(DisbandContractUnits, int);
+	LUAAPIEXTN(InitContractUnits, int);
 #endif
 	static int lGetCombatBonusVsHigherTech(lua_State* L);
 	static int lGetCombatBonusVsLargerCiv(lua_State* L);
@@ -611,6 +632,9 @@ protected:
 	static int lGetFeatureProductionModifier(lua_State* L);
 	static int lGetWorkerSpeedModifier(lua_State* L);
 	static int lGetImprovementUpgradeRateModifier(lua_State* L);
+#if defined(MOD_CIV6_WORKER)
+	LUAAPIEXTN(GetImprovementBuilderCost, int);
+#endif
 	static int lGetMilitaryProductionModifier(lua_State* L);
 	static int lGetSpaceProductionModifier(lua_State* L);
 	static int lGetSettlerProductionModifier(lua_State* L);
@@ -745,6 +769,7 @@ protected:
 	static int lGetMinorCivFriendshipLevelWithMajor(lua_State* L);
 	static int lGetActiveQuestForPlayer(lua_State* L); // DEPRECATED
 	static int lIsMinorCivActiveQuestForPlayer(lua_State* L);
+	static int lSetMinorCivActiveQuestForPlayer(lua_State* L);
 	static int lGetMinorCivNumActiveQuestsForPlayer(lua_State* L);
 	static int lIsMinorCivDisplayedQuestForPlayer(lua_State* L);
 	static int lGetMinorCivNumDisplayedQuestsForPlayer(lua_State* L);
@@ -1147,6 +1172,7 @@ protected:
 	static int lIsDiplomaticMarriage(lua_State* L);
 	static int lIsGPWLTKD(lua_State* L);
 	static int lIsCarnaval(lua_State* L);
+	static int lGetTraitConquestOfTheWorldCityAttackMod(lua_State* L);
 #endif
 	static int lIsUsingMayaCalendar(lua_State* L);
 	static int lGetMayaCalendarString(lua_State* L);
@@ -1200,6 +1226,8 @@ protected:
 	static int lGetCachedValueOfPeaceWithHuman(lua_State* L);
 	static int lGetTotalValueToMe(lua_State* L);
 	static int lGetTotalValueToMeNormal(lua_State* L);
+	static int lGetSpyChanceAtCity(lua_State* L);
+	static int lGetCityPotentialInfo(lua_State* L);
 #endif
 	static int lGetNumSpies(lua_State* L);
 	static int lGetNumUnassignedSpies(lua_State* L);
@@ -1214,6 +1242,9 @@ protected:
 	static int lIsSpyDiplomat(lua_State* L);
 	static int lIsSpySchmoozing(lua_State* L);
 	static int lCanSpyStageCoup(lua_State* L);
+#if defined(MOD_BALANCE_CORE)
+	static int lValidHeistLocation(lua_State* L);
+#endif
 	static int lGetAvailableSpyRelocationCities(lua_State* L);
 	static int lGetNumTechsToSteal(lua_State* L);
 	static int lGetIntrigueMessages(lua_State* L);
@@ -1251,13 +1282,8 @@ protected:
 	static int lGetInternationalTradeRouteCorporationModifierScience(lua_State* L);
 	static int lGetNumberofGlobalFranchises(lua_State* L);
 	static int lGetNumberofOffices(lua_State* L);
-	static int lGetCorporationName(lua_State* L);
-	static int lGetCorporationHelper(lua_State* L);
 	static int lGetMaxFranchises(lua_State* L);
-	static int lGetCorpID(lua_State* L);
-	static int lGetCorporationHeadquarters(lua_State* L);
-	static int lGetOfficeBuilding(lua_State* L);
-	static int lGetFranchiseBuilding(lua_State* L);
+	static int lGetCorporation(lua_State* L);
 	static int lGetCorporationFoundedTurn(lua_State* L);
 	static int lGetCurrentOfficeBenefit(lua_State* L);
 #endif
@@ -1394,6 +1420,7 @@ protected:
 	LUAAPIEXTN(CountAllWorkedTerrain, int, iTerrainType);
 #endif
 #if defined(MOD_BALANCE_CORE_EVENTS)
+	static int lGetDisabledTooltip (lua_State* L);
 	static int lGetScaledEventChoiceValue (lua_State* L);
 	static int lIsEventChoiceActive (lua_State* L);
 	static int lDoEventChoice (lua_State* L);
@@ -1405,6 +1432,19 @@ protected:
 	static int lSetEventChoiceCooldown  (lua_State* L);
 	static int lIsEventChoiceValid (lua_State* L);
 	static int lGetEventHappiness (lua_State* L);
+	static int lGetActivePlayerEventChoices(lua_State* L);
+	static int lGetActiveCityEventChoices(lua_State* L);
+	static int lGetRecentPlayerEventChoices(lua_State* L);
+	static int lGetRecentCityEventChoices(lua_State* L);
+#endif
+#if defined(MOD_BATTLE_ROYALE)
+	static int lGetNumMilitarySeaUnits(lua_State* L); // Sea Units
+	static int lGetNumMilitaryAirUnits(lua_State* L); // Air Units
+	static int lGetNumMilitaryLandUnits(lua_State* L); // Land Units
+
+	static int lGetMilitarySeaMight(lua_State* L);
+	static int lGetMilitaryAirMight(lua_State* L);
+	static int lGetMilitaryLandMight(lua_State* L);
 #endif
 };
 

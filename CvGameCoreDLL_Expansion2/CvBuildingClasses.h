@@ -122,15 +122,15 @@ public:
 	bool IsPuppetPurchaseOverride() const;
 	bool IsAllowsPuppetPurchase() const;
 	int GetCooldown() const;
-	int GetFreeBuildingTradeTargetCity() const;
-	int GetCorporationID() const;
-	int GetCorporationHQID() const;
 	bool IsTradeRouteInvulnerable() const;
 	int GetTRSpeedBoost() const;
 	int GetTRVisionBoost() const;
 	int GetVotesPerGPT() const;
 	bool IsRequiresRail() const;
 	bool IsDummy() const;
+	int GetResourceQuantityToPlace() const;
+	int GetLandmarksTourismPercentGlobal() const;
+	int GetGreatWorksTourismModifierGlobal() const;
 #endif
 	int GetSpecialistType() const;
 	int GetSpecialistCount() const;
@@ -193,6 +193,7 @@ public:
 	bool IsReformation() const;
 	bool IsBuildAnywhere() const;
 	int GetTradeReligionModifier() const;
+	int GetNumFreeArtifacts() const;
 #endif
 #if defined(MOD_BALANCE_CORE_SPIES)
 	int GetCannotFailSpies() const;
@@ -233,6 +234,7 @@ public:
 #if defined(MOD_BALANCE_CORE)
 	int GetLocalUnhappinessModifier() const;
 	int GetGlobalBuildingGoldMaintenanceMod() const;
+	int GetBuildingDefenseModifier() const;
 #endif
 	int GetHappinessPerCity() const;
 	int GetHappinessPerXPolicies() const;
@@ -318,6 +320,7 @@ public:
 	bool IsReligious() const;
 	bool IsBorderObstacle() const;
 #if defined(MOD_BALANCE_CORE)
+	bool IsAnyBodyOfWater() const;
 	int GetBorderObstacleCity() const;
 	int GetBorderObstacleWater() const;
 	int GetWLTKDTurns() const;
@@ -325,6 +328,7 @@ public:
 	int GetLandTourismEnd() const;
 	int GetSeaTourismEnd() const;
 	int GetAlwaysHeal() const;
+	bool IsCorp() const;
 #endif
 	bool IsPlayerBorderObstacle() const;
 	bool IsCityWall() const;
@@ -354,10 +358,6 @@ public:
 
 	const char* GetWonderSplashAudio() const;
 	CvString GetThemingBonusHelp() const;
-#if defined(MOD_BALANCE_CORE)
-	CvString GetCorporationHelper() const;
-	CvString GetOfficeBenefitHelper() const;
-#endif
 
 	// Accessor Functions (Arrays)
 
@@ -401,6 +401,9 @@ public:
 	int GetYieldFromPolicyUnlock(int i) const;
 	int* GetYieldFromPolicyUnlockArray() const;
 
+	int GetYieldFromUnitLevelUp(int i) const;
+	int* GetYieldFromUnitLevelUpArray() const;
+
 	int GetYieldFromPurchase(int i) const;
 	int* GetYieldFromPurchaseArray() const;
 
@@ -416,7 +419,7 @@ public:
 	int* GetYieldChangePerPopArray() const;
 	int GetYieldChangePerReligion(int i) const;
 	int* GetYieldChangePerReligionArray() const;
-	int GetYieldModifier(int i) const;;
+	int GetYieldModifier(int i) const;
 	int* GetYieldModifierArray() const;
 	int GetAreaYieldModifier(int i) const;
 	int* GetAreaYieldModifierArray() const;
@@ -458,23 +461,22 @@ public:
 	int GetFeatureAnd(int i) const;
 	int GetResourceMonopolyAnd(int i) const;
 	int GetResourceMonopolyOr(int i) const;
-	int GetCorporationYieldChange(int i) const;
-	int* GetCorporationYieldChangeArray() const;
-	int GetCorporationGPChange() const;
-	int GetCorporationMaxFranchises() const;
-	int GetCorporationResourceQuantity(int i) const;
-
-	int GetCorporationYieldModTrade(int i) const;
-	int* GetCorporationYieldModTradeArray() const;
-
-	int GetCorporationTradeRouteMod(int i) const;
-	int* GetCorporationTradeRouteModArray() const;
+	int GetGPRateModifierPerXFranchises() const;
+	int GetResourceQuantityPerXFranchises(int i) const;
+	int GetYieldPerFranchise(int i) const;
 #endif
 	int GetHurryModifier(int i) const;
+#if defined(MOD_BALANCE_CORE)
+	int GetHurryModifierLocal(int i) const;
+#endif
 	bool IsBuildingClassNeededInCity(int i) const;
 #if defined(MOD_BALANCE_CORE)
 	bool IsBuildingClassNeededAnywhere(int i) const;
 	bool IsBuildingClassNeededNowhere(int i) const;
+	int GetNumFreeSpecialUnits(int i) const;
+	int GetNumResourcesToPlace(int i) const;
+	int GetYieldPerFriend(int i) const;
+	int GetYieldPerAlly(int i) const;
 #endif
 	int GetNumFreeUnits(int i) const;
 #if defined(MOD_BALANCE_CORE_BUILDING_INSTANT_YIELD)
@@ -492,6 +494,8 @@ public:
 
 	int GetImprovementYieldChangeGlobal(int i, int j) const;
 	int* GetImprovementYieldChangeGlobalArray(int i) const;
+	int GetSpecialistYieldChangeLocal(int i, int j) const;
+	int* GetSpecialistYieldChangeLocalArray(int i) const;
 #endif
 	int GetSpecialistYieldChange(int i, int j) const;
 	int* GetSpecialistYieldChangeArray(int i) const;
@@ -511,6 +515,7 @@ public:
 	int GetBuildingClassLocalYieldChange(int i, int j) const;
 	int GetBuildingClassLocalHappiness(int i) const;
 	int GetSpecificGreatPersonRateModifier(int) const;
+	int GetResourceHappiness(int i) const;
 #endif
 	int GetBuildingClassHappiness(int i) const;
 
@@ -545,15 +550,15 @@ private:
 	bool m_bPuppetPurchaseOverride;
 	bool m_bAllowsPuppetPurchase;
 	int m_iGetCooldown;
-	int m_iFreeBuildingTradeTargetCity;
-	int m_iCorporationID;
-	int m_iCorporationHQID;
 	bool m_bTradeRouteInvulnerable;
 	int m_iTRSpeedBoost;
 	int m_iTRVisionBoost;
 	int m_iVotesPerGPT;
 	bool m_bRequiresRail;
 	bool m_bDummy;
+	int m_iResourceQuantityToPlace;
+	int m_iLandmarksTourismPercentGlobal;
+	int m_iGreatWorksTourismModifierGlobal;
 #endif
 	int m_iSpecialistType;
 	int m_iSpecialistCount;
@@ -618,6 +623,7 @@ private:
 #if defined(MOD_BALANCE_CORE)
 	int m_iLocalUnhappinessModifier;
 	int m_iGlobalBuildingGoldMaintenanceMod;
+	int m_iBuildingDefenseModifier;
 #endif
 	int m_iHappinessPerCity;
 	int m_iHappinessPerXPolicies;
@@ -706,6 +712,8 @@ private:
 	bool m_bIsReformation;
 	bool m_bBuildAnywhere;
 	int m_iTradeReligionModifier;
+	int m_iFreeArtifacts;
+	bool m_bAnyWater;
 #endif
 #if defined(MOD_BALANCE_CORE_SPIES)
 	int m_iCannotFailSpies;
@@ -751,6 +759,7 @@ private:
 	int m_iLandTourism;
 	int m_iSeaTourism;
 	int m_iAlwaysHeal;
+	bool m_bIsCorp;
 #endif
 	bool m_bPlayerBorderObstacle;
 	bool m_bCapital;
@@ -778,10 +787,6 @@ private:
 	CvString m_strArtDefineTag;
 	CvString m_strWonderSplashAudio;
 	CvString m_strThemingBonusHelp;
-#if defined(MOD_BALANCE_CORE)
-	CvString m_strCorporationHelper;
-	CvString m_strOfficeBenefitHelper;
-#endif
 
 	// Arrays
 
@@ -815,6 +820,7 @@ private:
 	int* m_piYieldFromUnitProduction;
 	int* m_piYieldFromBorderGrowth;
 	int* m_piYieldFromPolicyUnlock;
+	int* m_piYieldFromUnitLevelUp;
 	int* m_piYieldFromPurchase;
 	int* m_piScienceFromYield;
 #endif
@@ -842,19 +848,21 @@ private:
 	int* m_piLocalFeatureAnds;
 	int* m_piResourceMonopolyAnds;
 	int* m_piResourceMonopolyOrs;
-	int* m_piCorporationYield;
-	int* m_piCorporationYieldModTrade;
-	int* m_piCorporationTradeRouteMod;
-	int m_iCorporationGPChange;
-	int m_iCorporationMaxFranchises;
-	int* m_piCorporationResourceQuantity;
+	int* m_piYieldPerFranchise;
+	int m_iGPRateModifierPerXFranchises;
+	int* m_piResourceQuantityPerXFranchises;
 #endif
 	int* m_paiHurryModifier;
 
 	bool* m_pbBuildingClassNeededInCity;
 #if defined(MOD_BALANCE_CORE)
+	int* m_paiHurryModifierLocal;
 	bool* m_pbBuildingClassNeededAnywhere;
 	bool* m_pbBuildingClassNeededNowhere;
+	int* m_piNumSpecFreeUnits;
+	int* m_piNumResourceToPlace;
+	int* m_piYieldPerFriend;
+	int* m_piYieldPerAlly;
 #endif
 	int* m_piNumFreeUnits;
 
@@ -863,6 +871,7 @@ private:
 #if defined(MOD_BALANCE_CORE)
 	int** m_ppaiImprovementYieldChange;
 	int** m_ppaiImprovementYieldChangeGlobal;
+	int** m_ppaiSpecialistYieldChangeLocal;
 #endif
 	int** m_ppaiSpecialistYieldChange;
 	int** m_ppaiResourceYieldModifier;
@@ -876,6 +885,7 @@ private:
 	int** m_ppiBuildingClassLocalYieldChanges;
 	int* m_paiBuildingClassLocalHappiness;
 	int* m_paiSpecificGreatPersonRateModifier;
+	int* m_paiResourceHappinessChange;
 #endif
 	int* m_paiBuildingClassHappiness;
 #if defined(MOD_BALANCE_CORE_BUILDING_INSTANT_YIELD)
@@ -1012,7 +1022,15 @@ public:
 #else
 	int GetNumGreatWorks() const;
 #endif
+#if defined(MOD_BALANCE_CORE)
+	int GetNumGreatWorks(GreatWorkSlotType eGreatWorkSlot, bool bArtifact = false, bool bArt = false) const;
+#else
 	int GetNumGreatWorks(GreatWorkSlotType eGreatWorkSlot) const;
+#endif
+#if defined(MOD_BALANCE_CORE)
+	int GetThemingBonusIndex(BuildingTypes eBuilding) const;
+	void SetThemingBonusIndex(BuildingTypes eBuilding, int iIndex);
+#endif
 
 	int GetLandmarksTourismPercent() const;
 	void ChangeLandmarksTourismPercent(int iChange);
@@ -1044,7 +1062,7 @@ public:
 	bool CheckForSevenAncientWondersBuilt();
 
 #if defined(MOD_BALANCE_CORE)
-	const std::vector<BuildingTypes>& GetAllBuildings() const { return m_buildingsThatExistAtLeastOnce; }
+	const std::vector<BuildingTypes>& GetAllBuildingsHere() const { return m_buildingsThatExistAtLeastOnce; }
 #endif
 private:
 	void NotifyNewBuildingStarted(BuildingTypes eIndex);
@@ -1067,6 +1085,7 @@ private:
 	int* m_paiNumFreeBuilding;
 #if defined(MOD_BALANCE_CORE)
 	int* m_paiFirstTimeBuilding;
+	int* m_paiThemingBonusIndex;
 #endif
 
 #if defined(MOD_BALANCE_CORE)

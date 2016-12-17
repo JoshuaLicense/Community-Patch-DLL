@@ -906,10 +906,15 @@ int CvGrandStrategyAI::GetCulturePriority()
 						const BuildingTypes eBuildingLoop = static_cast<BuildingTypes>(iI);
 						if(eBuildingLoop == NO_BUILDING)
 							continue;
-						if(pEntry->GetBuildingClassTourism(eBuildingLoop))
+
+						CvBuildingEntry* pkLoopBuilding = GC.getBuildingInfo(eBuildingLoop);
+						if(pkLoopBuilding)
 						{
-							iPriorityBonus += 100;
-							break;
+							if(pEntry->GetBuildingClassTourism(pkLoopBuilding->GetBuildingClassType()))
+							{
+								iPriorityBonus += 100;
+								break;
+							}
 						}
 					}
 					if(pEntry->GetFaithBuildingTourism() > 0)
@@ -967,11 +972,11 @@ int CvGrandStrategyAI::GetUnitedNationsPriority()
 				{
 					if(GC.getFlavorTypes((FlavorTypes) iFlavorLoop) == "FLAVOR_GOLD")
 					{
-						iPriorityBonus += pkPolicyInfo->GetFlavorValue(iFlavorLoop);
+						iPriorityBonus += pkPolicyInfo->GetFlavorValue(iFlavorLoop) * 2;
 					}
 					else if(GC.getFlavorTypes((FlavorTypes) iFlavorLoop) == "FLAVOR_DIPLOMACY")
 					{
-						iPriorityBonus += pkPolicyInfo->GetFlavorValue(iFlavorLoop);
+						iPriorityBonus += pkPolicyInfo->GetFlavorValue(iFlavorLoop) * 3;
 					}
 				}
 			}
@@ -998,11 +1003,11 @@ int CvGrandStrategyAI::GetUnitedNationsPriority()
 						{
 							if(GC.getFlavorTypes((FlavorTypes) iFlavorLoop) == "FLAVOR_GOLD")
 							{
-								iPriorityBonus += pkLoopBuilding->GetFlavorValue(iFlavorLoop);
+								iPriorityBonus += pkLoopBuilding->GetFlavorValue(iFlavorLoop) * 2;
 							}
 							else if(GC.getFlavorTypes((FlavorTypes) iFlavorLoop) == "FLAVOR_DIPLOMACY")
 							{
-								iPriorityBonus += pkLoopBuilding->GetFlavorValue(iFlavorLoop);
+								iPriorityBonus += pkLoopBuilding->GetFlavorValue(iFlavorLoop) * 3;
 							}
 						}
 					}
@@ -1070,7 +1075,7 @@ int CvGrandStrategyAI::GetUnitedNationsPriority()
 			}
 		}
 	}
-	iPriorityBonus /= 10;
+	iPriorityBonus /= 5;
 	iPriority += iPriorityBonus;
 #endif
 #if !defined(MOD_BALANCE_CORE_GRANDSTRATEGY_AI)
@@ -1136,12 +1141,11 @@ int CvGrandStrategyAI::GetUnitedNationsPriority()
 #if defined(MOD_BALANCE_CORE_GRANDSTRATEGY_AI)
 	else if (iVotesControlled >= ((iVotesNeededToWin * 3) / 4))
 	{
-		iPriority *= 2;
+		iPriority *= 4;
 	}
 	else if (iVotesControlled >= ((iVotesNeededToWin * 2) / 4))
 	{
-		iPriority *= 3;
-		iPriority /= 2;
+		iPriority *= 2;
 	}
 	// We have the most votes
 	if (iVotesControlledDelta > 0)
@@ -1168,6 +1172,18 @@ int CvGrandStrategyAI::GetUnitedNationsPriority()
 	iPriority += (m_pPlayer->GetPlayerTraits()->GetCityStateFriendshipModifier() * 2);
 	iPriority += (m_pPlayer->GetPlayerTraits()->GetCityStateBonusModifier() * 2);
 	iPriority -= (m_pPlayer->GetPlayerTraits()->GetCityStateCombatModifier() * 2);
+	iPriority -= (m_pPlayer->GetCityStateCombatModifier());
+	iPriority += (m_pPlayer->GetPlayerTraits()->GetAllianceCSDefense() / 2);
+	iPriority += (m_pPlayer->GetPlayerTraits()->GetAllianceCSStrength() / 2);
+	for(int iI = 0; iI < NUM_YIELD_TYPES; iI++)
+	{
+		const YieldTypes eYield = static_cast<YieldTypes>(iI);
+		if(eYield != NO_YIELD)
+		{
+			iPriority += m_pPlayer->GetPlayerTraits()->GetYieldFromCSAlly(eYield);
+			iPriority += m_pPlayer->GetPlayerTraits()->GetYieldFromCSFriend(eYield);
+		}
+	}
 #else
 	else if (iVotesControlled >= ((iVotesNeededToWin * 3) / 4))
 	{
@@ -1403,13 +1419,23 @@ int CvGrandStrategyAI::GetBaseGrandStrategyPriority(AIGrandStrategyTypes eGrandS
 }
 
 /// Get the base Priority for a Grand Strategy; these are elements common to ALL Grand Strategies
+#if defined(MOD_AI_SMART_V3)
+int CvGrandStrategyAI::GetPersonalityAndGrandStrategy(FlavorTypes eFlavorType, bool bBoostGSMainFlavor)
+#else
 int CvGrandStrategyAI::GetPersonalityAndGrandStrategy(FlavorTypes eFlavorType)
+#endif
 {
 	if(m_eActiveGrandStrategy != NO_AIGRANDSTRATEGY)
 	{
 		CvAIGrandStrategyXMLEntry* pGrandStrategy = GetAIGrandStrategies()->GetEntry(m_eActiveGrandStrategy);
 		int iModdedFlavor = pGrandStrategy->GetFlavorModValue(eFlavorType) + m_pPlayer->GetFlavorManager()->GetPersonalityIndividualFlavor(eFlavorType);
 		iModdedFlavor = max(0,iModdedFlavor);
+#if defined(MOD_AI_SMART_V3)
+		if(MOD_AI_SMART_V3 && bBoostGSMainFlavor && (pGrandStrategy->GetFlavorValue(eFlavorType) > 0))
+		{
+			iModdedFlavor = min(10, ((pGrandStrategy->GetFlavorValue(eFlavorType) + iModdedFlavor + 1) / 2));
+		}
+#endif
 		return iModdedFlavor;
 	}
 	return m_pPlayer->GetFlavorManager()->GetPersonalityIndividualFlavor(eFlavorType);

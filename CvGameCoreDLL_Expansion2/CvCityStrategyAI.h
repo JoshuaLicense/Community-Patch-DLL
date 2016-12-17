@@ -197,7 +197,11 @@ public:
 #endif
 
 	// City AI methods
+#if defined(MOD_BALANCE_CORE)
+	void ChooseProduction(BuildingTypes eIgnoreBldg = NO_BUILDING, UnitTypes eIgnoreUnit = NO_UNIT, bool bInterruptBuildings = false);
+#else
 	void ChooseProduction(BuildingTypes eIgnoreBldg = NO_BUILDING, UnitTypes eIgnoreUnit = NO_UNIT);
+#endif
 #if defined(MOD_BALANCE_CORE)
 	CvCityBuildable ChooseHurry();
 	void LogHurryMessage(CvString& strMsg);
@@ -289,7 +293,11 @@ bool IsTestCityStrategy_NeedNavalTileImprovement(CvCity* pCity);
 bool IsTestCityStrategy_EnoughNavalTileImprovement(CvCity* pCity);
 #if defined(MOD_BALANCE_CORE)
 bool IsTestCityStrategy_EnoughSettlers(CvCity* pCity);
+#if defined(MOD_BUGFIX_MINOR_CIV_STRATEGIES)
+bool IsTestCityStrategy_NewContinentFeeder(AICityStrategyTypes eStrategy, CvCity* pCity);
+#else
 bool IsTestCityStrategy_NewContinentFeeder(CvCity* pCity);
+#endif
 bool IsTestCityStrategy_PocketCity(CvCity* pCity);
 #endif
 bool IsTestCityStrategy_NeedImprovement(CvCity* pCity, YieldTypes yield);
@@ -335,11 +343,13 @@ bool IsTestCityStrategy_NeedHappinessConnection(CvCity *pCity);
 bool IsTestCityStrategy_NeedHappinessPillage(CvCity *pCity);
 bool IsTestCityStrategy_NeedHappinessReligion(CvCity *pCity);
 bool IsTestCityStrategy_NeedHappinessStarve(CvCity *pCity);
+
+
 int GetBuildingYieldValue(CvCity *pCity, BuildingTypes eBuilding, YieldTypes eYield);
 int GetBuildingGrandStrategyValue(CvCity *pCity, BuildingTypes eBuilding, PlayerTypes ePlayer);
 int GetBuildingPolicyValue(CvCity *pCity, BuildingTypes eBuilding);
 int GetBuildingBasicValue(CvCity *pCity, BuildingTypes eBuilding);
-int GetBuildingTraitValue(CvCity *pCity, YieldTypes eYield, BuildingTypes eBuilding);
+int GetBuildingTraitValue(CvCity *pCity, YieldTypes eYield, BuildingTypes eBuilding, int iValue);
 #endif
 }
 

@@ -94,6 +94,12 @@ CvImprovementEntry::CvImprovementEntry(void):
 	m_iImprovementResource(NO_RESOURCE),
 	m_iImprovementResourceQuantity(0),
 	m_iUnitFreePromotionImprovement(NO_PROMOTION),
+	m_iWonderProductionModifier(0),
+	m_iUnitPlotExperience(0),
+	m_iGAUnitPlotExperience(0),
+	m_bIsExperience(false),
+	m_eCreatesFeature(NO_FEATURE),
+	m_bNewOwner(false),
 #endif
 	m_iImprovementPillage(NO_IMPROVEMENT),
 	m_iImprovementUpgrade(NO_IMPROVEMENT),
@@ -169,6 +175,9 @@ CvImprovementEntry::CvImprovementEntry(void):
 	m_piAdjacentTwoSameTypeYield(NULL),
 	m_ppiAdjacentImprovementYieldChanges(NULL),
 	m_ppiAdjacentTerrainYieldChanges(NULL),
+	m_ppiAdjacentResourceYieldChanges(NULL),
+	m_ppiAdjacentPlotYieldChanges(NULL),
+	m_ppiFeatureYieldChanges(NULL),
 #endif
 	m_ppiTechYieldChanges(NULL),
 	m_ppiTechNoFreshWaterYieldChanges(NULL),
@@ -202,9 +211,21 @@ CvImprovementEntry::~CvImprovementEntry(void)
 	{
 		CvDatabaseUtility::SafeDelete2DArray(m_ppiAdjacentImprovementYieldChanges);
 	}
-	if(m_ppiAdjacentTerrainYieldChanges!= NULL)
+	if(m_ppiAdjacentResourceYieldChanges != NULL)
+	{
+		CvDatabaseUtility::SafeDelete2DArray(m_ppiAdjacentResourceYieldChanges);
+	}
+	if(m_ppiAdjacentTerrainYieldChanges != NULL)
 	{
 		CvDatabaseUtility::SafeDelete2DArray(m_ppiAdjacentTerrainYieldChanges);
+	}
+	if(m_ppiAdjacentPlotYieldChanges != NULL)
+	{
+		CvDatabaseUtility::SafeDelete2DArray(m_ppiAdjacentPlotYieldChanges);
+	}
+	if (m_ppiFeatureYieldChanges != NULL)
+	{
+		CvDatabaseUtility::SafeDelete2DArray(m_ppiFeatureYieldChanges);
 	}
 #endif
 	if(m_paImprovementResource != NULL)
@@ -314,6 +335,12 @@ bool CvImprovementEntry::CacheResults(Database::Results& kResults, CvDatabaseUti
 	m_bAdjacentLake = kResults.GetBool("Lakeside");
 	m_bAdjacentCity = kResults.GetBool("Cityside");
 	m_iGrantsVision = kResults.GetInt("GrantsVisionXTiles");
+	m_iUnitPlotExperience = kResults.GetInt("UnitPlotExperience");
+	m_iGAUnitPlotExperience = kResults.GetInt("GAUnitPlotExperience");
+	m_bIsExperience = kResults.GetBool("IsExperience");
+	const char* szFeatureType = kResults.GetText("CreatesFeature");
+	m_eCreatesFeature = (FeatureTypes)GC.getInfoTypeForString(szFeatureType, true);
+	m_bNewOwner = kResults.GetBool("NewOwner");
 #endif
 	m_bNoTwoAdjacent = kResults.GetBool("NoTwoAdjacent");
 	m_bAdjacentLuxury = kResults.GetBool("AdjacentLuxury");
@@ -340,6 +367,7 @@ bool CvImprovementEntry::CacheResults(Database::Results& kResults, CvDatabaseUti
 	{
 		m_iUnitFreePromotionImprovement = GC.getInfoTypeForString(szTextVal, true);
 	}
+	m_iWonderProductionModifier = kResults.GetInt("WonderProductionModifier");
 #endif
 	//References
 	const char* szWorldsoundscapeAudioScript = kResults.GetText("WorldSoundscapeAudioScript");
@@ -486,6 +514,36 @@ bool CvImprovementEntry::CacheResults(Database::Results& kResults, CvDatabaseUti
 
 		pResults->Reset();
 	}
+	//m_ppiAdjacentResourceYieldChanges
+	{
+		const int iNumResources = kUtility.MaxRows("Resources");
+		CvAssertMsg(iNumResources > 0, "Num Resource Infos <= 0");
+		kUtility.Initialize2DArray(m_ppiAdjacentResourceYieldChanges, iNumResources, iNumYields);
+
+		std::string strKey = "Improvements - AdjacentResourceYieldChanges";
+		Database::Results* pResults = kUtility.GetResults(strKey);
+		if(pResults == NULL)
+		{
+			pResults = kUtility.PrepareResults(strKey, "select Yields.ID as YieldID, Resources.ID as ResourceID, Yield from Improvement_AdjacentResourceYieldChanges inner join Yields on YieldType = Yields.Type inner join Resources on ResourceType = Resources.Type where ImprovementType = ?");
+		}
+
+		pResults->Bind(1, szImprovementType, lenImprovementType, false);
+
+		while(pResults->Step())
+		{
+			const int yield_idx = pResults->GetInt(0);
+			CvAssert(yield_idx > -1);
+
+			const int resource_idx = pResults->GetInt(1);
+			CvAssert(resource_idx > -1);
+
+			const int yield = pResults->GetInt(2);
+
+			m_ppiAdjacentResourceYieldChanges[resource_idx][yield_idx] = yield;
+		}
+
+		pResults->Reset();
+	}
 	//m_ppiAdjacentTerrainYieldChanges
 	{
 		const int iNumTerrains = kUtility.MaxRows("Terrains");
@@ -516,6 +574,69 @@ bool CvImprovementEntry::CacheResults(Database::Results& kResults, CvDatabaseUti
 
 		pResults->Reset();
 	}
+
+	//m_ppiAdjacentPlotYieldChanges
+	{
+		const int iNumPlots = kUtility.MaxRows("Plots");
+		CvAssertMsg(iNumPlots > 0, "Num Plot Infos <= 0");
+		kUtility.Initialize2DArray(m_ppiAdjacentPlotYieldChanges, iNumPlots, iNumYields);
+
+		std::string strKey = "Plots - AdjacentPlotYieldChanges";
+		Database::Results* pResults = kUtility.GetResults(strKey);
+		if(pResults == NULL)
+		{
+			pResults = kUtility.PrepareResults(strKey, "select Yields.ID as YieldID, Plots.ID as PlotID, Yield from Improvement_AdjacentPlotYieldChanges inner join Yields on YieldType = Yields.Type inner join Plots on PlotType = Plots.Type where ImprovementType = ?");
+		}
+
+		pResults->Bind(1, szImprovementType, lenImprovementType, false);
+
+		while(pResults->Step())
+		{
+			const int yield_idx = pResults->GetInt(0);
+			CvAssert(yield_idx > -1);
+
+			const int plot_idx = pResults->GetInt(1);
+			CvAssert(plot_idx > -1);
+
+			const int yield = pResults->GetInt(2);
+
+			m_ppiAdjacentPlotYieldChanges[plot_idx][yield_idx] = yield;
+		}
+
+		pResults->Reset();
+	}
+
+	//m_ppiFeatureYieldChanges
+	{
+		const int iNumFeatures = kUtility.MaxRows("Features");
+		CvAssertMsg(iNumFeatures > 0, "Num Feature Infos <= 0");
+		kUtility.Initialize2DArray(m_ppiFeatureYieldChanges, iNumFeatures, iNumYields);
+
+		std::string strKey = "Features - FeatureYieldChanges";
+		Database::Results* pResults = kUtility.GetResults(strKey);
+		if (pResults == NULL)
+		{
+			pResults = kUtility.PrepareResults(strKey, "select Yields.ID as YieldID, Features.ID as FeatureID, Yield from Improvement_FeatureYieldChanges inner join Yields on YieldType = Yields.Type inner join Features on FeatureType = Features.Type where ImprovementType = ?");
+		}
+
+		pResults->Bind(1, szImprovementType, lenImprovementType, false);
+
+		while (pResults->Step())
+		{
+			const int yield_idx = pResults->GetInt(0);
+			CvAssert(yield_idx > -1);
+
+			const int feature_idx = pResults->GetInt(1);
+			CvAssert(feature_idx > -1);
+
+			const int yield = pResults->GetInt(2);
+
+			m_ppiFeatureYieldChanges[feature_idx][yield_idx] = yield;
+		}
+
+		pResults->Reset();
+	}
+	
 #endif
 	const int iNumTechs = GC.getNumTechInfos();
 	CvAssertMsg(iNumTechs > 0, "Num Tech Infos <= 0");
@@ -802,6 +923,30 @@ int CvImprovementEntry::GetResourceQuantityFromImprovement() const
 int CvImprovementEntry::GetUnitFreePromotion() const
 {
 	return m_iUnitFreePromotionImprovement;
+}
+int CvImprovementEntry::GetWonderProductionModifier() const
+{
+	return m_iWonderProductionModifier;
+}
+int CvImprovementEntry::GetUnitPlotExperience() const
+{
+	return m_iUnitPlotExperience;
+}
+int CvImprovementEntry::GetGAUnitPlotExperience() const
+{
+	return m_iGAUnitPlotExperience;
+}
+bool CvImprovementEntry::IsExperience() const
+{
+	return m_bIsExperience;
+}
+FeatureTypes CvImprovementEntry::GetCreatedFeature() const
+{
+	return m_eCreatesFeature;
+}
+bool CvImprovementEntry::IsNewOwner() const
+{
+	return m_bNewOwner;
 }
 #endif
 /// Returns the type of improvement that results from this improvement being pillaged
@@ -1269,6 +1414,21 @@ int* CvImprovementEntry::GetAdjacentImprovementYieldChangesArray(int i)
 	return m_ppiAdjacentImprovementYieldChanges[i];
 }
 
+/// How much an improvement yields if built next to a resource
+int CvImprovementEntry::GetAdjacentResourceYieldChanges(int i, int j) const
+{
+	CvAssertMsg(i < GC.getNumResourceInfos(), "Index out of bounds");
+	CvAssertMsg(i > -1, "Index out of bounds");
+	CvAssertMsg(j < NUM_YIELD_TYPES, "Index out of bounds");
+	CvAssertMsg(j > -1, "Index out of bounds");
+	return m_ppiAdjacentResourceYieldChanges[i][j];
+}
+
+int* CvImprovementEntry::GetAdjacentResourceYieldChangesArray(int i)
+{
+	return m_ppiAdjacentResourceYieldChanges[i];
+}
+
 int CvImprovementEntry::GetAdjacentTerrainYieldChanges(int i, int j) const
 {
 	CvAssertMsg(i < GC.getNumTerrainInfos(), "Index out of bounds");
@@ -1281,6 +1441,33 @@ int CvImprovementEntry::GetAdjacentTerrainYieldChanges(int i, int j) const
 int* CvImprovementEntry::GetAdjacentTerrainYieldChangesArray(int i)
 {
 	return m_ppiAdjacentTerrainYieldChanges[i];
+}
+
+int CvImprovementEntry::GetAdjacentPlotYieldChanges(int i, int j) const
+{
+	CvAssertMsg(i < GC.getNumPlotInfos(), "Index out of bounds");
+	CvAssertMsg(i > -1, "Index out of bounds");
+	CvAssertMsg(j < NUM_YIELD_TYPES, "Index out of bounds");
+	CvAssertMsg(j > -1, "Index out of bounds");
+	return m_ppiAdjacentPlotYieldChanges[i][j];
+}
+
+int* CvImprovementEntry::GetAdjacentPlotYieldChangesArray(int i)
+{
+	return m_ppiAdjacentPlotYieldChanges[i];
+}
+
+int CvImprovementEntry::GetFeatureYieldChanges(int i, int j) const
+{
+	CvAssertMsg(i < GC.getNumFeatureInfos(), "Index out of bounds");
+	CvAssertMsg(i > -1, "Index out of bounds");
+	CvAssertMsg(j < NUM_YIELD_TYPES, "Index out of bounds");
+	CvAssertMsg(j > -1, "Index out of bounds");
+	return m_ppiFeatureYieldChanges[i][j];
+}
+int* CvImprovementEntry::GetFeatureYieldChangesArray(int i)
+{
+	return m_ppiFeatureYieldChanges[i];
 }
 #endif
 

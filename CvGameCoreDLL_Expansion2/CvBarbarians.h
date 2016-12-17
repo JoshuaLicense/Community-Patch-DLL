@@ -29,10 +29,6 @@ public:
 
 	static void DoSpawnBarbarianUnit(CvPlot* pPlot, bool bIgnoreMaxBarbarians, bool bFinishMoves);
 
-#if defined(MOD_BALANCE_CORE_MILITARY)
-	static const std::vector<CvPlot*>& GetBarbCampPlots() { return m_vPlotsWithCamp; } 
-#endif
-
 	static void MapInit(int iWorldNumPlots);
 	static void Uninit();
 
@@ -46,7 +42,7 @@ private:
 	static bool CanBarbariansSpawn();
 	static bool IsPlotValidForBarbCamp(CvPlot* pPlot);
 #if defined(MOD_EVENTS_BARBARIANS)
-	static UnitTypes GetRandomBarbarianUnitType(CvPlot* pPlot, UnitAITypes eUnitAI);
+	static UnitTypes GetRandomBarbarianUnitType(CvPlot* pPlot, UnitAITypes eUnitAI, ResourceTypes eNearbyResource = NO_RESOURCE);
 #else
 	static UnitTypes GetRandomBarbarianUnitType(CvArea* pArea, UnitAITypes eUnitAI);
 #endif
@@ -64,10 +60,6 @@ private:
 	static short* m_aiPlotBarbCityNumUnitsSpawned;
 #endif
 	static short* m_aiPlotBarbCampNumUnitsSpawned;
-
-#if defined(MOD_BALANCE_CORE_MILITARY)
-	static std::vector<CvPlot*> m_vPlotsWithCamp;
-#endif
 
 };
 

@@ -812,6 +812,7 @@ int CvLuaEnums::pRegister(lua_State* L)
 	RegisterEnum(ENDTURN_BLOCKING_CITY_TILE);
 #endif
 #if defined(MOD_BALANCE_CORE)
+	RegisterEnum(ENDTURN_BLOCKING_PENDING_DEAL);
 	RegisterEnum(ENDTURN_BLOCKING_EVENT_CHOICE);
 #endif
 	RegisterEnum(NUM_ENDTURN_BLOCKING_TYPES);
@@ -913,6 +914,18 @@ int CvLuaEnums::pRegister(lua_State* L)
 #endif
 	RegisterEnum(NUM_MINOR_CIV_QUEST_TYPES);
 	EnumEnd(L);
+
+#if defined(MOD_BALANCE_CORE)
+	//Corps
+	EnumStart(L, "CorporationTypes");
+	RegisterEnum(NO_CORPORATION);
+	EnumEnd(L);
+
+	//Contracts
+	EnumStart(L, "ContractTypes");
+	RegisterEnum(NO_CONTRACT);
+	EnumEnd(L);
+#endif
 
 
 	// Resource Usage

@@ -75,6 +75,7 @@ public:
 	PlayerTypes GetGreatWorkCreator (int iIndex) const;
 	PlayerTypes GetGreatWorkController(int iIndex) const;
 #if defined(MOD_API_EXTENSIONS)
+	bool IsGreatWorkCreated(GreatWorkType eType) const;
 	CvCity* GetGreatWorkCity(int iIndex) const;
 #endif
 	int GetGreatWorkCurrentThemingBonus (int iIndex) const;
@@ -263,7 +264,7 @@ public:
 	int GetInfluenceSurveillanceTime(PlayerTypes ePlayer) const;
 	int GetInfluenceCityStateSpyRankBonus(PlayerTypes eCityStatePlayer) const;
 	int GetInfluenceMajorCivSpyRankBonus(PlayerTypes ePlayer) const;
-	CvString GetInfluenceSpyRankTooltip (CvString szName, CvString iRank, PlayerTypes ePlayer);
+	CvString GetInfluenceSpyRankTooltip (CvString szName, CvString iRank, PlayerTypes ePlayer, bool bNoBasicHelp = false, int iSpyID = -1);
 	int GetTourism();
 	int GetTourismModifierWith(PlayerTypes ePlayer) const;
 	CvString GetTourismModifierWithTooltip(PlayerTypes ePlayer) const;
@@ -399,12 +400,13 @@ public:
 #else
 	int GetCultureFromImprovements() const;
 #endif
-
+#if defined(MOD_BALANCE_CORE)
+	void UpdateThemingBonusIndex(BuildingClassTypes eBuildingClass);
+#endif
 	void LogGreatWorks (FILogFile* pLog);
 
 private:
 	int GetThemingBonusIndex(BuildingClassTypes eBuildingClass) const;
-
 	CvCity *m_pCity;
 };
 

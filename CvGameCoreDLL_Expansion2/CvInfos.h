@@ -491,13 +491,21 @@ protected:
 #endif
 };
 
+#if defined(MOD_BALANCE_CORE)
+// Forward declaration
+class CvCorporationEntry;
+#endif
+
 //++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 //  class : CvBuildingClassInfo
 //++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 class CvBuildingClassInfo :	public CvBaseInfo
 {
 public:
-
+#if defined(MOD_BALANCE_CORE)
+	// So when we load in Corporations, they can touch this
+	friend class CvCorporationEntry;
+#endif
 	CvBuildingClassInfo();
 	virtual ~CvBuildingClassInfo();
 
@@ -514,6 +522,13 @@ public:
 	// Arrays
 	int getVictoryThreshold(int i) const;
 
+#if defined(MOD_BALANCE_CORE)
+	CorporationTypes getCorporationType() const;
+	bool IsHeadquarters() const;
+	bool IsOffice() const;
+	bool IsFranchise() const;
+#endif
+
 	virtual bool CacheResults(Database::Results& kResults, CvDatabaseUtility& kUtility);
 
 protected:
@@ -528,6 +543,13 @@ protected:
 
 	// Arrays
 	int* m_piVictoryThreshold;
+
+#if defined(MOD_BALANCE_CORE)
+	CorporationTypes m_eCorporationType;
+	bool m_bIsHeadquarters;
+	bool m_bIsOffice;
+	bool m_bIsFranchise;
+#endif
 
 private:
 	CvBuildingClassInfo(const CvBuildingClassInfo&);
@@ -682,7 +704,7 @@ protected:
 
 private:
 	CvCivilizationInfo(const CvCivilizationInfo&);
-	const CvCivilizationInfo& operator=(const CvCivilizationInfo&);
+	CvCivilizationInfo& operator=(const CvCivilizationInfo&);
 };
 
 //++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
@@ -1206,11 +1228,17 @@ public:
 
 	int getTime() const;
 	int getCost() const;
+#if defined(MOD_CIV6_WORKER)
+	int getBuilderCost() const;
+#endif
 	int getCostIncreasePerImprovement() const;
 	int getTechPrereq() const;
 #if defined(MOD_BALANCE_CORE)
 	int getTechObsolete() const;
 	bool isKillOnlyCivilian() const;
+	bool IsFreeBestDomainUnit() const;
+	bool IsKillImprovement() const;
+	bool IsCultureBoost() const;
 #endif
 	int getImprovement() const;
 	int getRoute() const;
@@ -1242,11 +1270,17 @@ public:
 protected:
 	int m_iTime;
 	int m_iCost;
+#if defined(MOD_CIV6_WORKER)
+	int m_iBuilderCost;
+#endif
 	int m_iCostIncreasePerImprovement;
 	int m_iTechPrereq;
 #if defined(MOD_BALANCE_CORE)
 	bool m_bKillOnlyCivilian;
 	int m_iTechObsolete;
+	bool m_bFreeBestDomainUnit;
+	bool m_bKillImprovement;
+	bool m_bCultureBoost;
 #endif
 	int m_iImprovement;
 	int m_iRoute;
@@ -1627,6 +1661,7 @@ public:
 	int getOccurrenceFrequency() const;
 	int getAdjacentUnitFreePromotion() const;
 #if defined(MOD_BALANCE_CORE)
+	int getPromotionIfOwned() const;
 	int getLocationUnitFreePromotion() const;
 	int getAdjacentSpawnLocationUnitFreePromotion() const;
 	int getSpawnLocationUnitFreePromotion() const;
@@ -1648,7 +1683,12 @@ public:
 	bool isVisibleAlways() const;
 	bool isNukeImmune() const;
 	bool IsRough() const;
+#if defined(MOD_PSEUDO_NATURAL_WONDER)
+	bool IsNaturalWonder(bool orPseudoNatural = false) const;
+	bool IsPseudoNaturalWonder() const;
+#else
 	bool IsNaturalWonder() const;
+#endif
 
 	const char* getArtDefineTag() const;
 	void setArtDefineTag(const char* szTag);
@@ -1667,6 +1707,7 @@ public:
 	int getCoastalLandYieldChange(int i) const;
 	int getFreshWaterYieldChange(int i) const;
 	int GetTechYieldChanges(int i, int j) const;
+	int GetEraYieldChanges(int i) const;
 #endif
 	int get3DAudioScriptFootstepIndex(int i) const;
 
@@ -1699,6 +1740,7 @@ protected:
 	int m_iOccurrenceFrequency;
 	int m_iAdjacentUnitFreePromotion;
 #if defined(MOD_BALANCE_CORE)
+	int m_iPromotionIfOwned;
 	int m_iLocationUnitFreePromotion;
 	int m_iSpawnLocationUnitFreePromotion;
 	int m_iAdjacentSpawnLocationUnitFreePromotion;
@@ -1721,6 +1763,9 @@ protected:
 	bool m_bNukeImmune;
 	bool m_bRough;
 	bool m_bNaturalWonder;
+#if defined(MOD_PSEUDO_NATURAL_WONDER)
+	bool m_bPseudoNaturalWonder;
+#endif
 
 	// Set each time the game is started
 	bool m_bClearable;
@@ -1739,6 +1784,7 @@ protected:
 	int* m_piCoastalLandYieldChange;
 	int* m_piFreshWaterChange;
 	int** m_ppiTechYieldChanges;
+	int* m_piEraYieldChange;
 #endif
 	int* m_pi3DAudioScriptFootstepIndex;
 	bool* m_pbTerrain;
@@ -1771,6 +1817,14 @@ public:
 	int getPopulationChangeOffset() const;
 	int getPopulationChangeDivisor() const;
 	int getMinCity() const;
+#if defined(MOD_BALANCE_CORE)
+	int getMinCityFlatFreshWater() const;
+	int getMinCityFlatNoFreshWater() const;
+	int getMinCityHillFreshWater() const;
+	int getMinCityHillNoFreshWater() const;
+	int getMinCityMountainFreshWater() const;
+	int getMinCityMountainNoFreshWater() const;
+#endif
 	int getGoldenAgeYield() const;
 	int getGoldenAgeYieldThreshold() const;
 	int getGoldenAgeYieldMod() const;
@@ -1790,6 +1844,14 @@ protected:
 	int m_iPopulationChangeOffset;
 	int m_iPopulationChangeDivisor;
 	int m_iMinCity;
+#if defined(MOD_BALANCE_CORE)
+	int m_iMinCityFlatFreshWater;
+	int m_iMinCityFlatNoFreshWater;
+	int m_iMinCityHillFreshWater;
+	int m_iMinCityHillNoFreshWater;
+	int m_iMinCityMountainFreshWater;
+	int m_iMinCityMountainNoFreshWater;
+#endif
 	int m_iGoldenAgeYield;
 	int m_iGoldenAgeYieldThreshold;
 	int m_iGoldenAgeYieldMod;
@@ -2548,6 +2610,38 @@ private:
 
 #if defined(MOD_BALANCE_CORE_EVENTS)
 //++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+//  class : CvEventLinkingInfo
+//++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+class CvEventLinkingInfo
+{
+	friend class CvModEventInfo;
+
+public:
+	CvEventLinkingInfo() :
+	  m_bCheckWorld(false),
+	  m_bActive(false),
+	  m_iEvent(-1),
+	  m_iEventChoice(-1),
+	  m_iCityEvent(-1),
+	  m_iCityEventChoice(-1)
+	  {
+	  };
+	  int GetLinkingEvent() {return m_iEvent;};
+	  int GetLinkingEventChoice() {return m_iEventChoice;};
+	  int GetCityLinkingEvent() {return m_iCityEvent;};
+	  int GetCityLinkingEventChoice() {return m_iCityEventChoice;};
+	  bool CheckOtherPlayers() {return m_bCheckWorld;};
+	  bool CheckForActive() {return m_bActive;};
+
+protected:
+	bool m_bCheckWorld;
+	bool m_bActive;
+	int m_iEvent;
+	int m_iEventChoice;
+	int m_iCityEvent;
+	int m_iCityEventChoice;
+};
+//++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 //  class : CvModEventInfo
 //++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 class CvModEventInfo : public CvBaseInfo
@@ -2562,6 +2656,7 @@ public:
 	int getMinimumNationalPopulation() const;
 	int getMinimumNumberCities() const;
 	int getUnitTypeRequired() const;
+	int getEventClass() const;
 	int getRandomChance() const;
 	int getRandomChanceDelta() const;
 	int getRequiredCiv() const;
@@ -2589,16 +2684,6 @@ public:
 	int getFeatureRequired(FeatureTypes eFeature) const;
 	int getRequiredStateReligion() const;
 	bool hasStateReligion() const;
-	int getRequiredActiveEvent() const;
-	int getRequiredActiveEventChoice() const;
-	int getRequiredActiveCityEvent() const;
-	int getRequiredActiveCityEventChoice() const;
-	int getRequiredNoActiveEvent() const;
-	int getRequiredNoActiveEventChoice() const;
-	int getRequiredActiveOtherPlayerEvent() const;
-	int getRequiredActiveOtherPlayerEventChoice() const;
-	int getRequiredNoActiveOtherPlayerEvent() const;
-	int getRequiredNoActiveOtherPlayerEventChoice() const;
 	bool isUnhappy() const;
 	bool isSuperUnhappy() const;
 	bool isOneShot() const;
@@ -2609,6 +2694,9 @@ public:
 	bool isVassal() const;
 	int getNumCoastalRequired() const;
 	bool isTradeCapped() const;
+		
+	CvEventLinkingInfo *GetLinkerInfo(int i) const;
+	int GetNumLinkers() const {return m_iLinkerInfos;};
 
 	virtual bool CacheResults(Database::Results& kResults, CvDatabaseUtility& kUtility);
 
@@ -2620,6 +2708,7 @@ protected:
 	int m_iMinimumNationalPopulation;
 	int m_iMinimumNumberCities;
 	int m_iUnitTypeRequired;
+	int m_iEventClass;
 	int m_iRandomChance;
 	int m_iRandomChanceDelta;
 	int m_iRequiredCiv;
@@ -2649,16 +2738,6 @@ protected:
 	bool m_bHasStateReligion;
 	bool m_bUnhappy;
 	bool m_bSuperUnhappy;
-	int m_iRequiredActiveEvent;
-	int m_iRequiredActiveEventChoice;
-	int m_iRequiredActiveCityEvent;
-	int m_iRequiredActiveCityEventChoice;
-	int m_iRequiredActiveEventOtherPlayer;
-	int m_iRequiredActiveEventChoiceOtherPlayer;
-	int m_iRequiredNoActiveEventOtherPlayer;
-	int m_iRequiredNoActiveEventChoiceOtherPlayer;
-	int m_iRequiredNoActiveEvent;
-	int m_iRequiredNoActiveEventChoice;
 	bool m_bOneShot;
 	bool m_bMetAnotherCiv;
 	bool m_bInDebt;
@@ -2667,6 +2746,9 @@ protected:
 	bool m_bMaster;
 	int m_iCoastal;
 	bool m_bTradeCapped;
+	
+	CvEventLinkingInfo* m_paLinkerInfo;
+	int m_iLinkerInfos;
 
 private:
 	CvModEventInfo(const CvModEventInfo&);
@@ -2704,6 +2786,40 @@ protected:
 	int m_iVariable1;
 	int m_iVariable2;
 };
+
+//++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+//  class : CvEventChoiceLinkingInfo
+//++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+class CvEventChoiceLinkingInfo
+{
+	friend class CvModEventChoiceInfo;
+
+public:
+	CvEventChoiceLinkingInfo() :
+	  m_bCheckWorld(false),
+	  m_bActive(false),
+	  m_iEvent(-1),
+	  m_iEventChoice(-1),
+	  m_iCityEvent(-1),
+	  m_iCityEventChoice(-1)
+	  {
+	  };
+	  int GetLinkingEvent() {return m_iEvent;};
+	  int GetLinkingEventChoice() {return m_iEventChoice;};
+	  int GetCityLinkingEvent() {return m_iCityEvent;};
+	  int GetCityLinkingEventChoice() {return m_iCityEventChoice;};
+	  bool CheckOtherPlayers() {return m_bCheckWorld;};
+	  bool CheckForActive() {return m_bActive;};
+
+protected:
+	bool m_bCheckWorld;
+	bool m_bActive;
+	int m_iEvent;
+	int m_iEventChoice;
+	int m_iCityEvent;
+	int m_iCityEventChoice;
+};
+
 //++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 //  class : CvModEventChoiceInfo
 //++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
@@ -2746,6 +2862,7 @@ public:
 	int getFeatureYield(int i, int j) const;
 	int getImprovementYield(int i, int j) const;
 	int getResourceYield(int i, int j) const;
+	int getGlobalSpecialistYieldChange(int i, int j) const;
 	int getPlayerHappiness() const;
 	int getCityHappinessGlobal() const;
 	int getCityUnhappinessNeedMod(int i) const;
@@ -2780,16 +2897,6 @@ public:
 	int getFeatureRequired(FeatureTypes eFeature) const;
 	int getRequiredStateReligion() const;
 	bool hasStateReligion() const;
-	int getRequiredActiveEvent() const;
-	int getRequiredActiveEventChoice() const;
-	int getRequiredActiveCityEvent() const;
-	int getRequiredActiveCityEventChoice() const;
-	int getRequiredNoActiveEvent() const;
-	int getRequiredNoActiveEventChoice() const;
-	int getRequiredActiveOtherPlayerEvent() const;
-	int getRequiredActiveOtherPlayerEventChoice() const;
-	int getRequiredNoActiveOtherPlayerEvent() const;
-	int getRequiredNoActiveOtherPlayerEventChoice() const;
 	bool isUnhappy() const;
 	bool isSuperUnhappy() const;
 	bool isOneShot() const;
@@ -2802,6 +2909,10 @@ public:
 	bool isCoastalOnly() const;
 	bool isTradeCapped() const;
 	bool isCapitalEffectOnly() const;
+	bool isInstantYieldAllCities() const;
+		
+	CvEventChoiceLinkingInfo *GetLinkerInfo(int i) const;
+	int GetNumLinkers() const {return m_iLinkerInfos;};
 
 	virtual bool CacheResults(Database::Results& kResults, CvDatabaseUtility& kUtility);
 
@@ -2842,6 +2953,7 @@ protected:
 	int** m_ppiFeatureYield;
 	int** m_ppiImprovementYield;
 	int** m_ppiResourceYield;
+	int** m_ppiSpecialistYield;
 	CvString m_strDisabledTooltip;
 	//Filters
 
@@ -2871,16 +2983,6 @@ protected:
 	bool m_bHasStateReligion;
 	bool m_bUnhappy;
 	bool m_bSuperUnhappy;
-	int m_iRequiredActiveEvent;
-	int m_iRequiredActiveEventChoice;
-	int m_iRequiredActiveEventOtherPlayer;
-	int m_iRequiredActiveEventChoiceOtherPlayer;
-	int m_iRequiredNoActiveEventOtherPlayer;
-	int m_iRequiredNoActiveEventChoiceOtherPlayer;
-	int m_iRequiredNoActiveEvent;
-	int m_iRequiredNoActiveEventChoice;
-	int m_iRequiredActiveCityEvent;
-	int m_iRequiredActiveCityEventChoice;
 	bool m_bOneShot;
 	bool m_bMetAnotherCiv;
 	bool m_bInDebt;
@@ -2891,13 +2993,52 @@ protected:
 	bool m_bCoastalOnly;
 	bool m_bTradeCapped;
 	bool m_bCapitalEffectOnly;
+	bool m_bInstantYieldAllCities;
 
 	CvEventNotificationInfo* m_paNotificationInfo;
 	int m_iNotificationInfos;
 
+	CvEventChoiceLinkingInfo* m_paLinkerInfo;
+	int m_iLinkerInfos;
+
 private:
 	CvModEventChoiceInfo(const CvModEventChoiceInfo&);
 	CvModEventChoiceInfo& operator=(const CvModEventChoiceInfo&);
+};
+//++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+//  class : CvCityEventLinkingInfo
+//++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+class CvCityEventLinkingInfo
+{
+	friend class CvModCityEventInfo;
+
+public:
+	CvCityEventLinkingInfo() :
+	  m_bCheckWorld(false),
+	  m_bActive(false),
+	  m_iEvent(-1),
+	  m_iEventChoice(-1),
+	  m_iCityEvent(-1),
+	  m_iCityEventChoice(-1),
+	  m_bOnlyActiveCity(false)
+	  {
+	  };
+	  int GetLinkingEvent() {return m_iEvent;};
+	  int GetLinkingEventChoice() {return m_iEventChoice;};
+	  int GetCityLinkingEvent() {return m_iCityEvent;};
+	  int GetCityLinkingEventChoice() {return m_iCityEventChoice;};
+	  bool CheckOtherPlayers() {return m_bCheckWorld;};
+	  bool CheckForActive() {return m_bActive;};
+	  bool CheckOnlyActiveCity() {return m_bOnlyActiveCity;};
+
+protected:
+	bool m_bCheckWorld;
+	bool m_bActive;
+	bool m_bOnlyActiveCity;
+	int m_iEvent;
+	int m_iEventChoice;
+	int m_iCityEvent;
+	int m_iCityEventChoice;
 };
 
 //++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
@@ -2909,6 +3050,7 @@ public:
 	CvModCityEventInfo();
 	virtual ~CvModCityEventInfo();
 
+	int getEventClass() const;
 	bool IgnoresGlobalCooldown() const;
 	int getPrereqTech() const;
 	int getObsoleteTech() const;
@@ -2967,22 +3109,14 @@ public:
 	bool lacksPlayerReligion() const;
 	bool hasPlayerMajority() const;
 	bool lacksPlayerMajority() const;
-	int getRequiredActiveEvent() const;
-	int getRequiredActiveEventChoice() const;
-	int getRequiredActiveCityEvent() const;
-	int getRequiredActiveCityEventChoice() const;
-	int getRequiredNoActiveCityEvent() const;
-	int getRequiredNoActiveCityEventChoice() const;
-	int getRequiredNoActivePlayerEvent() const;
-	int getRequiredNoActivePlayerEventChoice() const;
-	int getRequiredActiveOtherPlayerEvent() const;
-	int getRequiredActiveOtherPlayerEventChoice() const;
-	int getRequiredNoActiveOtherPlayerEvent() const;
-	int getRequiredNoActiveOtherPlayerEventChoice() const;
+	
+	CvCityEventLinkingInfo *GetLinkerInfo(int i) const;
+	int GetNumLinkers() const {return m_iCityLinkerInfos;};
 
 	virtual bool CacheResults(Database::Results& kResults, CvDatabaseUtility& kUtility);
 
 protected:
+	int m_iEventClass;
 	bool m_bIgnoresGlobalCooldown;
 	int m_iPrereqTech;
 	int m_iObsoleteTech;
@@ -3041,18 +3175,9 @@ protected:
 	bool m_bLacksPlayerReligion;
 	bool m_bHasPlayerMajority;
 	bool m_bLacksPlayerMajority;
-	int m_iRequiredActiveEvent;
-	int m_iRequiredActiveEventChoice;
-	int m_iRequiredActiveCityEvent;
-	int m_iRequiredActiveCityEventChoice;
-	int m_iRequiredActiveEventOtherPlayer;
-	int m_iRequiredActiveEventChoiceOtherPlayer;
-	int m_iRequiredNoActiveEventOtherPlayer;
-	int m_iRequiredNoActiveEventChoiceOtherPlayer;
-	int m_iRequiredNoActiveEvent;
-	int m_iRequiredNoActiveEventChoice;
-	int m_iRequiredNoActiveCityEvent;
-	int m_iRequiredNoActiveCityEventChoice;
+	
+	CvCityEventLinkingInfo* m_paCityLinkerInfo;
+	int m_iCityLinkerInfos;
 
 private:
 	CvModCityEventInfo(const CvModCityEventInfo&);
@@ -3089,6 +3214,42 @@ protected:
 	CvString m_strShortDescription;
 	bool m_bWorldEvent;
 	bool m_bNeedPlayerID;
+};
+
+//++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+//  class : CvCityEventChoiceLinkingInfo
+//++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+class CvCityEventChoiceLinkingInfo
+{
+	friend class CvModEventCityChoiceInfo;
+
+public:
+	CvCityEventChoiceLinkingInfo() :
+	  m_bCheckWorld(false),
+	  m_bActive(false),
+	  m_iEvent(-1),
+	  m_iEventChoice(-1),
+	  m_iCityEvent(-1),
+	  m_iCityEventChoice(-1),
+	  m_bOnlyActiveCity(false)
+	  {
+	  };
+	  int GetLinkingEvent() {return m_iEvent;};
+	  int GetLinkingEventChoice() {return m_iEventChoice;};
+	  int GetCityLinkingEvent() {return m_iCityEvent;};
+	  int GetCityLinkingEventChoice() {return m_iCityEventChoice;};
+	  bool CheckOtherPlayers() {return m_bCheckWorld;};
+	  bool CheckForActive() {return m_bActive;};
+	  bool CheckOnlyActiveCity() {return m_bOnlyActiveCity;};
+
+protected:
+	bool m_bCheckWorld;
+	bool m_bActive;
+	bool m_bOnlyActiveCity;
+	int m_iEvent;
+	int m_iEventChoice;
+	int m_iCityEvent;
+	int m_iCityEventChoice;
 };
 //++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 //  class : CvModEventCityChoiceInfo
@@ -3132,6 +3293,7 @@ public:
 	int getResourceYield(int i, int j) const;
 	int getEventResourceChange(ResourceTypes eResource) const;
 	int getCityUnhappinessNeedMod(int i) const;
+	int getCitySpecialistYieldChange(int i, int j) const;
 	const char* getDisabledTooltip() const;
 	int getEventPromotion() const;
 	int ConvertsCityToPlayerReligion() const;
@@ -3184,18 +3346,6 @@ public:
 	bool isLosingMoney() const;
 	bool isMaster() const;
 	bool isVassal() const;
-	int getRequiredActiveEvent() const;
-	int getRequiredActiveEventChoice() const;
-	int getRequiredActiveCityEvent() const;
-	int getRequiredActiveCityEventChoice() const;
-	int getRequiredNoActiveCityEvent() const;
-	int getRequiredNoActiveCityEventChoice() const;
-	int getRequiredNoActivePlayerEvent() const;
-	int getRequiredNoActivePlayerEventChoice() const;
-	int getRequiredActiveOtherPlayerEvent() const;
-	int getRequiredActiveOtherPlayerEventChoice() const;
-	int getRequiredNoActiveOtherPlayerEvent() const;
-	int getRequiredNoActiveOtherPlayerEventChoice() const;
 	bool hasPlayerReligion() const;
 	bool lacksPlayerReligion() const;
 	bool hasPlayerMajority() const;
@@ -3203,6 +3353,9 @@ public:
 
 	CvCityEventNotificationInfo *GetNotificationInfo(int i) const;
 	int GetNumNotifications() const {return m_iCityNotificationInfos;};
+
+	CvCityEventChoiceLinkingInfo *GetLinkerInfo(int i) const;
+	int GetNumLinkers() const {return m_iCityLinkerInfos;};
 
 	virtual bool CacheResults(Database::Results& kResults, CvDatabaseUtility& kUtility);
 
@@ -3235,6 +3388,7 @@ protected:
 	int** m_ppiBuildingClassYieldModifier;
 	int** m_ppiTerrainYield;
 	int** m_ppiFeatureYield;
+	int ** m_ppiSpecialistYield;
 	int** m_ppiImprovementYield;
 	int** m_ppiResourceYield;
 	bool* m_pbParentEventIDs;
@@ -3292,18 +3446,6 @@ protected:
 	bool m_bLosingMoney;
 	bool m_bVassal;
 	bool m_bMaster;
-	int m_iRequiredActiveEvent;
-	int m_iRequiredActiveEventChoice;
-	int m_iRequiredActiveCityEvent;
-	int m_iRequiredActiveCityEventChoice;
-	int m_iRequiredActiveEventOtherPlayer;
-	int m_iRequiredActiveEventChoiceOtherPlayer;
-	int m_iRequiredNoActiveEventOtherPlayer;
-	int m_iRequiredNoActiveEventChoiceOtherPlayer;
-	int m_iRequiredNoActiveEvent;
-	int m_iRequiredNoActiveEventChoice;
-	int m_iRequiredNoActiveCityEvent;
-	int m_iRequiredNoActiveCityEventChoice;
 	bool m_bHasPlayerReligion;
 	bool m_bLacksPlayerReligion;
 	bool m_bHasPlayerMajority;
@@ -3311,6 +3453,8 @@ protected:
 
 	CvCityEventNotificationInfo* m_paCityNotificationInfo;
 	int m_iCityNotificationInfos;
+	CvCityEventChoiceLinkingInfo* m_paCityLinkerInfo;
+	int m_iCityLinkerInfos;
 
 private:
 	CvModEventCityChoiceInfo(const CvModEventCityChoiceInfo&);

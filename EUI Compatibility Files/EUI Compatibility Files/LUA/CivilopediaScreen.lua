@@ -53,7 +53,8 @@ local CategoryResources = 13;
 local CategoryImprovements = 14;
 local CategoryBeliefs = 15;
 local CategoryWorldCongress = 16;
-local numCategories = 16;
+local CategoryCorporations = 17;
+local numCategories = 17;
 
 local selectedCategory = CategoryHomePage;
 local CivilopediaCategory = {};
@@ -109,6 +110,10 @@ local g_RequiredBuildingsManager = InstanceManager:new( "RequiredBuildingInstanc
 --CBP
 local g_LeadsToBuildingsManager = InstanceManager:new( "LeadsToBuildingInstance", "LeadsToBuildingButton", Controls.LeadsToBuildingsInnerFrame );
 local g_MonopolyResourcesManager = InstanceManager:new( "MonopolyResourceInstance", "MonopolyResourceButton", Controls.MonopolyResourcesInnerFrame );
+local g_CorporationsManager = InstanceManager:new( "CorporationInstance", "CorporationButton", Controls.CorporationInnerFrame );
+local g_CorpHeadquartersManager = InstanceManager:new( "CorporationBuildingInstance", "CorporationBuildingButton", Controls.CorpHeadquartersInnerFrame );
+local g_CorpOfficeManager = InstanceManager:new( "CorporationBuildingInstance", "CorporationBuildingButton", Controls.CorpOfficeInnerFrame );
+local g_CorpFranchiseManager = InstanceManager:new( "CorporationBuildingInstance", "CorporationBuildingButton", Controls.CorpFranchiseInnerFrame );
 --END
 local g_LocalResourcesManager = InstanceManager:new( "LocalResourceInstance", "LocalResourceButton", Controls.LocalResourcesInnerFrame );
 local g_RequiredPromotionsManager = InstanceManager:new( "RequiredPromotionInstance", "RequiredPromotionButton", Controls.RequiredPromotionsInnerFrame );
@@ -207,6 +212,7 @@ CivilopediaCategory[CategoryResources].buttonTexture = "Assets/UI/Art/Civilopedi
 CivilopediaCategory[CategoryImprovements].buttonTexture = "Assets/UI/Art/Civilopedia/CivilopediaTopButtonsImprovements.dds";
 CivilopediaCategory[CategoryBeliefs].buttonTexture = "CivilopediaTopButtonsReligion.dds";
 CivilopediaCategory[CategoryWorldCongress].buttonTexture = "CivilopediaTopButtonsWorldCongress.dds";
+CivilopediaCategory[CategoryCorporations].buttonTexture = "civilopediatopbuttonscorporations.dds";
 
 CivilopediaCategory[CategoryHomePage].labelString = Locale.ConvertTextKey( "TXT_KEY_PEDIA_CATEGORY_1_LABEL" );
 CivilopediaCategory[CategoryGameConcepts].labelString = Locale.ConvertTextKey( "TXT_KEY_PEDIA_CATEGORY_2_LABEL" );
@@ -224,6 +230,7 @@ CivilopediaCategory[CategoryResources].labelString = Locale.ConvertTextKey( "TXT
 CivilopediaCategory[CategoryImprovements].labelString = Locale.ConvertTextKey( "TXT_KEY_PEDIA_CATEGORY_14_LABEL" );
 CivilopediaCategory[CategoryBeliefs].labelString = Locale.Lookup("TXT_KEY_PEDIA_CATEGORY_15_LABEL");
 CivilopediaCategory[CategoryWorldCongress].labelString = Locale.Lookup("TXT_KEY_PEDIA_CATEGORY_16_LABEL");
+CivilopediaCategory[CategoryCorporations].labelString = Locale.Lookup("TXT_KEY_PEDIA_CATEGORY_17_LABEL");
 
 CivilopediaCategory[CategoryHomePage].PopulateList = function()
 	sortedList[CategoryHomePage] = {};
@@ -739,11 +746,10 @@ CivilopediaCategory[CategoryBuildings].PopulateList = function()
 	end
 	
 	local sectionID = 0;
-	
 	if(Game == nil or not Game.IsOption(GameOptionTypes.GAMEOPTION_NO_RELIGION)) then
 		--Add Faith Buildings first
-		sortedList[CategoryBuildings][sectionID] = {};
 		local tableid = 1;
+		sortedList[CategoryBuildings][sectionID] = {};	
 		for building in DB.Query("SELECT Buildings.ID, Buildings.Description, Buildings.PortraitIndex, Buildings.IconAtlas from Buildings inner join  BuildingClasses on Buildings.BuildingClass = BuildingClasses.Type where Buildings.FaithCost > 0 and Buildings.Cost == -1 and BuildingClasses.MaxGlobalInstances < 0 and (BuildingClasses.MaxPlayerInstances <> 1 or Buildings.SpecialistCount > 0) and BuildingClasses.MaxTeamInstances < 0;") do
 			AddArticle(0, tableid, building);
 			tableid = tableid + 1;
@@ -751,12 +757,22 @@ CivilopediaCategory[CategoryBuildings].PopulateList = function()
 		sectionID = sectionID + 1;
 	end
 	
+	--CORPS
+	--Add Corporation Buildings Second
+	local tableid = 1;
+	sortedList[CategoryBuildings][sectionID] = {};
+	for building in DB.Query("SELECT Buildings.ID, Buildings.Description, Buildings.PortraitIndex, Buildings.IconAtlas from Buildings inner join  BuildingClasses on Buildings.BuildingClass = BuildingClasses.Type where Buildings.IsCorporation > 0 and BuildingClasses.MaxGlobalInstances < 0 and (BuildingClasses.MaxPlayerInstances <> 1 or Buildings.SpecialistCount > 0) and BuildingClasses.MaxTeamInstances < 0;") do
+		AddArticle(1, tableid, building);
+		tableid = tableid + 1;
+	end
+	sectionID = sectionID + 1;
+	
 	local sql = [[
 		SELECT Buildings.ID, Buildings.Description, Buildings.PortraitIndex, Buildings.IconAtlas 
 		FROM Buildings 
 		INNER JOIN BuildingClasses ON Buildings.BuildingClass = BuildingClasses.Type 
 		INNER JOIN Technologies ON Buildings.PrereqTech = Technologies.Type 
-		WHERE (FaithCost == 0 or Buildings.Cost >= 0) AND BuildingClasses.MaxGlobalInstances < 0 AND (BuildingClasses.MaxPlayerInstances <> 1 or Buildings.SpecialistCount > 0) AND BuildingClasses.MaxTeamInstances < 0 AND Technologies.Era = ?;]];
+		WHERE (FaithCost == 0 or Buildings.Cost >= 0) AND Buildings.IsCorporation == 0 AND BuildingClasses.MaxGlobalInstances < 0 AND BuildingClasses.MaxPlayerInstances <> 1 AND BuildingClasses.MaxTeamInstances < 0 AND Technologies.Era = ?;]];
 	
 	local BuildingsByEra = DB.CreateQuery(sql);
 	
@@ -781,7 +797,7 @@ CivilopediaCategory[CategoryBuildings].PopulateList = function()
 				SELECT Buildings.ID, Buildings.Description, Buildings.PortraitIndex, Buildings.IconAtlas 
 				FROM Buildings 
 				INNER JOIN BuildingClasses ON Buildings.BuildingClass = BuildingClasses.Type 
-				WHERE Buildings.PrereqTech IS NULL AND (Buildings.FaithCost == 0 or Buildings.Cost >= 0) AND BuildingClasses.MaxGlobalInstances < 0 AND (BuildingClasses.MaxPlayerInstances <> 1 or Buildings.SpecialistCount > 0) AND BuildingClasses.MaxTeamInstances < 0;]];
+				WHERE Buildings.PrereqTech IS NULL AND (Buildings.FaithCost == 0 or Buildings.Cost >= 0) AND Buildings.IsCorporation == 0 AND BuildingClasses.MaxGlobalInstances < 0 AND (BuildingClasses.MaxPlayerInstances <> 1 or Buildings.SpecialistCount > 0) AND BuildingClasses.MaxTeamInstances < 0;]];
 		
 			for building in DB.Query(sql) do
 				AddArticle(eraID, tableid, building);
@@ -810,7 +826,7 @@ CivilopediaCategory[CategoryWonders].PopulateList = function()
 	for building in GameInfo.Buildings() do	
 		-- exclude wonders etc.				
 		local thisBuildingClass = GameInfo.BuildingClasses[building.BuildingClass];
-		if thisBuildingClass.MaxGlobalInstances > 0  then
+		if thisBuildingClass.MaxGlobalInstances > 0 and building.IsCorporation == 0 then
 			local article = {};
 			local name = Locale.ConvertTextKey( building.Description )
 			article.entryName = name;
@@ -896,6 +912,38 @@ CivilopediaCategory[CategoryWonders].PopulateList = function()
 	
 	-- sort this list alphabetically by localized name
 	table.sort(sortedList[CategoryWonders][3], Alphabetically);
+	
+		-- fourth Corporations
+	sortedList[CategoryWonders][4] = {};
+	local tableid = 1;
+
+	for building in GameInfo.Buildings() do	
+		-- exclude wonders etc.				
+		local thisBuildingClass = GameInfo.BuildingClasses[building.BuildingClass];
+		if thisBuildingClass.MaxGlobalInstances > 0 and building.IsCorporation > 0 then
+			local article = {};
+			local name = Locale.ConvertTextKey( building.Description )
+			article.entryName = name;
+			article.entryID = building.ID;
+			article.entryCategory = CategoryWonders;
+			article.tooltipTextureOffset, article.tooltipTexture = IconLookup( building.PortraitIndex, buttonSize, building.IconAtlas );				
+			if not article.tooltipTextureOffset then
+				article.tooltipTexture = defaultErrorTextureSheet;
+				article.tooltipTextureOffset = nullOffset;
+			end				
+			
+			sortedList[CategoryWonders][4][tableid] = article;
+			tableid = tableid + 1;
+			
+			-- index by various keys
+			searchableList[Locale.ToLower(name)] = article;
+			searchableTextKeyList[building.Description] = article;
+			categorizedList[(CategoryWonders * absurdlyLargeNumTopicsInCategory) + building.ID] = article;
+		end
+	end
+	
+	-- sort this list alphabetically by localized name
+	table.sort(sortedList[CategoryWonders][4], Alphabetically);
 					
 end
 
@@ -1442,6 +1490,35 @@ CivilopediaCategory[CategoryWorldCongress].PopulateList = function()
 	end
 end
 
+CivilopediaCategory[CategoryCorporations].PopulateList = function()
+
+	sortedList[CategoryCorporations] = {};
+	
+	sortedList[CategoryCorporations][1] = {}; -- there is only one section (for now)
+	local tableid = 1;
+	
+	for corporation in GameInfo.Corporations() do
+		-- add a corporation entry to a list (localized name, tag, etc.)
+		local article = {};
+		local name = Locale.ConvertTextKey(corporation.Description);
+		article.entryName = name;
+		article.entryID = corporation.ID;
+		article.entryCategory = CategoryCorporations;
+		
+		sortedList[CategoryCorporations][1][tableid] = article;
+		tableid = tableid + 1;
+		
+		-- index by various keys
+		searchableList[Locale.ToLower(name)] = article;
+		searchableTextKeyList[corporation.Description] = article;
+		categorizedList[(CategoryCorporations * absurdlyLargeNumTopicsInCategory) + corporation.ID] = article;
+	end
+	
+	-- sort this list alphabetically by localized name
+	table.sort(sortedList[CategoryCorporations][1], Alphabetically);
+
+end
+
 -------------------------------------------------------------------------------
 -------------------------------------------------------------------------------
 
@@ -1949,7 +2026,37 @@ CivilopediaCategory[CategoryWorldCongress].DisplayHomePage = function()
 	ResizeEtc();
 end;
 
-
+CivilopediaCategory[CategoryCorporations].DisplayHomePage = function()
+	ClearArticle();
+	Controls.ArticleID:SetText( Locale.ConvertTextKey( "TXT_KEY_PEDIA_CORPORATIONS_PAGE_LABEL" ));	
+	
+	local portraitIndex = 6;
+	local portraitAtlas = "CORP_ATLAS";
+		
+	for row in DB.Query("SELECT PortraitIndex, IconAtlas from Corporations ORDER By Random() LIMIT 1") do
+		portraitIndex = row.PortraitIndex;
+		portraitAtlas = row.IconAtlas;
+	end	
+	
+	if IconHookup( portraitIndex, portraitSize, portraitAtlas, Controls.Portrait ) then
+		Controls.PortraitFrame:SetHide( false );
+	else
+		Controls.PortraitFrame:SetHide( true );
+	end
+	
+	UpdateTextBlock( Locale.ConvertTextKey( "TXT_KEY_PEDIA_CORPORATIONS_HOMEPAGE_BLURB" ), Controls.HomePageBlurbLabel, Controls.HomePageBlurbInnerFrame, Controls.HomePageBlurbFrame );
+	
+	g_BBTextManager:ResetInstances();
+			
+	--Basic Sectional Infos	
+	local thisBBTextInstance = g_BBTextManager:GetInstance();
+	if thisBBTextInstance then
+		thisBBTextInstance.BBTextHeader:SetText( Locale.ConvertTextKey( "TXT_KEY_PEDIA_CORPORATIONS_HOMEPAGE_LABEL1" ));
+		UpdateSuperWideTextBlock( Locale.ConvertTextKey( "TXT_KEY_PEDIA_CORPORATIONS_HOMEPAGE_TEXT1" ), thisBBTextInstance.BBTextLabel, thisBBTextInstance.BBTextInnerFrame, thisBBTextInstance.BBTextFrame );
+	end	
+	Controls.BBTextStack:SetHide( false );
+	ResizeEtc();
+end;
 
 --------------------------------------------------------------------------------------------------------
 -- a few handy-dandy helper functions
@@ -2120,6 +2227,11 @@ CivilopediaCategory[CategoryHomePage].SelectArticle = function( pageID, shouldAd
 		end
 		CivilopediaCategory[pageID].DisplayHomePage();
 	elseif pageID == CategoryWorldCongress then
+		if selectedCategory ~= pageID then
+			SetSelectedCategory(pageID);
+		end
+		CivilopediaCategory[pageID].DisplayHomePage();
+	elseif pageID == CategoryCorporations then
 		if selectedCategory ~= pageID then
 			SetSelectedCategory(pageID);
 		end
@@ -2517,6 +2629,13 @@ CivilopediaCategory[CategoryTech].SelectArticle = function( techID, shouldAddToL
 				 abilitiesString = abilitiesString .. "[NEWLINE]";
 			end
 			abilitiesString = abilitiesString ..  Locale.ConvertTextKey( "TXT_KEY_ABLTY_CITY_NO_EMBARK_COST_STRING" );
+			numAbilities = numAbilities + 1;
+		end
+		if thisTech.CorporationsEnabled then
+			if numAbilities > 0 then
+				 abilitiesString = abilitiesString .. "[NEWLINE]";
+			end
+			abilitiesString = abilitiesString ..  Locale.ConvertTextKey( "TXT_KEY_ABLTY_ENABLES_CORPORATIONS" );
 			numAbilities = numAbilities + 1;
 		end
 		for row in GameInfo.Tech_SpecialistYieldChanges( condition ) do
@@ -3161,6 +3280,39 @@ function SelectBuildingOrWonderArticle( buildingID )
 			Controls.MaintenanceFrame:SetHide( false );
 		end
 
+		-- update the Corporation (if exists) - CBP
+		-- loop through Corporations, find any that apply to this
+		local iCorp = 0;
+		for row in GameInfo.Corporations() do
+			-- our building class
+			local buildingClass = GameInfo.BuildingClasses[thisBuilding.BuildingClass];
+			if buildingClass then
+				-- HQ, office, or franchise of a corporation?
+				if (row.HeadquartersBuildingClass == buildingClass.Type or row.OfficeBuildingClass == buildingClass.Type or row.FranchiseBuildingClass == buildingClass.Type) then
+					local thisCorporationInstance = g_CorporationsManager:GetInstance();
+					if thisCorporationInstance then
+						local textureOffset, textureSheet = IconLookup( row.PortraitIndex, buttonSize, row.IconAtlas );				
+						if textureOffset == nil then
+							textureSheet = defaultErrorTextureSheet;
+							textureOffset = nullOffset;
+						end				
+						UpdateSmallButton( 0, thisCorporationInstance.CorporationImage, thisCorporationInstance.CorporationButton, textureSheet, textureOffset, CategoryCorporations, Locale.ConvertTextKey( row.Description ), row.ID );
+						iCorp = iCorp + 1;
+						-- find the first one
+						break;
+					end
+				end
+			end
+		end
+		UpdateButtonFrame( 1, Controls.CorporationInnerFrame, Controls.CorporationFrame );
+		if(iCorp > 0) then
+			Controls.CorporationFrame:SetHide(false);
+			Controls.CorporationInnerFrame:SetHide(false);
+		else
+			Controls.CorporationFrame:SetHide(true);
+			Controls.CorporationInnerFrame:SetHide(true);
+		end
+		
 		-- update the Happiness
 		local iHappiness = thisBuilding.Happiness;
 		if iHappiness > 0 then
@@ -4808,24 +4960,20 @@ CivilopediaCategory[CategoryResources].SelectArticle = function( resourceID, sho
 			numYields = 0;
 			yieldString = "";
 			fullstring = ""
-			local numYields2 = 0;
+			local numImprovement = 0;
+
 			for row in GameInfo.Improvement_ResourceType_Yields( condition ) do
 				numYields = numYields + 1;			
-				if row.Yield > 0 then
-					yieldString = yieldString.."+";
-				end
-				yieldString = yieldString..tostring(row.Yield)..GameInfo.Yields[row.YieldType].IconString.." ";
-				local OtherImprovement = GameInfo.Improvements[row.ImprovementType];
-				if(OtherImprovement and numYields2 == 0)then				
-					local condition2 = "ImprovementType = '" .. OtherImprovement.Type .. "'";
-					for row in GameInfo.Improvement_Yields( condition2 ) do
-						numYields2 = numYields2 + 1;				
-						if row.Yield > 0 then
-							yieldString = yieldString.."+";
-							teststring = yieldstring;
-						end
-						yieldString = yieldString..tostring(row.Yield)..GameInfo.Yields[row.YieldType].IconString.." ";
+				local thisImprovement = GameInfo.Improvements[row.ImprovementType];
+				if thisImprovement then
+					if numImprovement > 0 then
+						yieldString = yieldString.."[NEWLINE]";
 					end
+					if row.Yield > 0 then
+						yieldString = yieldString.."+";
+					end
+					numImprovement = numImprovement + 1;
+					yieldString = yieldString..tostring(row.Yield)..GameInfo.Yields[row.YieldType].IconString.." ("..Locale.ConvertTextKey( thisImprovement.Description )..") "
 				end
 			end
 			if numYields == 0 then
@@ -5437,6 +5585,192 @@ function GetLeagueProjectPediaText(iLeagueProjectID)
 	return s;
 end
 
+CivilopediaCategory[CategoryCorporations].SelectArticle = function(corporationID, shouldAddToList)
+	if selectedCategory ~= CategoryCorporations then
+		SetSelectedCategory(CategoryCorporations);
+	end
+	
+	ClearArticle();
+	
+	local buttonAdded = 0;
+	
+	if shouldAddToList == addToList then
+		currentTopic = currentTopic + 1;
+		listOfTopicsViewed[currentTopic] = categorizedList[(CategoryCorporations * absurdlyLargeNumTopicsInCategory) + corporationID];
+		for i = currentTopic + 1, endTopic, 1 do
+			listOfTopicsViewed[i] = nil;
+		end
+		endTopic = currentTopic;
+	end
+	
+	if (corporationID ~= -1 and corporationID < 1000) then	
+		local thisCorporation = GameInfo.Corporations[corporationID];
+	
+		if (thisCorporation ~= nil) then
+		
+			if IconHookup( thisCorporation.PortraitIndex, portraitSize, thisCorporation.IconAtlas, Controls.Portrait ) then
+				Controls.PortraitFrame:SetHide( false );
+			else
+				Controls.PortraitFrame:SetHide( true );
+			end
+			
+			-- update the name	
+			Controls.ArticleID:LocalizeAndSetText(thisCorporation.Description);
+			
+			local helpStr = "";
+			if(thisCorporation.Help ~= nil) then
+				helpStr = helpStr .. Locale.ConvertTextKey(thisCorporation.Help);
+			end
+			
+			local numFreeResources = 0;
+			local condition = "CorporationType = '" .. thisCorporation.Type .. "'";
+			for row in GameInfo.Corporation_NumFreeResource( condition ) do	
+				local freeResource = GameInfo.Resources[row.ResourceType];
+				if freeResource then	
+					if(numFreeResources == 0) then
+						helpStr = helpStr .. "[NEWLINE]";
+					end	
+					helpStr = helpStr .. "[NEWLINE]" .. Locale.ConvertTextKey( "TXT_KEY_PEDIA_CORPORATIONS_FREE_RESOURCE", row.NumResource, freeResource.IconString, freeResource.Description );
+					numFreeResources = numFreeResources + 1;
+				end
+			end
+			
+			-- update the summary
+			if (helpStr ~= nil) then
+				UpdateTextBlock( helpStr, Controls.SummaryLabel, Controls.SummaryInnerFrame, Controls.SummaryFrame );
+			end
+			
+			if(thisCorporation.ResourceBonusHelp ~= nil) then
+				UpdateTextBlock( Locale.ConvertTextKey( thisCorporation.ResourceBonusHelp ), Controls.CorporationResourceBonusLabel, Controls.CorpResourceBonusInnerFrame, Controls.CorporationResourceBonusFrame );
+			end
+			
+			if(thisCorporation.OfficeBonusHelp ~= nil) then
+				UpdateTextBlock( Locale.ConvertTextKey( thisCorporation.OfficeBonusHelp ), Controls.CorporationOfficeBonusLabel, Controls.CorpOfficeBonusInnerFrame, Controls.CorporationOfficeBonusFrame);
+			end
+			
+			if(thisCorporation.TradeRouteBonusHelp ~= nil) then
+				UpdateTextBlock( Locale.ConvertTextKey( thisCorporation.TradeRouteBonusHelp ), Controls.CorporationTRBonusLabel, Controls.CorporationTRBonusInnerFrame, Controls.CorporationTRBonusFrame);
+			end
+			
+			-- update free trade routes
+			local freeTRs = thisCorporation.NumFreeTradeRoutes;
+			if(freeTRs > 0) then
+				Controls.FreeTRFrame:SetHide(false);
+				Controls.FreeTRLabel:SetText(freeTRs .. " [ICON_INTERNATIONAL_TRADE]");
+			end
+			
+			g_MonopolyResourcesManager:ResetInstances();
+			buttonAdded = 0;
+
+			local condition = "CorporationType = '" .. thisCorporation.Type .. "'";
+			for row in GameInfo.Corporation_ResourceMonopolyOrs( condition ) do
+				local requiredResource = GameInfo.Resources[row.ResourceType];
+				if requiredResource then
+					local thisLocalResourceInstance = g_MonopolyResourcesManager:GetInstance();
+					if thisLocalResourceInstance then
+						local textureOffset, textureSheet = IconLookup( requiredResource.PortraitIndex, buttonSize, requiredResource.IconAtlas );				
+						if textureOffset == nil then
+							textureSheet = defaultErrorTextureSheet;
+							textureOffset = nullOffset;
+						end				
+						UpdateSmallButton( buttonAdded, thisLocalResourceInstance.MonopolyResourceImage, thisLocalResourceInstance.MonopolyResourceButton, textureSheet, textureOffset, CategoryResources, Locale.ConvertTextKey( requiredResource.Description ), requiredResource.ID );
+						buttonAdded = buttonAdded + 1;
+					end
+				end		
+			end
+			UpdateButtonFrame( buttonAdded, Controls.MonopolyResourcesInnerFrame, Controls.MonopolyResourcesFrame );
+			
+			g_CorpHeadquartersManager:ResetInstances();
+			g_CorpOfficeManager:ResetInstances();
+			g_CorpFranchiseManager:ResetInstances();
+			
+			local headquarters = GameInfo.BuildingClasses[thisCorporation.HeadquartersBuildingClass];
+			if(headquarters) then
+				local buildingInfo = GameInfo.Buildings[headquarters.DefaultBuilding];
+				if(buildingInfo) then
+					local instance = g_CorpHeadquartersManager:GetInstance();
+					if instance then
+						if not IconHookup( buildingInfo.PortraitIndex, buttonSize, buildingInfo.IconAtlas, instance.CorporationBuildingImage ) then
+							instance.CorporationBuildingImage:SetTexture( defaultErrorTextureSheet );
+							instance.CorporationBuildingImage:SetTextureOffset( nullOffset );
+						end
+						
+						--move this button
+						instance.CorporationBuildingButton:SetOffsetVal( buttonPadding, buttonPadding );
+						
+						instance.CorporationBuildingButton:SetToolTipString( Locale.ConvertTextKey( buildingInfo.Description ) );
+						instance.CorporationBuildingButton:SetVoids( buildingInfo.ID, addToList );
+						
+						if headquarters.MaxGlobalInstances > 0 or (headquarters.MaxPlayerInstances == 1 and headquarters.SpecialistCount == 0) or headquarters.MaxTeamInstances > 0 then
+							instance.CorporationBuildingButton:RegisterCallback( Mouse.eLClick, CivilopediaCategory[CategoryWonders].SelectArticle );
+						else
+							instance.CorporationBuildingButton:RegisterCallback( Mouse.eLClick, CivilopediaCategory[CategoryBuildings].SelectArticle );
+						end
+					end
+				end
+			end
+			
+			local office = GameInfo.BuildingClasses[thisCorporation.OfficeBuildingClass];
+			if(office ~= nil) then
+				local buildingInfo = GameInfo.Buildings[office.DefaultBuilding];
+				if(buildingInfo) then
+					local instance = g_CorpOfficeManager:GetInstance();
+					if instance then
+						if not IconHookup( buildingInfo.PortraitIndex, buttonSize, buildingInfo.IconAtlas, instance.CorporationBuildingImage ) then
+							instance.CorporationBuildingImage:SetTexture( defaultErrorTextureSheet );
+							instance.CorporationBuildingImage:SetTextureOffset( nullOffset );
+						end
+							
+						--move this button
+						instance.CorporationBuildingButton:SetOffsetVal( buttonPadding, buttonPadding );
+						
+						instance.CorporationBuildingButton:SetToolTipString( Locale.ConvertTextKey( buildingInfo.Description ) );
+						instance.CorporationBuildingButton:SetVoids( buildingInfo.ID, addToList );
+						
+						if office.MaxGlobalInstances > 0 or (office.MaxPlayerInstances == 1 and office.SpecialistCount == 0) or office.MaxTeamInstances > 0 then
+							instance.CorporationBuildingButton:RegisterCallback( Mouse.eLClick, CivilopediaCategory[CategoryWonders].SelectArticle );
+						else
+							instance.CorporationBuildingButton:RegisterCallback( Mouse.eLClick, CivilopediaCategory[CategoryBuildings].SelectArticle );
+						end
+					end
+				end
+			end
+			
+			local franchise = GameInfo.BuildingClasses[thisCorporation.FranchiseBuildingClass];
+			if(franchise ~= nil) then
+				local buildingInfo = GameInfo.Buildings[franchise.DefaultBuilding];
+				if(buildingInfo) then
+					local instance = g_CorpFranchiseManager:GetInstance();
+					if instance then
+						if not IconHookup( buildingInfo.PortraitIndex, buttonSize, buildingInfo.IconAtlas, instance.CorporationBuildingImage ) then
+							instance.CorporationBuildingImage:SetTexture( defaultErrorTextureSheet );
+							instance.CorporationBuildingImage:SetTextureOffset( nullOffset );
+						end
+							
+						--move this button
+						instance.CorporationBuildingButton:SetOffsetVal( buttonPadding, buttonPadding );
+						
+						instance.CorporationBuildingButton:SetToolTipString( Locale.ConvertTextKey( buildingInfo.Description ) );
+						instance.CorporationBuildingButton:SetVoids( buildingInfo.ID, addToList );
+						
+						if franchise.MaxGlobalInstances > 0 or (franchise.MaxPlayerInstances == 1 and franchise.SpecialistCount == 0) or franchise.MaxTeamInstances > 0 then
+							instance.CorporationBuildingButton:RegisterCallback( Mouse.eLClick, CivilopediaCategory[CategoryWonders].SelectArticle );
+						else
+							instance.CorporationBuildingButton:RegisterCallback( Mouse.eLClick, CivilopediaCategory[CategoryBuildings].SelectArticle );
+						end
+					end
+				end
+			end
+
+			UpdateButtonFrame( 1, Controls.CorpHeadquartersInnerFrame, Controls.CorpHeadquartersFrame );
+			UpdateButtonFrame( 1, Controls.CorpOfficeInnerFrame, Controls.CorpOfficeFrame );
+			UpdateButtonFrame( 1, Controls.CorpFranchiseInnerFrame, Controls.CorpFranchiseFrame );
+		end
+	end	
+
+	ResizeEtc();
+end
+
 ---------------------------------------------------------------------------------------------------
 ---------------------------------------------------------------------------------------------------
 
@@ -5802,6 +6136,9 @@ CivilopediaCategory[CategoryBuildings].SelectHeading = function( selectedEraID, 
 		PopulateAndAdd(sectionID, "TXT_KEY_PEDIA_RELIGIOUS");
 		sectionID = sectionID + 1;
 	end
+	
+	PopulateAndAdd(sectionID, "TXT_KEY_TOPIC_CORPORATION");
+	sectionID = sectionID + 1;
 
 	for era in GameInfo.Eras() do
 		local eraID = era.ID;
@@ -5836,7 +6173,7 @@ CivilopediaCategory[CategoryWonders].SelectHeading = function( selectedSectionID
 		otherSortedList[tostring( thisListInstance.ListItemButton )] = sortOrder;
 	end
 
-	for section = 1, 3, 1 do	
+	for section = 1, 4, 1 do	
 		-- add a section header
 		local thisHeaderInstance = g_ListHeadingManager:GetInstance();
 		if thisHeaderInstance then
@@ -6387,6 +6724,67 @@ CivilopediaCategory[CategoryWorldCongress].SelectHeading = function( selectedSec
 		
 end
 
+CivilopediaCategory[CategoryCorporations].SelectHeading = function( selectedSectionID, dummy )
+	print("CivilopediaCategory[CategoryCorporations].SelectHeading");
+	g_ListHeadingManager:ResetInstances();
+	g_ListItemManager:ResetInstances();
+
+	sortedList[CategoryCorporations][selectedSectionID].headingOpen = not sortedList[CategoryCorporations][selectedSectionID].headingOpen; -- ain't lua great
+	
+	local sortOrder = 0;
+	otherSortedList = {};
+
+	-- put in a home page before the first section
+	local thisListInstance = g_ListItemManager:GetInstance();
+	if thisListInstance then
+		sortOrder = sortOrder + 1;
+		thisListInstance.ListItemLabel:SetText( Locale.ConvertTextKey( "TXT_KEY_PEDIA_CORPORATIONS_PAGE_LABEL" ));
+		thisListInstance.ListItemButton:SetVoids( homePageOfCategoryID, addToList );
+		thisListInstance.ListItemButton:RegisterCallback( Mouse.eLClick, CivilopediaCategory[CategoryCorporations].buttonClicked );
+		thisListInstance.ListItemButton:SetToolTipCallback( TipHandler );
+		otherSortedList[tostring( thisListInstance.ListItemButton )] = sortOrder;
+	end
+
+	for section = 0, 2, 1 do	
+		-- add a section header
+		local thisHeaderInstance = g_ListHeadingManager:GetInstance();
+		if thisHeaderInstance then
+			sortOrder = sortOrder + 1;
+			if sortedList[CategoryCorporations][section].headingOpen then
+				local textString = "TXT_KEY_PEDIA_CORPORATIONS_CATEGORY_"..tostring( section );
+				local localizedLabel = "[ICON_MINUS] "..Locale.ConvertTextKey( textString );
+				thisHeaderInstance.ListHeadingLabel:SetText( localizedLabel );
+			else
+				local textString = "TXT_KEY_PEDIA_CORPORATIONS_CATEGORY_"..tostring( section );
+				local localizedLabel = "[ICON_PLUS] "..Locale.ConvertTextKey( textString );
+				thisHeaderInstance.ListHeadingLabel:SetText( localizedLabel );
+			end
+			thisHeaderInstance.ListHeadingButton:SetVoids( section, 0 );
+			thisHeaderInstance.ListHeadingButton:RegisterCallback( Mouse.eLClick, CivilopediaCategory[CategoryCorporations].SelectHeading );
+			otherSortedList[tostring( thisHeaderInstance.ListHeadingButton )] = sortOrder;
+		end	
+		
+		-- for each element of the sorted list		
+		if sortedList[CategoryCorporations][section].headingOpen then
+			for i, v in ipairs(sortedList[CategoryCorporations][section]) do
+				local thisListInstance = g_ListItemManager:GetInstance();
+				if thisListInstance then
+					sortOrder = sortOrder + 1;
+					thisListInstance.ListItemLabel:SetText( v.entryName );
+					thisListInstance.ListItemButton:SetVoids( v.entryID, addToList );
+					thisListInstance.ListItemButton:RegisterCallback( Mouse.eLClick, CivilopediaCategory[CategoryCorporations].SelectArticle );
+					thisListInstance.ListItemButton:SetToolTipCallback( TipHandler )
+					otherSortedList[tostring( thisListInstance.ListItemButton )] = sortOrder;
+				end
+			end
+		end
+
+	end	
+	
+	Controls.ListOfArticles:SortChildren( SortFunction );
+	ResizeEtc();
+end
+
 
 ----------------------------------------------------------------------------------------------------------------------------------
 ----------------------------------------------------------------------------------------------------------------------------------
@@ -6724,6 +7122,9 @@ CivilopediaCategory[CategoryBuildings].DisplayList = function()
 		PopulateAndAdd(0, "TXT_KEY_PEDIA_RELIGIOUS");
 		sectionID = sectionID + 1;
 	end
+	
+	PopulateAndAdd(sectionID, "TXT_KEY_TOPIC_CORPORATION");
+	sectionID = sectionID + 1;
 
 	for era in GameInfo.Eras() do
 		local eraID = era.ID;
@@ -6754,7 +7155,7 @@ CivilopediaCategory[CategoryWonders].DisplayList = function()
 		otherSortedList[tostring( thisListInstance.ListItemButton )] = sortOrder;
 	end
 
-	for section = 1, 3, 1 do	
+	for section = 1, 4, 1 do	
 		local thisHeaderInstance = g_ListHeadingManager:GetInstance();
 		if thisHeaderInstance then
 			sortedList[CategoryWonders][section].headingOpen = true; -- ain't lua great
@@ -7255,6 +7656,44 @@ CivilopediaCategory[CategoryWorldCongress].DisplayList = function()
 
 end
 
+CivilopediaCategory[CategoryCorporations].DisplayList = function()
+	print("CivilopediaCategory[CategoryCorporations].DisplayList");
+	g_ListHeadingManager:ResetInstances();
+	g_ListItemManager:ResetInstances();
+
+	local sortOrder = 0;
+	otherSortedList = {};
+	
+	-- put in a home page before the first section
+	local thisListInstance = g_ListItemManager:GetInstance();
+	if thisListInstance then
+		sortOrder = sortOrder + 1;
+		thisListInstance.ListItemLabel:SetText( Locale.ConvertTextKey( "TXT_KEY_PEDIA_CORPORATIONS_PAGE_LABEL" ));
+		thisListInstance.ListItemButton:SetVoids( homePageOfCategoryID, addToList );
+		thisListInstance.ListItemButton:RegisterCallback( Mouse.eLClick, CivilopediaCategory[CategoryCorporations].buttonClicked );
+		thisListInstance.ListItemButton:SetToolTipCallback( TipHandler );
+		otherSortedList[tostring( thisListInstance.ListItemButton )] = sortOrder;
+	end
+	
+	-- for each element of the sorted list		
+	for i, v in ipairs(sortedList[CategoryCorporations][1]) do
+		-- add a unit entry
+		local thisListInstance = g_ListItemManager:GetInstance();
+		if thisListInstance then
+			sortOrder = sortOrder + 1;
+			thisListInstance.ListItemLabel:SetText( v.entryName );
+			thisListInstance.ListItemButton:SetVoids( v.entryID, addToList );
+			thisListInstance.ListItemButton:RegisterCallback( Mouse.eLClick, CivilopediaCategory[CategoryCorporations].SelectArticle );
+			thisListInstance.ListItemButton:SetToolTipCallback( TipHandler )
+			otherSortedList[tostring( thisListInstance.ListItemButton )] = sortOrder;
+		end
+	end
+	
+	Controls.ListOfArticles:SortChildren( SortFunction );
+	ResizeEtc();
+	
+end
+
 
 -------------------------------------------------------------------------------
 -------------------------------------------------------------------------------
@@ -7291,6 +7730,11 @@ function ClearArticle()
 	-- CBP
 	Controls.LeadsToBuildingsFrame:SetHide( true );	
 	Controls.MonopolyResourcesFrame:SetHide( true );
+	Controls.CorporationFrame:SetHide( true );
+	Controls.CorpHeadquartersFrame:SetHide( true );
+	Controls.CorpOfficeFrame:SetHide( true );
+	Controls.CorpFranchiseFrame:SetHide( true );
+	Controls.FreeTRFrame:SetHide( true );
 	-- End
 	Controls.RevealedResourcesFrame:SetHide( true );
 	Controls.RequiredResourcesFrame:SetHide( true );
@@ -7326,6 +7770,9 @@ function ClearArticle()
 	Controls.YieldFrame:SetHide( true );
 	Controls.MountainYieldFrame:SetHide( true );
 	--CBP
+	Controls.CorporationResourceBonusFrame:SetHide( true );
+	Controls.CorporationOfficeBonusFrame:SetHide( true );
+	Controls.CorporationTRBonusFrame:SetHide( true );
 	Controls.TradeRouteYieldFrame:SetHide( true );
 	Controls.AdjacentYieldFrame:SetHide( true );
 	Controls.AdjacentTerrainYieldFrame:SetHide( true );	

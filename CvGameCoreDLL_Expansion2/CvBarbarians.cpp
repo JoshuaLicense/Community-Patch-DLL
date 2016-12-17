@@ -18,15 +18,10 @@ short* CvBarbarians::m_aiPlotBarbCitySpawnCounter = NULL;
 short* CvBarbarians::m_aiPlotBarbCityNumUnitsSpawned = NULL;
 #endif
 
-#if defined(MOD_BALANCE_CORE_MILITARY)
-std::vector<CvPlot*> CvBarbarians::m_vPlotsWithCamp;
-#endif
-
-
 //	---------------------------------------------------------------------------
 bool CvBarbarians::IsPlotValidForBarbCamp(CvPlot* pPlot)
 {
-	int iRange = 4;
+	int iRange = 3;
 	int iDY;
 
 	int iPlotX = pPlot->getX();
@@ -78,12 +73,6 @@ void CvBarbarians::DoBarbCampCleared(CvPlot* pPlot, PlayerTypes ePlayer)
 		GAMEEVENTINVOKE_HOOK(GAMEEVENT_BarbariansCampCleared, pPlot->getX(), pPlot->getY(), ePlayer);
 	}
 #endif
-#if defined(MOD_BALANCE_CORE_MILITARY)
-	std::vector<CvPlot*>::iterator it = std::find(m_vPlotsWithCamp.begin(),m_vPlotsWithCamp.end(),pPlot);
-	if (it!=m_vPlotsWithCamp.end())
-		m_vPlotsWithCamp.erase(it);
-#endif
-
 }
 
 #if defined(MOD_DIPLOMACY_CITYSTATES_QUESTS)
@@ -150,10 +139,16 @@ void CvBarbarians::DoCampActivationNotice(CvPlot* pPlot)
 	CvGame& kGame = GC.getGame();
 	// Default to between 8 and 12 turns per spawn
 #if defined(MOD_CORE_REDUCE_RANDOMNESS)
-	int iNumTurnsToSpawn = 12 + kGame.getSmallFakeRandNum(10,*pPlot);
+	int iNumTurnsToSpawn = 7 + kGame.getSmallFakeRandNum(10,*pPlot);
 #else
 	int iNumTurnsToSpawn = 8 + kGame.getJonRandNum(5, "Barb Spawn Rand call");
 #endif
+
+	if (GC.getGame().isOption(GAMEOPTION_CHILL_BARBARIANS))
+	{
+		iNumTurnsToSpawn *= 3;
+		iNumTurnsToSpawn /= 2;
+	}
 
 	// Raging
 	if (kGame.isOption(GAMEOPTION_RAGING_BARBARIANS))
@@ -174,6 +169,13 @@ void CvBarbarians::DoCampActivationNotice(CvPlot* pPlot)
 
 	// Increment # of barbs spawned from this camp
 	m_aiPlotBarbCampNumUnitsSpawned[pPlot->GetPlotIndex()]++;	// This starts at -1 so when a camp is first created it will bump up to 0, which is correct
+
+	//// If it's too early to spawn then add in a small amount to delay things a bit - between 3 and 6 extra turns
+	//if (CanBarbariansSpawn())
+	//{
+	//	iNumTurnsToSpawn += 3;
+	//	iNumTurnsToSpawn += auto_ptr<ICvGame1> pGame = GameCore::GetGame();\n.getJonRandNum(4, "Early game Barb Spawn Rand call");
+	//}
 
 	// Difficulty level can add time between spawns (e.g. Settler is +8 turns)
 	CvHandicapInfo* pHandicapInfo = GC.getHandicapInfo(kGame.getHandicapType());
@@ -202,10 +204,16 @@ void CvBarbarians::DoCityActivationNotice(CvPlot* pPlot)
 	// Default to between 8 and 12 turns per spawn
 	//bumped a bit - too many barbs gets annoying.
 #if defined(MOD_CORE_REDUCE_RANDOMNESS)
-	int iNumTurnsToSpawn = 12 + kGame.getSmallFakeRandNum(10,*pPlot);
+	int iNumTurnsToSpawn = 7 + kGame.getSmallFakeRandNum(10,*pPlot);
 #else
 	int iNumTurnsToSpawn = 15 + kGame.getJonRandNum(5, "Barb Spawn Rand call");
 #endif
+
+	if (GC.getGame().isOption(GAMEOPTION_CHILL_BARBARIANS))
+	{
+		iNumTurnsToSpawn *= 3;
+		iNumTurnsToSpawn /= 2;
+	}
 
 	// Raging
 	if (kGame.isOption(GAMEOPTION_RAGING_BARBARIANS))
@@ -250,6 +258,11 @@ void CvBarbarians::DoCityAttacked(CvPlot* pPlot)
 
 	// Halve the amount of time to spawn
 	int iNewValue = iCounter / 2;
+	iNewValue--;
+	if (iNewValue <= 0)
+	{
+		iNewValue = 0;
+	}
 
 	m_aiPlotBarbCitySpawnCounter[pPlot->GetPlotIndex()] = iNewValue;
 }
@@ -262,6 +275,14 @@ void CvBarbarians::DoCampAttacked(CvPlot* pPlot)
 
 	// Halve the amount of time to spawn
 	int iNewValue = iCounter / 2;
+#if defined(MOD_BALANCE_CORE)
+	//And reduce by one to 'round up' a change.
+	iNewValue--;
+	if (iNewValue <= 0)
+	{
+		iNewValue = 0;
+	}
+#endif
 
 	m_aiPlotBarbCampSpawnCounter[pPlot->GetPlotIndex()] = iNewValue;
 }
@@ -327,6 +348,8 @@ void CvBarbarians::MapInit(int iWorldNumPlots)
 {
 	Uninit();
 
+	int iI;
+
 	if (iWorldNumPlots > 0)
 	{
 		if (m_aiPlotBarbCampSpawnCounter == NULL)
@@ -349,7 +372,7 @@ void CvBarbarians::MapInit(int iWorldNumPlots)
 #endif
 
 		// Default values
-		for (int iI = 0; iI < iWorldNumPlots; ++iI)
+		for (iI = 0; iI < iWorldNumPlots; ++iI)
 		{
 			m_aiPlotBarbCampSpawnCounter[iI] = -1;
 			m_aiPlotBarbCampNumUnitsSpawned[iI] = -1;
@@ -383,10 +406,6 @@ void CvBarbarians::Uninit()
 	{
 		SAFE_DELETE_ARRAY(m_aiPlotBarbCityNumUnitsSpawned);
 	}
-#endif
-
-#if defined(MOD_BALANCE_CORE_MILITARY)
-	 m_vPlotsWithCamp.clear();
 #endif
 }
 
@@ -462,6 +481,10 @@ void CvBarbarians::DoCamps()
 				iNumCampsInExistence++;
 			}
 
+			//Discount all owned plots.
+			if (pLoopPlot->getOwner() != NO_PLAYER)
+				continue;
+
 			if(pLoopPlot->isWater() || !pLoopPlot->isValidMovePlot(BARBARIAN_PLAYER))
 				continue;
 
@@ -470,29 +493,54 @@ void CvBarbarians::DoCamps()
 				continue;
 
 			// No camps on resources or improvements
-			if(pLoopPlot->getResourceType() != NO_RESOURCE || pLoopPlot->getImprovementType() != NO_IMPROVEMENT)
+			if(/*pLoopPlot->getResourceType() != NO_RESOURCE || */ pLoopPlot->getImprovementType() != NO_IMPROVEMENT)
 				continue;
 
 			// Don't look at Tiles that can't have an improvement
 			if(pLoopPlot->getFeatureType() != NO_FEATURE && GC.getFeatureInfo(pLoopPlot->getFeatureType())->isNoImprovement())
 				continue;
 
+			bool bMinors = MOD_BALANCE_CORE_BARBARIAN_THEFT;
+			if (GC.getGame().getGameTurn() <= 5)
+			{
+				bMinors = false;
+			}
 			// No new camps on plots in sight of a player
-			if(pLoopPlot->isVisibleToCivTeam(true))
+			if (pLoopPlot->isVisibleToCivTeam(true, bMinors))
 				continue;
 
 			iNumNotVisiblePlots++;
 
 			vAllPlots.push_back(pLoopPlot);
+
+#if defined(MOD_CORE_REDUCE_RANDOMNESS)
+			if (vAllPlots.size()>1)
+			{
+				//do one iteration of a fisher-yates shuffle
+				int iSwap = kGame.getSmallFakeRandNum( vAllPlots.size(), *pLoopPlot);
+				std::swap(vAllPlots[iSwap],vAllPlots.back());
+			}
+#endif
+
 			if (pLoopPlot->isCoastalLand())
+			{
 				vCoastalPlots.push_back(pLoopPlot);
+
+#if defined(MOD_CORE_REDUCE_RANDOMNESS)
+				if (vCoastalPlots.size()>1)
+				{
+					//do one iteration of a fisher-yates shuffle
+					int iSwap = kGame.getSmallFakeRandNum( vCoastalPlots.size(), *pLoopPlot);
+					std::swap(vCoastalPlots[iSwap],vCoastalPlots.back());
+				}
+#endif
+			}
 		}
 
 		int iNumValidCampPlots = iNumNotVisiblePlots;
 		int iFogTilesPerBarbarianCamp = kMap.getWorldInfo().getFogTilesPerBarbarianCamp();
 		int iCampTargetNum = (iFogTilesPerBarbarianCamp != 0)? iNumValidCampPlots / iFogTilesPerBarbarianCamp : 0;
 		int iNumCampsToAdd = iCampTargetNum - iNumCampsInExistence;
-		int iMaxCampsThisArea;
 
 		if(iNumCampsToAdd > 0 && GC.getBARBARIAN_CAMP_ODDS_OF_NEW_CAMP_SPAWNING() > 0) // slewis - added the barbarian chance for the FoR scenario
 		{
@@ -506,7 +554,7 @@ void CvBarbarians::DoCamps()
 			else
 			{
 #if defined(MOD_CORE_REDUCE_RANDOMNESS)
-				if( kGame.getSmallFakeRandNum(GC.getBARBARIAN_CAMP_ODDS_OF_NEW_CAMP_SPAWNING()) == 0)
+				if (kGame.getSmallFakeRandNum(GC.getBARBARIAN_CAMP_ODDS_OF_NEW_CAMP_SPAWNING(), iNumValidCampPlots) == 0)
 #else
 				if(kGame.getJonRandNum(/*2*/ GC.getBARBARIAN_CAMP_ODDS_OF_NEW_CAMP_SPAWNING(), "Random roll to see if Barb Camp spawns this turn") > 0)
 #endif
@@ -529,34 +577,36 @@ void CvBarbarians::DoCamps()
 			int iPlayerCapitalMinDistance = /*4*/ GC.getBARBARIAN_CAMP_MINIMUM_DISTANCE_CAPITAL();
 			int iBarbCampMinDistance = /*7*/ GC.getBARBARIAN_CAMP_MINIMUM_DISTANCE_ANOTHER_CAMP();
 			int iMaxDistanceToLook = iPlayerCapitalMinDistance > iBarbCampMinDistance ? iPlayerCapitalMinDistance : iBarbCampMinDistance;
-			int iPlotDistance;
-
-			int iDX, iDY;
-			CvPlot* pNearbyCampPlot;
-			bool bSomethingTooClose;
-
-			CvString strBuffer;
-
 			int iPlayerLoop;
-
+#if defined(MOD_BALANCE_CORE)
+			ResourceTypes eCloseResource = NO_RESOURCE;
+			ResourceClassTypes eResourceClassRush = (ResourceClassTypes)GC.getInfoTypeForString("RESOURCECLASS_RUSH");
+#endif
 			// Find Plots to put the Camps
 			do
 			{
 				iCount++;
 
-			// Do a random roll to bias in favor of Coastal land Tiles so that the Barbs will spawn Boats :) - required 1/6 of the time
+				// Do a random roll to bias in favor of Coastal land Tiles so that the Barbs will spawn Boats :) - required 1/6 of the time
 #if defined(MOD_CORE_REDUCE_RANDOMNESS)
-				bool bWantsCoastal = kGame.getSmallFakeRandNum(/*6*/ GC.getBARBARIAN_CAMP_COASTAL_SPAWN_ROLL()) == 0 ? true : false;
+				// make sure we have suitable coastal plots!
+				bool bWantsCoastal = kGame.getSmallFakeRandNum(/*6*/ GC.getBARBARIAN_CAMP_COASTAL_SPAWN_ROLL(), iNumValidCampPlots) == 0 ? !vCoastalPlots.empty() : false;
 
-				//make sure we have suitable plots ..
-				bWantsCoastal &= !vCoastalPlots.empty();
+				// if we don't have any valid plots left at all, then bail
+				if (vAllPlots.empty())
+					break;
+
+				std::vector<CvPlot*>& vRelevantPlots = bWantsCoastal ? vCoastalPlots : vAllPlots;
+
+				int iPlotIndex = kGame.getSmallFakeRandNum( min(9u, vRelevantPlots.size()), (int)vRelevantPlots.size() );
 #else
 				bool bWantsCoastal = kGame.getJonRandNum(/*6*/ GC.getBARBARIAN_CAMP_COASTAL_SPAWN_ROLL(), "Barb Camp Plot-Finding Roll - Coastal Bias") == 0 ? true : false;
+				int iPlotIndex = kGame.getJonRandNum( bWantsCoastal ? vCoastalPlots.size() : vAllPlots.size(), "Barb Camp Plot-Finding Roll");
 #endif
 
-				int iPlotIndex = kGame.getJonRandNum( bWantsCoastal ? vCoastalPlots.size() : vAllPlots.size(), "Barb Camp Plot-Finding Roll");
-				CvPlot* pLoopPlot = bWantsCoastal ? vCoastalPlots[iPlotIndex] : vAllPlots[iPlotIndex];
+				CvPlot* pLoopPlot = vRelevantPlots[iPlotIndex];
 
+				//now do some additional (expensive) checks we shouldn't do above
 #if defined(MOD_BUGFIX_BARB_CAMP_TERRAINS)
 				CvImprovementEntry* pkImprovementInfo = GC.getImprovementInfo(eCamp);
 				if(MOD_BUGFIX_BARB_CAMP_TERRAINS == false || pkImprovementInfo == NULL || 
@@ -564,35 +614,41 @@ void CvBarbarians::DoCamps()
 				{
 #endif
 					// Max Camps for this area
-					iMaxCampsThisArea = iCampTargetNum * pLoopPlot->area()->getNumTiles() / iNumLandPlots;
-					// Add 1 just in case the above algorithm rounded something off
-					iMaxCampsThisArea++;
+					int iMaxCampsThisArea = iCampTargetNum * pLoopPlot->area()->getNumTiles() / iNumLandPlots + 1;
 
 					// Already enough Camps in this Area?
-					if(pLoopPlot->area()->getNumImprovements(eCamp) <= iMaxCampsThisArea)
+					if (pLoopPlot->area()->getNumImprovements(eCamp) <= iMaxCampsThisArea)
 					{
-						bSomethingTooClose = false;
+						bool bSomethingTooClose = false;
 
 						// Look at nearby Plots to make sure another camp isn't too close
-						for(iDX = -(iMaxDistanceToLook); iDX <= iMaxDistanceToLook; iDX++)
+						for (int iDX = -(iMaxDistanceToLook); iDX <= iMaxDistanceToLook; iDX++)
 						{
-							for(iDY = -(iMaxDistanceToLook); iDY <= iMaxDistanceToLook; iDY++)
+							for (int iDY = -(iMaxDistanceToLook); iDY <= iMaxDistanceToLook; iDY++)
 							{
-								pNearbyCampPlot = plotXY(pLoopPlot->getX(), pLoopPlot->getY(), iDX, iDY);
+								CvPlot* pNearbyCampPlot = plotXY(pLoopPlot->getX(), pLoopPlot->getY(), iDX, iDY);
 
-								if(pNearbyCampPlot != NULL)
+								if (pNearbyCampPlot != NULL)
 								{
-									iPlotDistance = plotDistance(pNearbyCampPlot->getX(), pNearbyCampPlot->getY(), pLoopPlot->getX(), pLoopPlot->getY());
-
-									// Can't be too close to a player
-									if(iPlotDistance <= iPlayerCapitalMinDistance)
+									int iPlotDistance = plotDistance(pNearbyCampPlot->getX(), pNearbyCampPlot->getY(), pLoopPlot->getX(), pLoopPlot->getY());
+#if defined(MOD_BALANCE_CORE)
+									if (iPlotDistance <= 2)
 									{
-										if(pNearbyCampPlot->isCity())
+										if (pNearbyCampPlot->getResourceType(BARBARIAN_TEAM) != NO_RESOURCE && GC.getResourceInfo(pNearbyCampPlot->getResourceType())->getResourceUsage() == RESOURCEUSAGE_STRATEGIC && GC.getResourceInfo(pNearbyCampPlot->getResourceType())->getResourceClassType() == eResourceClassRush)
 										{
-											if(pNearbyCampPlot->getPlotCity()->isCapital())
+											eCloseResource = pNearbyCampPlot->getResourceType();
+										}
+									}
+#endif
+									// Can't be too close to a player
+									if (iPlotDistance <= iPlayerCapitalMinDistance)
+									{
+										if (pNearbyCampPlot->isCity())
+										{
+											if (pNearbyCampPlot->getPlotCity()->isCapital())
 											{
 												// Only care about Majors' capitals
-												if(pNearbyCampPlot->getPlotCity()->getOwner() < MAX_MAJOR_CIVS)
+												if (pNearbyCampPlot->getPlotCity()->getOwner() < MAX_MAJOR_CIVS)
 												{
 													bSomethingTooClose = true;
 													break;
@@ -602,9 +658,9 @@ void CvBarbarians::DoCamps()
 									}
 
 									// Can't be too close to another Camp
-									if(iPlotDistance <= iBarbCampMinDistance)
+									if (iPlotDistance <= iBarbCampMinDistance)
 									{
-										if(pNearbyCampPlot->getImprovementType() == eCamp)
+										if (pNearbyCampPlot->getImprovementType() == eCamp)
 										{
 											bSomethingTooClose = true;
 											break;
@@ -612,19 +668,22 @@ void CvBarbarians::DoCamps()
 									}
 								}
 							}
-							if(bSomethingTooClose)
+
+							if (bSomethingTooClose)
 							{
 								break;
 							}
 						}
 
-						// Found a camp too close, check another Plot
-						if(bSomethingTooClose)
+						// Found a camp or a city too close, check another one
+						if (bSomethingTooClose || !CvBarbarians::IsPlotValidForBarbCamp(pLoopPlot))
+						{
+#if defined(MOD_CORE_REDUCE_RANDOMNESS)
+							//if we're using the fake random generator, it will produce the same candidate every time, need to remove it from the pool
+							vRelevantPlots.erase(vRelevantPlots.begin() + iPlotIndex);
+#endif
 							continue;
-
-						// Last check
-						if(!CvBarbarians::IsPlotValidForBarbCamp(pLoopPlot))
-							continue;
+						}
 
 						pLoopPlot->setImprovementType(eCamp);
 #if !defined(MOD_BUGFIX_BARB_CAMP_SPAWNING)
@@ -633,12 +692,12 @@ void CvBarbarians::DoCamps()
 #endif
 
 #if defined(MOD_EVENTS_BARBARIANS)
-						eBestUnit = GetRandomBarbarianUnitType(pLoopPlot, UNITAI_DEFENSE);
+						eBestUnit = GetRandomBarbarianUnitType(pLoopPlot, UNITAI_DEFENSE, eCloseResource);
 #else
 						eBestUnit = GetRandomBarbarianUnitType(kMap.getArea(pLoopPlot->getArea()), UNITAI_DEFENSE);
 #endif
 
-						if(eBestUnit != NO_UNIT)
+						if (eBestUnit != NO_UNIT)
 						{
 							GET_PLAYER(BARBARIAN_PLAYER).initUnit(eBestUnit, pLoopPlot->getX(), pLoopPlot->getY(), GC.getUnitInfo(eBestUnit)->GetDefaultUnitAIType());
 #if defined(MOD_EVENTS_BARBARIANS)
@@ -651,28 +710,38 @@ void CvBarbarians::DoCamps()
 						// If we should update Camp visibility (for Policy), do so
 						PlayerTypes ePlayer;
 						TeamTypes eTeam;
-						for(iPlayerLoop = 0; iPlayerLoop < MAX_MAJOR_CIVS; iPlayerLoop++)
+						for (iPlayerLoop = 0; iPlayerLoop < MAX_MAJOR_CIVS; iPlayerLoop++)
 						{
-							ePlayer = (PlayerTypes) iPlayerLoop;
+							ePlayer = (PlayerTypes)iPlayerLoop;
 							eTeam = GET_PLAYER(ePlayer).getTeam();
 
-							if(GET_PLAYER(ePlayer).IsAlwaysSeeBarbCamps())
+							if (GET_PLAYER(ePlayer).IsAlwaysSeeBarbCamps())
 							{
-								if(pLoopPlot->isRevealed(eTeam))
+								if (pLoopPlot->isRevealed(eTeam))
 								{
 									pLoopPlot->setRevealedImprovementType(eTeam, eCamp);
-									if(GC.getGame().getActivePlayer() == ePlayer)
+									if (GC.getGame().getActivePlayer() == ePlayer)
 										bAlwaysRevealedBarbCamp = true;
 								}
 							}
 						}
 
 						// Add another Unit adjacent to the Camp to stir up some trouble (JON: Disabled for now 09/12/09)
-						//doSpawnBarbarianUnit(pLoopPlot);
+						if (!GC.getGame().isOption(GAMEOPTION_CHILL_BARBARIANS))
+						{
+							DoSpawnBarbarianUnit(pLoopPlot, true, true);
+						}
 
 						iNumCampsToAdd--;
 					}
 #if defined(MOD_BUGFIX_BARB_CAMP_TERRAINS)
+				}
+				else
+				{
+#if defined(MOD_CORE_REDUCE_RANDOMNESS)
+					//if we're using the fake random generator, it will produce the same candidate every time, need to remove it from the pool
+					vRelevantPlots.erase(vRelevantPlots.begin() + iPlotIndex);
+#endif
 				}
 #endif
 			}
@@ -680,35 +749,13 @@ void CvBarbarians::DoCamps()
 		}
 	}
 
-#if defined(MOD_BALANCE_CORE_MILITARY)
-	 m_vPlotsWithCamp.clear();
-
-	// Is there an appropriate Improvement to place as a Barb Camp?
-	if(eCamp != NO_IMPROVEMENT)
-	{
-		CvMap& kMap = GC.getMap();
-		// Figure out how many Nonvisible tiles we have to base # of camps to spawn on
-		for(int iI = 0; iI < kMap.numPlots(); iI++)
-		{
-			CvPlot* pLoopPlot = kMap.plotByIndexUnchecked(iI);
-
-			// See how many camps we already have
-			if(pLoopPlot->getImprovementType() == eCamp)
-			{
-				m_vPlotsWithCamp.push_back(pLoopPlot);
-			}
-		}
-	}
-#endif
-
-
 	if(bAlwaysRevealedBarbCamp)
 		GC.getMap().updateDeferredFog();
 }
 
 //	--------------------------------------------------------------------------------
 #if defined(MOD_EVENTS_BARBARIANS)
-UnitTypes CvBarbarians::GetRandomBarbarianUnitType(CvPlot* pPlot, UnitAITypes eUnitAI)
+UnitTypes CvBarbarians::GetRandomBarbarianUnitType(CvPlot* pPlot, UnitAITypes eUnitAI, ResourceTypes eNearbyResource)
 {
 	CvArea* pArea = GC.getMap().getArea(pPlot->getArea());
 #else
@@ -780,7 +827,7 @@ UnitTypes CvBarbarians::GetRandomBarbarianUnitType(CvArea* pArea, UnitAITypes eU
 
 			if(bValid)
 			{
-				if(!GET_PLAYER(BARBARIAN_PLAYER).canTrain(eLoopUnit))
+				if (!GET_PLAYER(BARBARIAN_PLAYER).canBarbariansTrain(eLoopUnit, false, eNearbyResource))
 				{
 					bValid = false;
 				}
@@ -788,11 +835,45 @@ UnitTypes CvBarbarians::GetRandomBarbarianUnitType(CvArea* pArea, UnitAITypes eU
 
 			if(bValid)
 			{
-				iValue = (1 + kGame.getJonRandNum(1000, "Barb Unit Selection"));
+#if defined(MOD_BALANCE_CORE)
+				CvUnitEntry* pUnitInfoPtr = GC.getUnitInfo(eLoopUnit);
+				// Resource Requirements
+				for (int iResourceLoop = 0; iResourceLoop < GC.getNumResourceInfos(); iResourceLoop++)
+				{
+					const ResourceTypes eResource = static_cast<ResourceTypes>(iResourceLoop);
+					CvResourceInfo* pkResourceInfo = GC.getResourceInfo(eResource);
+					if (pkResourceInfo)
+					{
+						const int iNumResource = pUnitInfoPtr->GetResourceQuantityRequirement(eResource);
+
+						if (iNumResource > 0)
+						{
+							iValue += 500;
+							break;
+						}
+					}
+				}
+				if (pPlot->getImprovementType() != NO_IMPROVEMENT && kUnit.GetRangedCombat() > 0)
+				{
+					iValue += 500;
+				}
+				if (pPlot->getImprovementType() == NO_IMPROVEMENT && kUnit.GetRange() == 1)
+				{
+					iValue += 5;
+				}
+				if (kUnit.GetRangedCombat() > 0)
+				{
+					iValue += kUnit.GetRangedCombat();
+				}
+				else
+				{
+					iValue += kUnit.GetCombat();
+				}
+#endif
 
 				if(kUnit.GetUnitAIType(eUnitAI))
 				{
-					iValue += 200;
+					iValue *= 2;
 				}
 
 				if(iValue > iBestValue)
@@ -805,12 +886,14 @@ UnitTypes CvBarbarians::GetRandomBarbarianUnitType(CvArea* pArea, UnitAITypes eU
 	}
 
 #if defined(MOD_EVENTS_BARBARIANS)
-	if (MOD_EVENTS_BARBARIANS) {
+	if (MOD_EVENTS_BARBARIANS)
+	{
 		int iValue = 0;
 		if (GAMEEVENTINVOKE_VALUE(iValue, GAMEEVENT_BarbariansCampGetSpawnUnit, pPlot->getX(), pPlot->getY(), eBestUnit) == GAMEEVENTRETURN_VALUE) {
 			// Defend against modder stupidity!
 			UnitTypes eUnitType = (UnitTypes)iValue;
-			if (eUnitType != NO_UNIT && GC.getUnitInfo(eUnitType) != NULL) {
+			if (eUnitType != NO_UNIT && GC.getUnitInfo(eUnitType) != NULL)
+			{
 				eBestUnit = eUnitType;
 			}
 		}
@@ -879,32 +962,51 @@ void CvBarbarians::DoSpawnBarbarianUnit(CvPlot* pPlot, bool bIgnoreMaxBarbarians
 	if (pPlot == 0)
 		return;
 
+	// Look at nearby Plots to see if there are already too many Barbs nearby
+	iNumNearbyUnits = 0;
+#if defined(MOD_BALANCE_CORE)
+	ResourceTypes eCloseResource = NO_RESOURCE;
+	ResourceClassTypes eResourceClassRush = (ResourceClassTypes)GC.getInfoTypeForString("RESOURCECLASS_RUSH");
+#endif
+	for (iX = -iRange; iX <= iRange; iX++)
+	{
+		for (iY = -iRange; iY <= iRange; iY++)
+		{
+			// Cut off the corners of the area we're looking at that we don't want
+			pNearbyPlot = plotXYWithRangeCheck(pPlot->getX(), pPlot->getY(), iX, iY, iRange);
+
+			if (pNearbyPlot != NULL)
+			{
+#if defined(MOD_BALANCE_CORE)			
+				if (pNearbyPlot->getResourceType() != NO_RESOURCE && GC.getResourceInfo(pNearbyPlot->getResourceType())->getResourceUsage() == RESOURCEUSAGE_STRATEGIC && GC.getResourceInfo(pNearbyPlot->getResourceType())->getResourceClassType() == eResourceClassRush)
+				{
+					eCloseResource = pNearbyPlot->getResourceType();
+				}
+#endif
+				if (pNearbyPlot->getNumUnits() > 0)
+				{
+					for (iNearbyUnitLoop = 0; iNearbyUnitLoop < pNearbyPlot->getNumUnits(); iNearbyUnitLoop++)
+					{
+						const CvUnit* const unit = pNearbyPlot->getUnitByIndex(iNearbyUnitLoop);
+						if (unit && pNearbyPlot->getUnitByIndex(iNearbyUnitLoop)->isBarbarian())
+						{
+							iNumNearbyUnits++;
+						}
+					}
+				}
+			}
+		}
+	}
+
 	// is this camp empty - first priority is to fill it
-	if (pPlot && pPlot->GetNumCombatUnits() == 0)
+	if (pPlot && pPlot->GetNumCombatUnits() == 0 && !pPlot->isCity())
 	{
 		UnitTypes eUnit;
-#if defined(MOD_BALANCE_CORE_MILITARY)
-		ImprovementTypes eCamp = (ImprovementTypes)GC.getBARBARIAN_CAMP_IMPROVEMENT();
-		if(pPlot->getImprovementType() == eCamp)
-		{
 #if defined(MOD_EVENTS_BARBARIANS)
-			eUnit = GetRandomBarbarianUnitType(pPlot, UNITAI_FAST_ATTACK);
+		eUnit = GetRandomBarbarianUnitType(pPlot, UNITAI_RANGED, eCloseResource);
 #else
-			eUnit = GetRandomBarbarianUnitType(GC.getMap().getArea(pPlot->getArea()), UNITAI_RANGED);
+		eUnit = GetRandomBarbarianUnitType(GC.getMap().getArea(pPlot->getArea()), UNITAI_RANGED);
 #endif
-		}
-		else
-		{
-#endif
-#if defined(MOD_EVENTS_BARBARIANS)
-			eUnit = GetRandomBarbarianUnitType(pPlot, UNITAI_FAST_ATTACK);
-#else
-			eUnit = GetRandomBarbarianUnitType(GC.getMap().getArea(pPlot->getArea()), UNITAI_FAST_ATTACK);
-#endif
-#if defined(MOD_BALANCE_CORE_MILITARY)
-		}
-#endif
-
 		if (eUnit != NO_UNIT)
 		{
 #if defined(MOD_BALANCE_CORE_MILITARY)
@@ -926,33 +1028,6 @@ void CvBarbarians::DoSpawnBarbarianUnit(CvPlot* pPlot, bool bIgnoreMaxBarbarians
 #endif
 #endif
 			return;
-		}
-	}
-
-	// Look at nearby Plots to see if there are already too many Barbs nearby
-	iNumNearbyUnits = 0;
-
-	for(iX = -iRange; iX <= iRange; iX++)
-	{
-		for(iY = -iRange; iY <= iRange; iY++)
-		{
-			// Cut off the corners of the area we're looking at that we don't want
-			pNearbyPlot = plotXYWithRangeCheck(pPlot->getX(), pPlot->getY(), iX, iY, iRange);
-
-			if(pNearbyPlot != NULL)
-			{
-				if(pNearbyPlot->getNumUnits() > 0)
-				{
-					for(iNearbyUnitLoop = 0; iNearbyUnitLoop < pNearbyPlot->getNumUnits(); iNearbyUnitLoop++)
-					{
-						const CvUnit* const unit = pNearbyPlot->getUnitByIndex(iNearbyUnitLoop);
-						if(unit && pNearbyPlot->getUnitByIndex(iNearbyUnitLoop)->isBarbarian())
-						{
-							iNumNearbyUnits++;
-						}
-					}
-				}
-			}
 		}
 	}
 
@@ -1003,7 +1078,7 @@ void CvBarbarians::DoSpawnBarbarianUnit(CvPlot* pPlot, bool bIgnoreMaxBarbarians
 			UnitAITypes eUnitAI = pSpawnPlot->isWater() ? UNITAI_ATTACK_SEA : UNITAI_FAST_ATTACK;
 
 #if defined(MOD_EVENTS_BARBARIANS)
-			UnitTypes eUnit = GetRandomBarbarianUnitType(pSpawnPlot, eUnitAI);
+			UnitTypes eUnit = GetRandomBarbarianUnitType(pSpawnPlot, eUnitAI, eCloseResource);
 #else
 			UnitTypes eUnit = GetRandomBarbarianUnitType(GC.getMap().getArea(pSpawnPlot->getArea()), eUnitAI);
 #endif

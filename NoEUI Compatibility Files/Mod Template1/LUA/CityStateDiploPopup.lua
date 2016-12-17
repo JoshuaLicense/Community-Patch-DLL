@@ -722,7 +722,7 @@ function OnQuestInfoClicked()
 				Events.GameplayFX(hex.x, hex.y, -1);
 			end
 		end
-		if (minorPlayer:IsMinorCivDisplayedQuestForPlayer(activePlayerID, MinorCivQuestTypes.MINOR_CIV_QUEST_UNIT_GET_CITY)) then
+		if (pMinor:IsMinorCivDisplayedQuestForPlayer(activePlayerID, MinorCivQuestTypes.MINOR_CIV_QUEST_UNIT_GET_CITY)) then
 			local iQuestData1 = pMinor:GetQuestData1(iActivePlayer, MinorCivQuestTypes.MINOR_CIV_QUEST_UNIT_GET_CITY);
 			local iQuestData2 = pMinor:GetQuestData2(iActivePlayer, MinorCivQuestTypes.MINOR_CIV_QUEST_UNIT_GET_CITY);
 			local pPlot = Map.GetPlot(iQuestData1, iQuestData2);
@@ -795,7 +795,7 @@ function OnMarriageButtonClicked()
 
 	if (pMinor:CanMajorMarry(iActivePlayer)) then
 		UIManager:DequeuePopup( ContextPtr );
-		Game.DoMinorMarriage(iActivePlayer, pMinor:GetID());
+		Game.DoMinorBuyout(iActivePlayer, pMinor:GetID());
 	end
 end
 Controls.MarriageButton:RegisterCallback( Mouse.eLClick, OnMarriageButtonClicked );
