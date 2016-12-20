@@ -25299,18 +25299,7 @@ void CvCity::DoAcquirePlot(int iPlotX, int iPlotY)
 	{
 		return;
 	}
-#if defined(MOD_WWII_TERRITORY_CHANGES)
-	if(pPlot->isWater())
-	{
-		return;
-	}
-	else
-	{
-		GET_PLAYER(getOwner()).AddAPlot(pPlot);
-	}
-#else
 	GET_PLAYER(getOwner()).AddAPlot(pPlot);
-#endif
 
 #if defined(MOD_BALANCE_CORE)
 	if(pPlot->getOwner() != getOwner() && pPlot->getOwner() != NO_PLAYER && GET_PLAYER(pPlot->getOwner()).isHuman())
@@ -25324,11 +25313,8 @@ void CvCity::DoAcquirePlot(int iPlotX, int iPlotY)
 		}
 	}
 #endif
-#if defined(MOD_WWII_NO_WATER_TILES)
-	pPlot->setOwner(getOwner(), NO_PLAYER, /*bCheckUnits*/ true, /*bUpdateResources*/ true);
-#else
 	pPlot->setOwner(getOwner(), GetID(), /*bCheckUnits*/ true, /*bUpdateResources*/ true);
-#endif
+
 	DoUpdateCheapestPlotInfluenceDistance();
 }
 
