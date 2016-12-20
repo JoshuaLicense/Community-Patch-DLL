@@ -4333,7 +4333,11 @@ void CvPlayer::acquireCity(CvCity* pOldCity, bool bConquest, bool bGift)
 		{
 			CvPlot* pPlot = GC.getMap().plot(aiPurchasedPlotX[ui], aiPurchasedPlotY[ui]);
 			if(pPlot->getOwner() != pNewCity->getOwner())
+#if defined(MOD_WWII_TERRITORY_CHANGES)
+				pPlot->setOwner(pNewCity->getOwner(), /*iAcquireCityID*/ NO_PLAYER, /*bCheckUnits*/ true, /*bUpdateResources*/ true);
+#else
 				pPlot->setOwner(pNewCity->getOwner(), /*iAcquireCityID*/ pNewCity->GetID(), /*bCheckUnits*/ true, /*bUpdateResources*/ true);
+#endif
 		}
 
 		// Is this City being Occupied?
