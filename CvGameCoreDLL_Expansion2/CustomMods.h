@@ -27,6 +27,11 @@
 #define MOD_DLL_VERSION_STATUS ""			// a (alpha), b (beta) or blank (released)
 #define MOD_DLL_CUSTOM_BUILD_NAME ""
 
+ //////////////////////////
+ //WWII
+ /////////////////////////////////////////
+#define MOD_WWII_TERRITORY_CHANGES // No water tiles and no city ownership on tiles
+
 //////////////////////////
 //MULTIPLAYER INSTRUCTIONS:
 /////////////////////////////////////////
