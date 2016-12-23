@@ -541,7 +541,7 @@ void CvCity::init(int iID, PlayerTypes eOwner, int iX, int iY, bool bBumpUnits, 
 				{
 					if(pLoopPlot->getOwner() == NO_PLAYER)
 					{
-#if defined(MOD_WWII_TERRITORY_CHANGES)
+#if defined(MOD_WWII_TERRITORY)
 						if(!pLoopPlot->isWater())
 						{
 							pLoopPlot->setOwner(getOwner(), NO_PLAYER, bBumpUnits);
@@ -8214,7 +8214,26 @@ bool CvCity::canCreate(ProjectTypes eProject, bool bContinue, bool bTestVisible)
 	{
 		return false;
 	}
+#if defined(MOD_WWII_PROJECTS)
+	CvProjectEntry* pkProjectInfo = GC.getProjectInfo(eProject);
+	const int iNumBuildingClassInfos = GC.getNumBuildingClassInfos();
+	const CvCivilizationInfo& thisCivilization = getCivilizationInfo();
 
+	for(int iBuildingClassLoop = 0; iBuildingClassLoop < iNumBuildingClassInfos; iBuildingClassLoop++)
+	{
+		const BuildingClassTypes eBuildingClass = (BuildingClassTypes) iBuildingClassLoop;
+		CvBuildingClassInfo* pkBuildingClassInfo = GC.getBuildingClassInfo(eBuildingClass);
+		if(!pkBuildingClassInfo)
+			continue;
+
+		if(pkProjectInfo->GetBuildingClassRequireds(eBuildingClass))
+		{
+			const BuildingTypes ePrereqBuilding = (BuildingTypes) (thisCivilization.getCivilizationBuildings(eBuildingClass));
+			if(GetCityBuildings()->GetNumBuilding(ePrereqBuilding) == 0)
+				return false;
+		}
+	}
+#endif
 	ICvEngineScriptSystem1* pkScriptSystem = gDLL->GetScriptSystem();
 	if(pkScriptSystem)
 	{

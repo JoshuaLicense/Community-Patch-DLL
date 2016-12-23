@@ -30,7 +30,8 @@
  //////////////////////////
  //WWII
  /////////////////////////////////////////
-#define MOD_WWII_TERRITORY_CHANGES // No water tiles and no city ownership on tiles
+#define MOD_WWII_TERRITORY // Capture territory with units, no water tiles and no city ownership on tiles
+#define MOD_WWII_PROJECTS // Projects changes (Restrict projects)
 
 //////////////////////////
 //MULTIPLAYER INSTRUCTIONS:

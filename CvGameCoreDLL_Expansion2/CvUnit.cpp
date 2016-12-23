@@ -19973,6 +19973,10 @@ if (!bDoEvade)
 		}
 	}
 
+#if defined(MOD_WWII_TERRITORY)
+	capturePlot(pNewPlot);
+#endif
+
 	ICvEngineScriptSystem1* pkScriptSystem = gDLL->GetScriptSystem();
 	if(pkScriptSystem)
 	{
@@ -30204,6 +30208,81 @@ void CvUnit::RemoveCargoPromotions(CvUnit& cargounit)
 			cargounit.setHasPromotion(ePromotionArmySupport, false);
 		}
 		cargounit.SetBaseCombatStrength(cargounit.getUnitInfo().GetCombat());
+	}
+}
+#endif
+#if defined(MOD_WWII_TERRITORY)
+
+bool CvUnit::canCaptureTerritory() const
+{
+	VALIDATE_OBJECT
+	return getUnitInfo().CanCaptureTerritory();
+}
+
+void CvUnit::capturePlot(CvPlot* pPlot)
+{
+	VALIDATE_OBJECT
+
+	if(!pPlot)
+		return;
+
+	if(pPlot->isCity() || !pPlot->isOwned()) // no capturing city plots or water
+		return;
+
+	if(!canCaptureTerritory()) // certain unit can only capture
+		return;
+
+	if(getOwner() != pPlot->getOwner() && pPlot->getOwner() != NO_PLAYER)
+	{
+		PlayerTypes eUnitOwner = getOwner();
+		PlayerTypes ePlotOwner = pPlot->getOwner();
+		PlayerTypes ePlotOriginalOwner = pPlot->getOriginalOwner();
+
+		if(GET_TEAM(GET_PLAYER(eUnitOwner).getTeam()).isAtWar(GET_PLAYER(ePlotOwner).getTeam())) // player are at war ?
+		{
+			// Shall we liberate that plot ?
+			bool bLiberated = false;
+
+			if(ePlotOriginalOwner != eUnitOwner && ePlotOriginalOwner != NO_PLAYER && ePlotOriginalOwner != ePlotOwner) // The original owner is not the unit owner or the curent owner
+			{
+				if(GET_TEAM(GET_PLAYER(ePlotOriginalOwner).getTeam()).isAtWar(GET_PLAYER(ePlotOwner).getTeam())) // The original owner is at war with the curent owner
+				{
+					if(!GET_TEAM(GET_PLAYER(ePlotOriginalOwner).getTeam()).isAtWar(GET_PLAYER(eUnitOwner).getTeam()))  // The original owner is not at war with the unit owner
+					{
+						if(GET_PLAYER(ePlotOriginalOwner).isMinorCiv() && !GET_PLAYER(eUnitOwner).isMinorCiv())
+						{
+							CvMinorCivAI* pMinorAI = GET_PLAYER(ePlotOriginalOwner).GetMinorCivAI();
+							if(pMinorAI->IsFriends(eUnitOwner))  // a major civ is liberating a friend minor territory
+							{
+								pMinorAI->ChangeFriendshipWithMajor(eUnitOwner, 5/*GC.getLIBERATE_PLOT_CS_BONUS()*/, /*bFromQuest*/ false);
+								if(eUnitOwner == GC.getGame().getActivePlayer())
+								{
+									CvString strBuffer = GetLocalizedText("TXT_KEY_MISC_LIBERATE_MINOR_PLOT_BONUS", 5/*GC.getLIBERATE_PLOT_CS_BONUS()*/, GET_PLAYER(ePlotOriginalOwner).getNameKey());
+									GC.GetEngineUserInterface()->AddMessage(0, eUnitOwner, true, GC.getEVENT_MESSAGE_TIME(), strBuffer);
+									bLiberated = true;
+								}
+							}
+						}
+
+						if(!GET_PLAYER(ePlotOriginalOwner).isMinorCiv() && !GET_PLAYER(eUnitOwner).isMinorCiv())
+						{
+							if(!GET_TEAM(GET_PLAYER(ePlotOriginalOwner).getTeam()).IsAllowsOpenBordersToTeam(GET_PLAYER(eUnitOwner).getTeam()))
+								bLiberated = true;
+						}
+
+						if(bLiberated)
+						{
+							pPlot->setOwner(ePlotOriginalOwner, -1, /*bCheckUnits*/ false);
+						}
+					}
+				}
+			}
+
+			if(!bLiberated)
+			{
+				pPlot->setOwner(eUnitOwner, -1, /*bCheckUnits*/ false);
+			}
+		}
 	}
 }
 #endif

@@ -246,7 +246,9 @@ public:
 	void DoUpdatePower();
 
 	UnitMoveRate GetMoveRate(int numHexes) const;
-
+#if defined(MOD_WWII_TERRITORY)
+	bool CanCaptureTerritory() const;
+#endif
 private:
 
 	int m_iProductionCost;
@@ -422,6 +424,9 @@ private:
 	CvString m_strUnitArtInfoTag;
 	bool m_bUnitArtInfoCulturalVariation;
 	bool m_bUnitArtInfoEraVariation;
+#if defined(MOD_WWII_TERRITORY)
+	bool m_bCanCaptureTerritory;
+#endif
 
 	UnitMoveRate m_unitMoveRate[12];
 

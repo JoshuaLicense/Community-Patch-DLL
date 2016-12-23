@@ -3581,7 +3581,6 @@ void CvPlayer::acquireCity(CvCity* pOldCity, bool bConquest, bool bGift)
 	FStaticVector<int, 121, true, c_eCiv5GameplayDLL, 0> aiPurchasedPlotY;
 	const int iMaxRange = /*5*/ GC.getMAXIMUM_ACQUIRE_PLOT_DISTANCE();
 
-#if !defined(MOD_WWII_TERRITORY_CHANGES)
 	for(int iPlotLoop = 0; iPlotLoop < GC.getMap().numPlots(); iPlotLoop++)
 	{
 		CvPlot* pLoopPlot = GC.getMap().plotByIndexUnchecked(iPlotLoop);
@@ -3592,7 +3591,6 @@ void CvPlayer::acquireCity(CvCity* pOldCity, bool bConquest, bool bGift)
 			pLoopPlot->ClearCityPurchaseInfo();
 		}
 	}
-#endif
 
 	int iOldCityRings = pOldCity->getWorkPlotDistance();
 
@@ -4330,15 +4328,15 @@ void CvPlayer::acquireCity(CvCity* pOldCity, bool bConquest, bool bGift)
 	}
 	else //if (bConquest)
 	{
+#if !defined(MOD_WWII_TERRITORY)
 		// Set the plots to the new owner, now, we may be flipping it to a liberated player and we need to pass on the information.
 		for(uint ui = 0; ui < aiPurchasedPlotX.size(); ui++)
 		{
 			CvPlot* pPlot = GC.getMap().plot(aiPurchasedPlotX[ui], aiPurchasedPlotY[ui]);
 			if(pPlot->getOwner() != pNewCity->getOwner())
 				pPlot->setOwner(pNewCity->getOwner(), /*iAcquireCityID*/ pNewCity->GetID(), /*bCheckUnits*/ true, /*bUpdateResources*/ true);
-
 		}
-
+#endif
 		// Is this City being Occupied?
 		if(pNewCity->getOriginalOwner() != GetID())
 		{
@@ -15101,7 +15099,23 @@ bool CvPlayer::canCreate(ProjectTypes eProject, bool bContinue, bool bTestVisibl
 			}
 		}
 	}
+#if defined(MOD_WWII_PROJECTS)
+	for(iI = 0; iI < GC.getNumUnitInfos(); iI++)
+	{
+		CvUnitEntry* pkUnitEntry = GC.getUnitInfo((UnitTypes) iI);
+		// Is this project required by an unit ?
+		if(pkUnitEntry && pkUnitEntry->GetProjectPrereq() == pProjectInfo.GetID())
+		{
+			UnitTypes eThisPlayersUnitType = (UnitTypes) getCivilizationInfo().getCivilizationUnits((UnitClassTypes) pkUnitEntry->GetUnitClassType());
 
+			// If the player isn't allowed to train this Unit (via Civilization_UnitClassOverrides) then return false
+			if(pkUnitEntry->GetID() != eThisPlayersUnitType)
+			{
+				return false;
+			}
+		}
+	}
+#endif
 	ICvEngineScriptSystem1* pkScriptSystem = gDLL->GetScriptSystem();
 	if(pkScriptSystem)
 	{

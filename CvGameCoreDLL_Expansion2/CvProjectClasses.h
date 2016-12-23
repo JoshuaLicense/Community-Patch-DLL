@@ -56,6 +56,9 @@ public:
 	int GetVictoryThreshold(int i) const;
 	int GetVictoryMinThreshold(int i) const;
 	int GetProjectsNeeded(int i) const;
+#if defined(MOD_WWII_PROJECTS)
+	bool GetBuildingClassRequireds(int i) const;
+#endif
 
 protected:
 	int m_iVictoryPrereq;
@@ -86,6 +89,9 @@ protected:
 	int* m_piVictoryMinThreshold;
 	int* m_piProjectsNeeded;
 	int* m_piFlavorValue;
+#if defined(MOD_WWII_PROJECTS)
+	bool* m_pbBuildingClassRequireds;
+#endif
 };
 
 //++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++

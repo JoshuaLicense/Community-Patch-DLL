@@ -198,7 +198,10 @@ CvUnitEntry::CvUnitEntry(void) :
 	m_bUnitArtInfoEraVariation(false),
 	m_bUnitArtInfoCulturalVariation(false),
 	m_iUnitFlagIconOffset(0),
-	m_iUnitPortraitOffset(0)
+	m_iUnitPortraitOffset(0),
+#if defined(MOD_WWII_TERRITORY)
+	m_bCanCaptureTerritory(false)
+#endif
 {
 }
 
@@ -366,6 +369,9 @@ bool CvUnitEntry::CacheResults(Database::Results& kResults, CvDatabaseUtility& k
 #endif
 #if defined(MOD_CARGO_SHIPS)
 	m_iCargoCombat = kResults.GetInt("CargoCombat");
+#endif
+#if defined(MOD_WWII_TERRITORY)
+	m_bCanCaptureTerritory = kResults.GetBool("CanCaptureTerritory");
 #endif
 
 	//References
@@ -1681,6 +1687,12 @@ int CvUnitEntry::GetUnitPortraitOffset() const
 	return m_iUnitPortraitOffset;
 }
 
+#if defined(MOD_WWII_TERRITORY)
+bool CvUnitEntry::CanCaptureTerritory() const
+{
+	return m_bCanCaptureTerritory;
+}
+#endif
 
 // DERIVED FIELDS
 

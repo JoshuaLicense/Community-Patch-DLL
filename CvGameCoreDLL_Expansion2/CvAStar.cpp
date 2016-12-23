@@ -1633,9 +1633,23 @@ int StepValidGeneric(const CvAStarNode* parent, const CvAStarNode* node, const S
 	if (finder->HaveFlag(CvUnit::MOVEFLAG_NO_OCEAN) && pToPlot->getTerrainType() == TERRAIN_OCEAN)
 		return FALSE;
 
+#if defined(MOD_WWII_TERRITORY)
+	//are we only allowed in friendly territory?
+	if(finder->HaveFlag(CvUnit::MOVEFLAG_TERRITORY_NO_ENEMY))
+	{
+		if(pToPlot->isOwned() && !pToPlot->IsFriendlyTerritory(ePlayer))
+			return FALSE;
+	}
+	//can't embark!
+	if(finder->HaveFlag(CvUnit::MOVEFLAG_NO_EMBARK))
+	{
+		if(pToPlot->isWater())
+			return false;
+	}
+#endif
 	//territory check
 	PlayerTypes ePlotOwnerPlayer = pToPlot->getOwner();
-	if (ePlotOwnerPlayer != NO_PLAYER && ePlayer != NO_PLAYER && ePlotOwnerPlayer != eEnemy && !pToPlot->IsFriendlyTerritory(ePlayer))
+	if (ePlotOwnerPlayer != NO_PLAYER && ePlayer != NO_PLAYER && ePlotOwnerPlayer != eEnemy && !pToPlot->IsFriendlyTerritory(ePlayer)) // plot is owned, player exists, plot owner is not an enemy and plot is not in friendly territory
 	{
 		CvPlayer& plotOwnerPlayer = GET_PLAYER(ePlotOwnerPlayer);
 		bool bPlotOwnerIsMinor = plotOwnerPlayer.isMinorCiv();

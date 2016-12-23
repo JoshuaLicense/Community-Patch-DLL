@@ -330,6 +330,10 @@ void CvPlot::reset(int iX, int iY, bool bConstructorCall)
 #if defined(MOD_BALANCE_CORE)
 	m_bIsTradeUnitRoute = false;
 #endif
+#if defined(MOD_WWII_TERRITORY)
+	m_eOriginalOwner = NO_PLAYER;
+	m_strControl = "";
+#endif
 }
 
 //////////////////////////////////////
@@ -410,6 +414,9 @@ void CvPlot::doTurn()
 	if(isOwned())
 	{
 		changeOwnershipDuration(1);
+#if defined(MOD_WWII_TERRITORY)
+		checkOwnership();
+#endif
 	}
 
 	if(getImprovementType() != NO_IMPROVEMENT)
@@ -6261,6 +6268,9 @@ void CvPlot::setOwner(PlayerTypes eNewValue, int iAcquiringCityID, bool bCheckUn
 			// Plot is unowned
 			else
 			{
+#if defined(MOD_WWII_TERRITORY)
+				setOriginalOwner(eNewValue);
+#endif
 				// Someone paying for this improvement
 				if(GetPlayerResponsibleForImprovement() != NO_PLAYER)
 				{
@@ -13070,6 +13080,10 @@ void CvPlot::read(FDataStream& kStream)
 #if defined(MOD_BALANCE_CORE)
 	kStream >> m_bIsTradeUnitRoute;
 #endif
+#if defined(MOD_WWII_TERRITORY)
+	kStream >> m_eOriginalOwner;
+	kStream >> m_strControl;
+#endif
 }
 
 //	--------------------------------------------------------------------------------
@@ -13220,6 +13234,10 @@ void CvPlot::write(FDataStream& kStream) const
 	kStream << m_kArchaeologyData;
 #if defined(MOD_BALANCE_CORE)
 	kStream << m_bIsTradeUnitRoute;
+#endif
+#if defined(MOD_WWII_TERRITORY)
+	kStream << m_eOriginalOwner;
+	kStream << m_strControl;
 #endif
 }
 
@@ -15852,4 +15870,222 @@ bool CvPlot::GetPlotsAtRangeX(int iRange, bool bFromPlot, bool bWithLOS, std::ve
 	return false;
 }
 
+#endif
+
+#if defined(MOD_WWII_TERRITORY)
+void CvPlot::setOriginalOwner(PlayerTypes eNewValue)
+{
+	if(getOriginalOwner() != eNewValue)
+	{
+		m_eOriginalOwner = eNewValue;
+	}
+}
+
+void CvPlot::checkOwnership()
+{
+	// isOwned() && isWater() isn't needed, right? Only called in isOwned() and water is never owned, yeah?
+
+	PlayerTypes ePlotOwner = getOwner();
+	PlayerTypes eOriginalOwner = getOriginalOwner();
+
+	bool bCaptured = ePlotOwner != eOriginalOwner;
+
+	if(bCaptured && IsFriendlyTerritory(eOriginalOwner))
+	{
+		setOwner(eOriginalOwner, NO_PLAYER, false);
+		bCaptured = false;
+	}
+	if(!isUnderControl(bCaptured))
+	{
+		findControl(bCaptured);
+	}
+}
+
+bool CvPlot::isUnderControl(bool bCaptured)
+{
+	PlayerTypes ePlotOwner = getOwner();
+	CvPlayer& kPlotOwner = GET_PLAYER(ePlotOwner);
+
+	int iMaxRange = bCaptured ? 5 : MAX_INT; //GC.getCITY_MAX_PLOT_CONTROL_RANGE();
+
+	int iCityLoop;
+	for(CvCity* pLoopCity = kPlotOwner.firstCity(&iCityLoop); pLoopCity != NULL; pLoopCity = kPlotOwner.nextCity(&iCityLoop))
+	{
+		if(!(pLoopCity->isMatchingArea(this) || isMountain())) // Check if it's in the same area, and isn't a mountain, as mountains have their own area id.
+			continue;
+
+		SPathFinderUserData data(ePlotOwner, PT_GENERIC_ANY_AREA, NO_PLAYER, iMaxRange);
+		data.iFlags |= CvUnit::MOVEFLAG_TERRITORY_NO_ENEMY;
+		data.iFlags |= CvUnit::MOVEFLAG_NO_EMBARK;
+
+		if(GC.GetStepFinder().DoesPathExist(this->getX(), this->getY(), pLoopCity->getX(), pLoopCity->getY(), data))
+		{
+			CUSTOMLOG("City (%d, %d) found for plot (%d, %d)", pLoopCity->getX(), pLoopCity->getY(), this->getX(), this->getY());
+			CvString strBuffer = GetLocalizedText("TXT_KEY_PLOT_CITY_CONTROL", pLoopCity->getName());
+			setControlString(strBuffer);
+			return true;
+		}
+	}
+	//No closest city or can't find path. Check for units close...
+	CUSTOMLOG("No city found for plot (%d, %d)", this->getX(), this->getY());
+
+	int iUnitLoop;
+	for(CvUnit* pLoopUnit = kPlotOwner.firstUnit(&iUnitLoop); pLoopUnit != NULL; pLoopUnit = kPlotOwner.nextUnit(&iUnitLoop))
+	{
+		if(!pLoopUnit)
+			continue;
+
+		if(!(pLoopUnit->getArea() == getArea() || isMountain())) // Check if it's in the same area, and isn't a mountain, as mountains have their own area id.
+			continue;
+
+		if(!pLoopUnit->canCaptureTerritory()) // only certain units can capture territory!
+			continue;
+
+		SPathFinderUserData data(ePlotOwner, PT_GENERIC_ANY_AREA, NO_PLAYER, iMaxRange);
+		data.iFlags |= CvUnit::MOVEFLAG_TERRITORY_NO_ENEMY;
+		data.iFlags |= CvUnit::MOVEFLAG_NO_EMBARK;
+
+		if(GC.GetStepFinder().DoesPathExist(this->getX(), this->getY(), pLoopUnit->getX(), pLoopUnit->getY(), data))
+		{
+			CUSTOMLOG("Unit (%d, %d) found for plot (%d, %d)", pLoopUnit->getX(), pLoopUnit->getY(), this->getX(), this->getY());
+			CvString strBuffer = GetLocalizedText("TXT_KEY_PLOT_UNIT_CONTROL", pLoopUnit->getName());
+			setControlString(strBuffer);
+			return true;
+		}
+	}
+	//No unit found or can't find path to such plot
+	CUSTOMLOG("No unit found for plot (%d, %d)", this->getX(), this->getY());
+	return false; // return false as this plot is not under control of any player!	
+}
+
+bool CvPlot::findControl(bool bCaptured) // add 100 to the iValue for friends
+{
+	CvCity* pBestCity = NULL;
+	CvCity* pLoopCity;	
+
+	CvUnit* pBestUnit = NULL;
+	CvUnit* pLoopUnit;
+
+	int iI;
+	int iCityLoop;
+	int iUnitLoop;
+
+	int iValue = MAX_INT;
+	int iBestValue = MAX_INT;
+
+	int iMaxRange = 5; //GC.getCITY_MAX_PLOT_CONTROL_RANGE();
+
+	// Loop through major players units to find the closest!
+	for(iI = 0; iI < MAX_PLAYERS; iI++)
+	{
+		CvPlayer& thisPlayer = GET_PLAYER((PlayerTypes) iI);
+		if(thisPlayer.isAlive()) // No point giving it to a dead civ
+		{
+			for(pLoopCity = thisPlayer.firstCity(&iCityLoop); pLoopCity != NULL; pLoopCity = thisPlayer.nextCity(&iCityLoop)) // Loop through their cities
+			{
+				if(!(pLoopCity->isMatchingArea(this) || isMountain())) // Check if it's in the same area, and isn't a mountain, as mountains have their own area id.
+					continue;
+
+				iValue = plotDistance(this->getX(), this->getY(), pLoopCity->getX(), pLoopCity->getY()); // distance from the plot
+			
+				//if unit's team is at war with the current owner or if the tile is actually captured and unit's team is at war with the original owner of the plot
+				if(!(GET_TEAM(pLoopCity->getTeam()).isAtWar(getTeam()) || (bCaptured && GET_TEAM(pLoopCity->getTeam()).isAtWar(GET_PLAYER(getOriginalOwner()).getTeam()))))
+					iValue += 100;
+
+				if(iValue < (iMaxRange+1) && iValue < iBestValue) // only store value if within range and is below the best value!
+				{
+					SPathFinderUserData data(thisPlayer.GetID(), PT_GENERIC_ANY_AREA, NO_PLAYER, iMaxRange);
+					data.iFlags |= CvUnit::MOVEFLAG_TERRITORY_NO_ENEMY;
+					data.iFlags |= CvUnit::MOVEFLAG_NO_EMBARK;
+
+					if(GC.GetStepFinder().DoesPathExist(this->getX(), this->getY(), pLoopCity->getX(), pLoopCity->getY(), data)) // check if there is a path from the city to the plot!
+					{
+						iBestValue = iValue;
+						pBestCity = pLoopCity;
+					}
+				}
+			}
+
+			for(pLoopUnit = thisPlayer.firstUnit(&iUnitLoop); pLoopUnit != NULL; pLoopUnit = thisPlayer.nextUnit(&iUnitLoop))
+			{
+				if(pLoopUnit->canCaptureTerritory())
+				{
+					if(!(pLoopUnit->getArea() == this->getArea() || isMountain())) // Check if it's in the same area, and isn't a mountain, as mountains have their own area id.
+						continue;
+
+					iValue = plotDistance(this->getX(), this->getY(), pLoopUnit->getX(), pLoopUnit->getY()); // distance from the plot
+
+					//if unit's team is at war with the current owner or if the tile is actually captured and unit's team is at war with the original owner of the plot
+					if(!(GET_TEAM(pLoopUnit->getTeam()).isAtWar(getTeam()) || (bCaptured && GET_TEAM(pLoopUnit->getTeam()).isAtWar(GET_PLAYER(getOriginalOwner()).getTeam()))))
+						iValue += 100;
+
+					if(iValue < (iMaxRange + 1) && iValue < iBestValue) // only store value if within range and is below the best value!
+					{
+						SPathFinderUserData data(thisPlayer.GetID(), PT_GENERIC_ANY_AREA, NO_PLAYER, iMaxRange);
+						data.iFlags |= CvUnit::MOVEFLAG_TERRITORY_NO_ENEMY;
+						data.iFlags |= CvUnit::MOVEFLAG_NO_EMBARK;
+
+						if(GC.GetStepFinder().DoesPathExist(this->getX(), this->getY(), pLoopUnit->getX(), pLoopUnit->getY(), data)) // check if there is a path from the city to the plot!
+						{
+							iBestValue = iValue;
+							pBestUnit = pLoopUnit;
+						}
+					}
+				}
+			}
+		}
+		if(pBestCity || pBestUnit)
+		{
+			char text[256];
+			text[0] = NULL;
+			PlayerTypes eNewOwner = pBestUnit ? pBestUnit->getOwner() : pBestCity->getOwner(); // if pBestUnit is a unit, it means that a unit is closer so use that as owner ID!
+			CvString strOwner = pBestUnit ? pBestUnit->getName() : pBestCity->getName();
+
+			if(GET_PLAYER(getOwner()).isLocalPlayer())
+			{
+				sprintf_s(text, GetLocalizedText("TXT_KEY_PLOT_CONTROL_LOST"));
+				SHOW_PLOT_POPUP(this, getOwner(), text, 0.0f);
+			}
+			else if(GET_PLAYER(eNewOwner).isLocalPlayer())
+			{
+				sprintf_s(text, GetLocalizedText("TXT_KEY_PLOT_CONTROL_GAINED"));
+				SHOW_PLOT_POPUP(this, eNewOwner, text, 0.0f);
+			}
+			// Set control string for mouse over plot
+			CvString strBuffer = GetLocalizedText("TXT_KEY_PLOT_CONTROL", strOwner, pBestUnit?"[ICON_STRENGTH]":"[ICON_CITY_STATE]");
+			setControlString(strBuffer);
+
+			// Set new owner
+			setOwner(eNewOwner, NO_PLAYER, false);
+			return true;
+		}
+	}
+	return false;
+}
+
+void CvPlot::setControlString(CvString strNewValue)
+{
+	VALIDATE_OBJECT
+		gDLL->stripSpecialCharacters(strNewValue);
+
+	m_strControl = strNewValue;
+}
+
+const CvString CvPlot::getControlString() const
+{
+	VALIDATE_OBJECT
+		CvString strBuffer;
+
+	if(m_strControl.IsEmpty())
+	{
+		Localization::String strLoc = Localization::Lookup("TXT_KEY_PLOT_UNKNOWN_CONTROL");
+		strBuffer.Format(strLoc.toUTF8());
+		return strBuffer;
+	}
+
+	Localization::String strControlString = Localization::Lookup(m_strControl);
+	strBuffer.Format(strControlString.toUTF8());
+	
+	return strBuffer;
+}
 #endif

@@ -1654,6 +1654,10 @@ public:
 
 	bool	getCaptureDefinition(CvUnitCaptureDefinition* pkCaptureDef, PlayerTypes eCapturingPlayer = NO_PLAYER);
 	static CvUnit* createCaptureUnit(const CvUnitCaptureDefinition& kCaptureDef);
+#if defined(MOD_WWII_TERRITORY)
+	bool canCaptureTerritory() const;
+	void capturePlot(CvPlot* pPlot);
+#endif
 
 protected:
 	const MissionData* HeadMissionData() const;

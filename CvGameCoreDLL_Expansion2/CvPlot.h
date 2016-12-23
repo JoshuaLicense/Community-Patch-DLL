@@ -950,6 +950,25 @@ public:
 
 	bool canPlaceUnit(PlayerTypes ePlayer) const;
 
+#if defined(MOD_WWII_TERRITORY)
+	inline PlayerTypes getOriginalOwner() const
+	{
+		return (PlayerTypes) m_eOriginalOwner;
+	}
+	void setOriginalOwner(PlayerTypes eNewValue);
+
+	void checkOwnership();
+
+	bool isUnderControl(bool bCaptured);
+	bool hasCloseCity(PlayerTypes eCheckPlayer, bool bCaptured);
+	bool hasCloseUnit(PlayerTypes eCheckPlayer, bool bCaptured);
+
+	bool findControl(bool bCaptured);
+
+	const CvString getControlString() const;
+	void setControlString(const CvString strNewValue);
+#endif
+
 protected:
 	class PlotBoolField
 	{
@@ -1128,6 +1147,11 @@ protected:
 
 	// added so under cheat mode we can access protected stuff
 	friend class CvGameTextMgr;
+
+#if defined(MOD_WWII_TERRITORY)
+	char /*PlayerTypes*/ m_eOriginalOwner;
+	CvString m_strControl;
+#endif
 };
 
 namespace FSerialization

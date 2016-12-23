@@ -21,6 +21,9 @@ CvProjectEntry::CvProjectEntry(void):
 	m_eFreeBuilding(NO_BUILDINGCLASS),
 	m_eFreePolicy(NO_POLICY),
 #endif
+#if defined(MOD_WWII_PROJECTS)
+	m_pbBuildingClassRequireds(NULL),
+#endif
 	m_piFlavorValue(NULL)
 {
 }
@@ -31,6 +34,9 @@ CvProjectEntry::~CvProjectEntry(void)
 	SAFE_DELETE_ARRAY(m_piVictoryThreshold);
 	SAFE_DELETE_ARRAY(m_piVictoryMinThreshold);
 	SAFE_DELETE_ARRAY(m_piProjectsNeeded);
+#if defined(MOD_WWII_PROJECTS)
+	SAFE_DELETE_ARRAY(m_pbBuildingClassRequireds);
+#endif
 	SAFE_DELETE_ARRAY(m_piFlavorValue);
 }
 //------------------------------------------------------------------------------
@@ -109,7 +115,9 @@ bool CvProjectEntry::CacheResults(Database::Results& kResults, CvDatabaseUtility
 			}
 		}
 	}
-
+#if defined(MOD_WWII_PROJECTS)
+	kUtility.PopulateArrayByExistence(m_pbBuildingClassRequireds, "BuildingClasses", "Project_BuildingClassRequireds", "BuildingClassType", "ProjectType", szProjectType);
+#endif
 	kUtility.SetFlavors(m_piFlavorValue, "Project_Flavors", "ProjectType", szProjectType);
 	kUtility.PopulateArrayByValue(m_piProjectsNeeded, "Projects", "Project_Prereqs", "PrereqProjectType", "ProjectType", szProjectType, "AmountNeeded");
 
@@ -305,6 +313,13 @@ int CvProjectEntry::GetProjectsNeeded(int i) const
 
 	return 0;
 }
+
+#if defined(MOD_WWII_PROJECTS)
+bool CvProjectEntry::GetBuildingClassRequireds(int i) const
+{
+	return m_pbBuildingClassRequireds ? m_pbBuildingClassRequireds[i] : false;
+}
+#endif
 
 //=====================================
 // CvProjectXMLEntries
