@@ -117,6 +117,12 @@ bool CvProjectEntry::CacheResults(Database::Results& kResults, CvDatabaseUtility
 	}
 #if defined(MOD_WWII_PROJECTS)
 	kUtility.PopulateArrayByExistence(m_pbBuildingClassRequireds, "BuildingClasses", "Project_BuildingClassRequireds", "BuildingClassType", "ProjectType", szProjectType);
+
+	m_iUnlockType = kResults.GetInt("UnlockType");
+	m_iUnlockValue = kResults.GetInt("UnlockValue");
+
+	const char* szReference = kResults.GetText("UnitReference");
+	m_iUnitReference = GC.getInfoTypeForString(szReference, true);
 #endif
 	kUtility.SetFlavors(m_piFlavorValue, "Project_Flavors", "ProjectType", szProjectType);
 	kUtility.PopulateArrayByValue(m_piProjectsNeeded, "Projects", "Project_Prereqs", "PrereqProjectType", "ProjectType", szProjectType, "AmountNeeded");
@@ -319,6 +325,20 @@ bool CvProjectEntry::GetBuildingClassRequireds(int i) const
 {
 	return m_pbBuildingClassRequireds ? m_pbBuildingClassRequireds[i] : false;
 }
+
+int CvProjectEntry::GetUnlockType() const
+{
+	return m_iUnlockType;
+}
+int CvProjectEntry::GetUnlockValue() const
+{
+	return m_iUnlockValue;
+}
+int CvProjectEntry::GetUnitReference() const
+{
+	return m_iUnitReference;
+}
+
 #endif
 
 //=====================================

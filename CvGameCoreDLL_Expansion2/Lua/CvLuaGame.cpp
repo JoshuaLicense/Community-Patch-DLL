@@ -4005,3 +4005,19 @@ int CvLuaGame::lWriteCSV(lua_State * L)
 	return 1;
 }
 #endif
+
+#if defined(MOD_WWII_MISC)
+int CvLuaGame::lGetNumeralDate(lua_State* L)
+{
+	return BasicLuaMethod(L, &CvGame::GetNumeralDate);
+}
+
+int CvLuaGame::lSetNumeralDate(lua_State* L)
+{
+	CvGame& kGame = GC.getGame();
+	long lNumeralDate = lua_tointeger(L, 1);
+
+	kGame.SetNumeralDate(lNumeralDate);
+	return 0;
+}
+#endif

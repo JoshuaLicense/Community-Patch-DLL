@@ -675,6 +675,10 @@ public:
 #if defined(MOD_BALANCE_CORE_GLOBAL_IDS)
 	int GetNextGlobalID() { return ++m_iGlobalAssetCounter; }
 #endif
+#if defined(MOD_WWII_MISC)
+	int GetNumeralDate() const;
+	void SetNumeralDate(const int iNewValue);
+#endif
 
 	void SetClosestCityMapDirty();
 	//assuming a typical unit with baseMoves==2
@@ -909,7 +913,9 @@ protected:
 
 	void PopulateDigSite(CvPlot& kPlot, EraTypes eEra, GreatWorkArtifactClass eArtifact);
 	void SpawnArchaeologySitesHistorically();
-
+#if defined(MOD_WWII_MISC)
+	int m_iNumeralDate;
+#endif
 
 };
 

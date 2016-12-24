@@ -58,6 +58,10 @@ public:
 	int GetProjectsNeeded(int i) const;
 #if defined(MOD_WWII_PROJECTS)
 	bool GetBuildingClassRequireds(int i) const;
+
+	int GetUnlockType() const;
+	int GetUnlockValue() const;
+	int GetUnitReference() const;
 #endif
 
 protected:
@@ -91,6 +95,10 @@ protected:
 	int* m_piFlavorValue;
 #if defined(MOD_WWII_PROJECTS)
 	bool* m_pbBuildingClassRequireds;
+
+	int m_iUnlockType;
+	int m_iUnlockValue;
+	int m_iUnitReference;
 #endif
 };
 

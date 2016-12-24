@@ -509,6 +509,10 @@ protected:
 	static int lDeleteCSV(lua_State* L);
 	static int lWriteCSV(lua_State* L);
 #endif
+#if defined(MOD_WWII_MISC)
+	static int lGetNumeralDate(lua_State* L);
+	static int lSetNumeralDate(lua_State* L);
+#endif
 };
 
 #endif //CVLUAGAME_H

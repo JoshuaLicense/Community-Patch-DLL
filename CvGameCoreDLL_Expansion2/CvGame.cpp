@@ -110,6 +110,8 @@ CvGame::CvGame() :
 	, m_bFOW(true)
 	, m_bArchaeologyTriggered(false)
 	, m_lastTurnAICivsProcessed(-1)
+#if defined(MOD_WWII_MISC)
+#endif
 {
 	m_aiEndTurnMessagesReceived = FNEW(int[MAX_PLAYERS], c_eCiv5GameplayDLL, 0);
 	m_aiRankPlayer = FNEW(int[MAX_PLAYERS], c_eCiv5GameplayDLL, 0);        // Ordered by rank...
@@ -1144,6 +1146,8 @@ void CvGame::uninit()
 #endif
 #if defined(MOD_BALANCE_CORE_SPIES)
 	m_iLargestBasePotential = 0;
+#endif
+#if defined(MOD_WWII_MISC)
 #endif
 
 	m_strScriptData = "";
@@ -8114,6 +8118,10 @@ void CvGame::doTurn()
 	incrementGameTurn();
 	incrementElapsedGameTurns();
 
+#if defined(MOD_WWII_MISC)
+	GAMEEVENTINVOKE_HOOK(GAMEEVENT_GameDoTurn);
+#endif
+
 	if(isOption(GAMEOPTION_DYNAMIC_TURNS))
 	{// update turn mode for dynamic turn mode.
 		for(int teamIdx = 0; teamIdx < MAX_TEAMS; ++teamIdx)
@@ -13610,4 +13618,15 @@ PlayerTypes CvGame::GetGreatestPlayerResourceMonopoly(ResourceTypes eResource) c
 }
 
 #endif
+#endif
+
+#if defined(MOD_WWII_MISC)
+int CvGame::GetNumeralDate() const
+{
+	return m_iNumeralDate;
+}
+void CvGame::SetNumeralDate(const int iNewValue)
+{
+	m_iNumeralDate = iNewValue;
+}
 #endif

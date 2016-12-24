@@ -32,6 +32,7 @@
  /////////////////////////////////////////
 #define MOD_WWII_TERRITORY // Capture territory with units, no water tiles and no city ownership on tiles
 #define MOD_WWII_PROJECTS // Projects changes (Restrict projects)
+#define MOD_WWII_MISC // stuff like date functions
 
 //////////////////////////
 //MULTIPLAYER INSTRUCTIONS:
@@ -1255,6 +1256,8 @@ enum BattleTypeTypes
 #define GAMEEVENT_EventCanTake				"EventCanTake", "ii"
 #define GAMEEVENT_CityEventCanTake			"CityEventCanTake", "iii"
 #define GAMEEVENT_EventUnitCreated			"EventUnitCreated", "iii"
+// WWII
+#define GAMEEVENT_GameDoTurn				"GameDoTurn", ""
 
 // Serialization wrappers
 #define MOD_SERIALIZE

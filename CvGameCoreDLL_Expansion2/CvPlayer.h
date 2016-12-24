@@ -2658,6 +2658,10 @@ public:
 	int GetCityDistanceInPlots(const CvPlot* pPlot) const;
 	CvCity* GetClosestCityByPlots(const CvPlot* pPlot) const;
 #endif
+#if defined(MOD_WWII_PROJECTS)
+	int GetUnitClassExpTimes100(UnitClassTypes eType) const;
+	void ChangeUnitClassExpTimes100(UnitClassTypes eType, int iChange);
+#endif
 
 protected:
 	class ConqueredByBoolField
@@ -3444,7 +3448,9 @@ protected:
 	FAutoVariable<int, CvPlayer> m_iMilitaryAirMight;
 	FAutoVariable<int, CvPlayer> m_iMilitaryLandMight;
 #endif
-
+#if defined(MOD_WWII_PROJECTS)
+	FAutoVariable<std::vector<int>, CvPlayer> m_aiUnitClassExpTimes100;
+#endif
 };
 
 extern bool CancelActivePlayerEndTurn();

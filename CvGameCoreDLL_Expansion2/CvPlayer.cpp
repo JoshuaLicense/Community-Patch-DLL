@@ -694,6 +694,9 @@ CvPlayer::CvPlayer() :
 	, m_iMilitaryAirMight("CvPlayer::m_iMilitaryAirMight", m_syncArchive)
 	, m_iMilitaryLandMight("CvPlayer::m_iMilitaryLandMight", m_syncArchive)
 #endif
+#if defined(MOD_WWII_PROJECTS)
+	, m_aiUnitClassExpTimes100("CvPlayer::m_aiUnitClassExp", m_syncArchive)
+#endif
 {
 	m_pPlayerPolicies = FNEW(CvPlayerPolicies, c_eCiv5GameplayDLL, 0);
 	m_pEconomicAI = FNEW(CvEconomicAI, c_eCiv5GameplayDLL, 0);
@@ -2171,7 +2174,10 @@ void CvPlayer::reset(PlayerTypes eID, bool bConstructorCall)
 			}
 		}
 #endif
-
+#if defined(MOD_WWII_PROJECTS)
+		m_aiUnitClassExpTimes100.clear();
+		m_aiUnitClassExpTimes100.resize(GC.getNumUnitClassInfos(), 0);
+#endif
 		m_aVote.clear();
 		m_aUnitExtraCosts.clear();
 
@@ -15114,6 +15120,21 @@ bool CvPlayer::canCreate(ProjectTypes eProject, bool bContinue, bool bTestVisibl
 				return false;
 			}
 		}
+	}
+	switch(pProjectInfo.GetUnlockType())
+	{
+	case 1: 
+		if(pProjectInfo.GetUnlockValue() > GC.getGame().GetNumeralDate())
+			return false;
+		break;
+	case 2:
+		int iExpNeeded = pProjectInfo.GetUnlockValue();
+		int iReference = pProjectInfo.GetUnitReference();
+
+		CvUnitEntry* pkUnitInfo = GC.getUnitInfo((UnitTypes) iReference);
+		if(GetUnitClassExpTimes100((UnitClassTypes) pkUnitInfo->GetUnitClassType()) < iExpNeeded)
+			return false;
+		break;
 	}
 #endif
 	ICvEngineScriptSystem1* pkScriptSystem = gDLL->GetScriptSystem();
@@ -30004,6 +30025,9 @@ void CvPlayer::changeCombatExperience(int iChange)
 #else
 	m_iLifetimeCombatExperience += iChange;
 #endif
+#if defined(MOD_WWII_PROJECTS)
+	m_aiUnitClassExpTimes100.setAt(pFromUnit->getUnitClassType(), m_aiUnitClassExpTimes100[pFromUnit->getUnitClassType()] + iChangeTimes100);
+#endif
 }
 
 //	--------------------------------------------------------------------------------
@@ -30221,6 +30245,9 @@ void CvPlayer::changeNavalCombatExperience(int iChange)
 	m_iLifetimeCombatExperienceTimes100 += iChangeTimes100;
 #else
 	m_iLifetimeCombatExperience += iChange;
+#endif
+#if defined(MOD_WWII_PROJECTS)
+	m_aiUnitClassExpTimes100.setAt(pFromUnit->getUnitClassType(), m_aiUnitClassExpTimes100[pFromUnit->getUnitClassType()] + iChangeTimes100);
 #endif
 }
 
@@ -45395,3 +45422,9 @@ void CvPlayer::setPlotFoundValue(int iX, int iY, int iValue)
 	if (iIndex<m_viPlotFoundValues.size())
 		m_viPlotFoundValues[iIndex] = iValue;
 }
+#if defined(MOD_WWII_PROJECTS)
+int CvPlayer::GetUnitClassExpTimes100(UnitClassTypes eType) const
+{
+	return m_aiUnitClassExpTimes100[eType];
+}
+#endif
