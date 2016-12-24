@@ -111,6 +111,7 @@ CvGame::CvGame() :
 	, m_bArchaeologyTriggered(false)
 	, m_lastTurnAICivsProcessed(-1)
 #if defined(MOD_WWII_MISC)
+	, m_iNumeralDate(19000101)
 #endif
 {
 	m_aiEndTurnMessagesReceived = FNEW(int[MAX_PLAYERS], c_eCiv5GameplayDLL, 0);
@@ -1148,6 +1149,7 @@ void CvGame::uninit()
 	m_iLargestBasePotential = 0;
 #endif
 #if defined(MOD_WWII_MISC)
+	m_iNumeralDate = 19000101;
 #endif
 
 	m_strScriptData = "";
