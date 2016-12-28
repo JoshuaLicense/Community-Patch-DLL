@@ -4706,7 +4706,12 @@ void CvGame::incrementGameTurn()
 int CvGame::getTurnYear(int iGameTurn)
 {
 	// moved the body of this method to Game Core Utils so we have access for other games than the current one (replay screen in HOF)
+#if defined(MOD_WWII_MISC)
+	// some reason calendar is always 0...
+	return getTurnYearForGame(iGameTurn, getStartYear(), CALENDAR_WEEKS, getGameSpeedType());
+#else
 	return getTurnYearForGame(iGameTurn, getStartYear(), getCalendar(), getGameSpeedType());
+#endif
 }
 
 

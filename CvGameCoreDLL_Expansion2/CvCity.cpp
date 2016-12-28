@@ -21533,6 +21533,20 @@ int CvCity::getYieldRateTimes100(YieldTypes eIndex, bool bIgnoreTrade) const
 			return 0;
 		}
 #endif
+#if defined(MOD_WWII_YIELDS)
+		if(eIndex == YIELD_PERSONNEL)
+		{
+			return 0;
+		}
+		if(eIndex == YIELD_MATERIEL)
+		{
+			return 0;
+		}
+		if(eIndex == YIELD_FUEL)
+		{
+			return 0;
+		}
+#endif
 	}
 
 	int iProcessYield = 0;

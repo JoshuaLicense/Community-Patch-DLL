@@ -307,6 +307,18 @@ protected:
 	static int lGetTotalFaithPerTurn(lua_State* L);
 	static int lGetFaithPerTurnFromCities(lua_State* L);
 	static int lGetFaithPerTurnFromMinorCivs(lua_State* L);
+#if defined(MOD_WWII_YIELDS)
+	static int lGetYield(lua_State* L);
+
+	static int lGetBaseYieldPerTurn(lua_State* L);
+	static int lGetYieldPerTurnFromCities(lua_State* L);
+	static int lGetYieldPerTurnFromMinorCivs(lua_State* L);
+	static int lGetYieldPerTurnFromTraits(lua_State* L);
+
+	static int lGetYieldPerTurn(lua_State* L);
+
+	static int lGetRequiredYieldPerTurn(lua_State* L);
+#endif
 #if defined(MOD_BALANCE_CORE)
 	static int lGetGoldPerTurnFromMinorCivs(lua_State* L);
 	static int lGetSciencePerTurnFromMinorCivs(lua_State* L);

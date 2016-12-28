@@ -18,6 +18,44 @@
 // must be included after all other headers
 #include "LintFree.h"
 
+
+#if defined(MOD_WWII_MISC)
+void CvGameTextMgr::setYearStr(CvString& strString, int iGameTurn, bool bSave, CalendarTypes eCalendar, int iStartYear, GameSpeedTypes eSpeed)
+{
+	eCalendar = CALENDAR_WEEKS;
+	int iTurnYear = getTurnYearForGame(iGameTurn, iStartYear, eCalendar, eSpeed);
+
+	strString = GetLocalizedText("TXT_KEY_SCENARIO_YEAR", iTurnYear);
+}
+void CvGameTextMgr::setDateStr(CvString& strString, int iGameTurn, bool bSave, CalendarTypes eCalendar, int iStartYear, GameSpeedTypes eSpeed)
+{
+	CvString strYearBuffer;
+	CvString strWeekBuffer;
+
+	int iTempGameTurn = iGameTurn + GC.getHIDDEN_START_TURN_OFFSET();
+	
+	eCalendar = CALENDAR_WEEKS;
+	setYearStr(strYearBuffer, iTempGameTurn, false, eCalendar, iStartYear, eSpeed);
+
+	const int iNumMonths = DB.Count("Months");
+	const int iNumSeasons = DB.Count("Seasons");
+
+	int iDay = ((iTempGameTurn % GC.getWEEKS_PER_MONTHS()) * 5);
+	strWeekBuffer = GetLocalizedText("TXT_KEY_SCENARIO_WEEK", (iDay == 0 ? 1 : iDay));
+
+	const int idx = (iTempGameTurn / GC.getWEEKS_PER_MONTHS()) % iNumMonths;
+
+	CvBaseInfo kCalendarInfo;
+	Database::SingleResult kResult;
+
+	DB.SelectAt(kResult, "Months", idx);
+	kCalendarInfo.CacheResult(kResult);
+
+	const char* Descr = kCalendarInfo.GetDescription();
+
+	strString = (CvString(Descr) + " " + strWeekBuffer + ", " + strYearBuffer);
+}
+#else
 void CvGameTextMgr::setYearStr(CvString& strString, int iGameTurn, bool bSave, CalendarTypes eCalendar, int iStartYear, GameSpeedTypes eSpeed)
 {
 	int iTurnYear = getTurnYearForGame(iGameTurn, iStartYear, eCalendar, eSpeed);
@@ -181,3 +219,4 @@ void CvGameTextMgr::setDateStr(CvString& strString, int iGameTurn, bool bSave, C
 		CvAssert(false);
 	}
 }
+#endif

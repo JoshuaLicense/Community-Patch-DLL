@@ -24,6 +24,9 @@ public:
 
 	static void setYearStr(CvString& szString, int iGameTurn, bool bSave, CalendarTypes eCalendar, int iStartYear, GameSpeedTypes eSpeed);
 	static void setDateStr(CvString& szString, int iGameTurn, bool bSave, CalendarTypes eCalendar, int iStartYear, GameSpeedTypes eSpeed);
+#if defined(MOD_WWII_MISC)
+	static void setDateStr(CvString& szString, int iGameTurn, int iStartYear);
+#endif
 };
 
 #endif	//CIV5_GAME_TEXT_MGR_H

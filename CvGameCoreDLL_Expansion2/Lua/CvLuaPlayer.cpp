@@ -1448,6 +1448,18 @@ void CvLuaPlayer::PushMethods(lua_State* L, int t)
 	Method(GetMilitaryAirMight);
 	Method(GetMilitaryLandMight);
 #endif
+#if defined(MOD_WWII_YIELDS)
+	Method(GetYield);
+
+	Method(GetBaseYieldPerTurn);
+	Method(GetYieldPerTurnFromCities);
+	Method(GetYieldPerTurnFromMinorCivs);
+	Method(GetYieldPerTurnFromTraits);
+
+	Method(GetYieldPerTurn);
+
+	Method(GetRequiredYieldPerTurn);
+#endif
 }
 //------------------------------------------------------------------------------
 void CvLuaPlayer::HandleMissingInstance(lua_State* L)
@@ -15129,5 +15141,47 @@ int CvLuaPlayer::lGetMilitaryAirMight(lua_State* L)
 int CvLuaPlayer::lGetMilitaryLandMight(lua_State* L)
 {
 	return BasicLuaMethod(L, &CvPlayerAI::GetMilitaryLandMight);
+}
+#endif
+#if defined(MOD_WWII_YIELDS)
+int CvLuaPlayer::lGetYield(lua_State* L)
+{
+	return BasicLuaMethod(L, &CvPlayerAI::GetYield);
+}
+//------------------------------------------------------------------------------
+//int GetBaseYieldPerTurn(eYield);
+int CvLuaPlayer::lGetBaseYieldPerTurn(lua_State* L)
+{
+	return BasicLuaMethod(L, &CvPlayerAI::GetBaseYieldPerTurn);
+}
+//------------------------------------------------------------------------------
+//int GetYieldPerTurnFromCities();
+int CvLuaPlayer::lGetYieldPerTurnFromCities(lua_State* L)
+{
+	return BasicLuaMethod(L, &CvPlayerAI::GetYieldPerTurnFromCities);
+}
+//------------------------------------------------------------------------------
+//int GetPersonnelPerTurnFromMinorCivs();
+int CvLuaPlayer::lGetYieldPerTurnFromMinorCivs(lua_State* L)
+{
+	return BasicLuaMethod(L, &CvPlayerAI::GetYieldPerTurnFromMinorCivs);
+}
+//------------------------------------------------------------------------------
+//int GetYieldPerTurn();
+int CvLuaPlayer::lGetYieldPerTurn(lua_State* L)
+{
+	return BasicLuaMethod(L, &CvPlayerAI::GetYieldPerTurn);
+}
+//------------------------------------------------------------------------------
+//int GetYieldFromTraits();
+int CvLuaPlayer::lGetYieldPerTurnFromTraits(lua_State* L)
+{
+	return BasicLuaMethod(L, &CvPlayerAI::GetYieldPerTurnFromTraits);
+}
+//------------------------------------------------------------------------------
+//int GetYieldFromTraits();
+int CvLuaPlayer::lGetRequiredYieldPerTurn(lua_State* L)
+{
+	return BasicLuaMethod(L, &CvPlayerAI::GetRequiredYieldPerTurn);
 }
 #endif

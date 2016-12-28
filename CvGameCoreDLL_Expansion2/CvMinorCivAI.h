@@ -626,7 +626,10 @@ public:
 	int GetCurrentScienceFlatBonus(PlayerTypes ePlayer);
 	int GetCurrentScienceBonus(PlayerTypes ePlayer);
 #endif
-
+#if defined(MOD_WWII_YIELDS)
+	int GetCurrentYieldFlatBonus(YieldTypes eYield, PlayerTypes ePlayer);
+	int GetCurrentYieldBonus(YieldTypes eYield, PlayerTypes ePlayer);
+#endif
 	// Food bonuses
 	int GetFriendsCapitalFoodBonus(PlayerTypes ePlayer, EraTypes eAssumeEra = NO_ERA);
 	int GetFriendsOtherCityFoodBonus(PlayerTypes ePlayer, EraTypes eAssumeEra = NO_ERA);

@@ -519,6 +519,10 @@ void CvLuaGame::RegisterMembers(lua_State* L)
 	Method(DeleteCSV);
 	Method(WriteCSV);
 #endif
+#if defined(MOD_WWII_MISC)
+	Method(GetNumeralDate);
+	Method(SetNumeralDate);
+#endif
 }
 //------------------------------------------------------------------------------
 
@@ -864,18 +868,14 @@ int CvLuaGame::lGetGameTurnYear(lua_State* L)
 {
 	return BasicLuaMethod(L, &CvGame::getGameTurnYear);
 }
+
 //------------------------------------------------------------------------------
 //string GetTurnString();
 int CvLuaGame::lGetTurnString(lua_State* L)
 {
 	CvGame& game = GC.getGame();
 	CvString strString;
-	CvGameTextMgr::setDateStr(strString,
-		game.getGameTurn(),
-		false,
-		game.getCalendar(),
-		game.getStartYear(),
-		game.getGameSpeedType());
+	CvGameTextMgr::setDateStr(strString, game.getGameTurn(), false,	game.getCalendar(),	game.getStartYear(), game.getGameSpeedType());
 
 	lua_pushstring(L, strString);
 	return 1;
@@ -4015,9 +4015,9 @@ int CvLuaGame::lGetNumeralDate(lua_State* L)
 int CvLuaGame::lSetNumeralDate(lua_State* L)
 {
 	CvGame& kGame = GC.getGame();
-	long lNumeralDate = lua_tointeger(L, 1);
+	int iNumeralDate = lua_tointeger(L, 1);
 
-	kGame.SetNumeralDate(lNumeralDate);
+	kGame.SetNumeralDate(iNumeralDate);
 	return 0;
 }
 #endif

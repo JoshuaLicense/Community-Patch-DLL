@@ -32,6 +32,7 @@
  /////////////////////////////////////////
 #define MOD_WWII_TERRITORY // Capture territory with units, no water tiles and no city ownership on tiles
 #define MOD_WWII_PROJECTS // Projects changes (Restrict projects)
+#define MOD_WWII_YIELDS // Fuel, Personnel and Materiel
 #define MOD_WWII_MISC // stuff like date functions
 
 //////////////////////////

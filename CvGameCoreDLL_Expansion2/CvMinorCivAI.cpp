@@ -18524,3 +18524,68 @@ FDataStream& operator>>(FDataStream& loadFrom, MinorCivQuestTypes& writeTo)
 	writeTo = static_cast<MinorCivQuestTypes>(v);
 	return loadFrom;
 }
+
+#if defined(MOD_WWII_YIELDS)
+int CvMinorCivAI::GetCurrentYieldBonus(YieldTypes eYield, PlayerTypes ePlayer)
+{
+	int iValue = 0;
+
+	iValue += GetCurrentYieldFlatBonus(eYield, ePlayer);
+
+	return iValue;
+}
+
+int CvMinorCivAI::GetCurrentYieldFlatBonus(YieldTypes eYield, PlayerTypes ePlayer)
+{
+	CvAssertMsg(ePlayer >= 0, "eIndex is expected to be non-negative (invalid Index)");
+	CvAssertMsg(ePlayer < MAX_PLAYERS, "ePlayer is expected to be within maximum bounds (invalid Index)");
+	if(ePlayer < 0 || ePlayer >= MAX_PLAYERS) return 0;
+
+	// Minor civ players do not get a bonus
+	if(ePlayer >= MAX_MAJOR_CIVS)
+		return 0;
+
+	int iTrait = -1;
+	switch(eYield)
+	{
+	case YIELD_PERSONNEL:
+		iTrait = MINOR_CIV_TRAIT_MARITIME;
+		break;
+	case YIELD_MATERIEL:
+		iTrait = MINOR_CIV_TRAIT_MILITARISTIC;
+		break;		
+	}
+
+	// Only for Religious trait minors
+	if(GetTrait() != iTrait)
+		return 0;
+
+	int iAmount = GetPlayer()->getTotalPopulation();
+
+	int iBonus = 0;
+	if(IsAllies(ePlayer))
+		iBonus = 2;
+	if(IsFriends(ePlayer))
+		iBonus = 1;
+
+	iAmount *= iBonus;
+
+	// Modify the bonus if called for by our trait
+	int iModifier = GET_PLAYER(ePlayer).GetPlayerTraits()->GetCityStateBonusModifier();
+	if(iModifier > 0)
+	{
+		iAmount *= (iModifier + 100);
+		iAmount /= 100;
+	}
+
+#if defined(MOD_CITY_STATE_SCALE)
+	if(MOD_CITY_STATE_SCALE)
+	{
+		iAmount *= 100 + max(0, GetPlayer()->getNumCities() - 1) * GD_INT_GET(CITY_STATE_SCALE_PER_CITY_MOD);
+		iAmount /= 100;
+	}
+#endif
+
+	return iAmount;
+}
+#endif

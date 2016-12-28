@@ -2662,6 +2662,20 @@ public:
 	int GetUnitClassExpTimes100(UnitClassTypes eType) const;
 	void ChangeUnitClassExpTimes100(UnitClassTypes eType, int iChange);
 #endif
+#if defined(MOD_WWII_YIELDS)
+	int GetYield(YieldTypes eYield) const;
+	void ChangeYield(YieldTypes eYield, int iChange);
+	void SetYield(YieldTypes eYield, int iNewValue);
+
+	int GetBaseYieldPerTurn(YieldTypes eYield) const;
+	int GetYieldPerTurnFromCities(YieldTypes eYield) const;
+	int GetYieldPerTurnFromMinorCivs(YieldTypes eYield) const;
+	int GetYieldPerTurnFromMinor(YieldTypes eYield, PlayerTypes eMinor) const;
+
+	int GetYieldPerTurn(YieldTypes eYield) const;
+
+	int GetRequiredYieldPerTurn(YieldTypes eYield) const;
+#endif
 
 protected:
 	class ConqueredByBoolField
@@ -3450,6 +3464,11 @@ protected:
 #endif
 #if defined(MOD_WWII_PROJECTS)
 	FAutoVariable<std::vector<int>, CvPlayer> m_aiUnitClassExpTimes100;
+#endif
+#if defined(MOD_WWII_YIELDS)
+	FAutoVariable<int, CvPlayer> m_iPersonnel;
+	FAutoVariable<int, CvPlayer> m_iMateriel;
+	FAutoVariable<int, CvPlayer> m_iFuel;
 #endif
 };
 

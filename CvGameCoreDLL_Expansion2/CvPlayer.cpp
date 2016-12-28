@@ -697,6 +697,12 @@ CvPlayer::CvPlayer() :
 #if defined(MOD_WWII_PROJECTS)
 	, m_aiUnitClassExpTimes100("CvPlayer::m_aiUnitClassExp", m_syncArchive)
 #endif
+#if defined(MOD_WWII_YIELDS)
+	, m_iPersonnel("CvPlayer::m_iPersonnel", m_syncArchive)
+	, m_iMateriel("CvPlayer::m_iMateriel", m_syncArchive)
+	, m_iFuel("CvPlayer::m_iFuel", m_syncArchive)
+#endif
+
 {
 	m_pPlayerPolicies = FNEW(CvPlayerPolicies, c_eCiv5GameplayDLL, 0);
 	m_pEconomicAI = FNEW(CvEconomicAI, c_eCiv5GameplayDLL, 0);
@@ -1661,6 +1667,11 @@ void CvPlayer::uninit()
 	m_iFaithPurchaseIndex = 0;
 	m_iMaxEffectiveCities = 1;
 	m_iLastSliceMoved = 0;
+#if defined(MOD_WWII_YIELDS)
+	m_iPersonnel = 0;
+	m_iMateriel = 0;
+	m_iFuel = 0;
+#endif
 
 	m_bHasBetrayedMinorCiv = false;
 	m_bAlive = false;
@@ -10847,6 +10858,12 @@ void CvPlayer::doTurnPostDiplomacy()
 			}
 		}
 	}
+#if defined(MOD_WWII_YIELDS)
+	//Give the Yields initially, later deduct the deductions!
+	ChangeYield(YIELD_PERSONNEL, GetBaseYieldPerTurn(YIELD_PERSONNEL));
+	ChangeYield(YIELD_MATERIEL, GetBaseYieldPerTurn(YIELD_MATERIEL));
+	ChangeYield(YIELD_FUEL, GetBaseYieldPerTurn(YIELD_FUEL));
+#endif
 
 	// Gold
 	GetTreasury()->DoGold();
@@ -15128,7 +15145,7 @@ bool CvPlayer::canCreate(ProjectTypes eProject, bool bContinue, bool bTestVisibl
 			return false;
 		break;
 	case 2:
-		int iExpNeeded = pProjectInfo.GetUnlockValue();
+		int iExpNeeded = pProjectInfo.GetUnlockValue() * 100; //Exp times 100
 		int iReference = pProjectInfo.GetUnitReference();
 
 		CvUnitEntry* pkUnitInfo = GC.getUnitInfo((UnitTypes) iReference);
@@ -30026,7 +30043,10 @@ void CvPlayer::changeCombatExperience(int iChange)
 	m_iLifetimeCombatExperience += iChange;
 #endif
 #if defined(MOD_WWII_PROJECTS)
-	m_aiUnitClassExpTimes100.setAt(pFromUnit->getUnitClassType(), m_aiUnitClassExpTimes100[pFromUnit->getUnitClassType()] + iChangeTimes100);
+	if(pFromUnit)
+	{
+		m_aiUnitClassExpTimes100.setAt(pFromUnit->getUnitClassType(), m_aiUnitClassExpTimes100[pFromUnit->getUnitClassType()] + iChangeTimes100);
+	}
 #endif
 }
 
@@ -30247,7 +30267,10 @@ void CvPlayer::changeNavalCombatExperience(int iChange)
 	m_iLifetimeCombatExperience += iChange;
 #endif
 #if defined(MOD_WWII_PROJECTS)
-	m_aiUnitClassExpTimes100.setAt(pFromUnit->getUnitClassType(), m_aiUnitClassExpTimes100[pFromUnit->getUnitClassType()] + iChangeTimes100);
+	if(pFromUnit)
+	{
+		m_aiUnitClassExpTimes100.setAt(pFromUnit->getUnitClassType(), m_aiUnitClassExpTimes100[pFromUnit->getUnitClassType()] + iChangeTimes100);
+	}
 #endif
 }
 
@@ -45426,5 +45449,136 @@ void CvPlayer::setPlotFoundValue(int iX, int iY, int iValue)
 int CvPlayer::GetUnitClassExpTimes100(UnitClassTypes eType) const
 {
 	return m_aiUnitClassExpTimes100[eType];
+}
+#endif
+#if defined(MOD_WWII_YIELDS)
+int CvPlayer::GetYield(YieldTypes eYield) const
+{
+	switch(eYield)
+	{
+	case YIELD_PERSONNEL: 
+		return m_iPersonnel;
+		break;
+	case YIELD_MATERIEL:
+		return m_iMateriel;
+		break;
+	case YIELD_FUEL:
+		return m_iFuel;
+		break;
+	}
+	return 0;
+}
+void CvPlayer::SetYield(YieldTypes eYield, int iNewValue)
+{
+	if(GetYield(eYield) != iNewValue)
+	{
+		switch(eYield)
+		{
+		case YIELD_PERSONNEL:
+			m_iPersonnel = iNewValue;
+			break;
+		case YIELD_MATERIEL:
+			m_iMateriel = iNewValue;
+			break;
+		case YIELD_FUEL:
+			m_iFuel = iNewValue;
+			break;
+		}
+
+		if(GC.getGame().getActivePlayer() == GetID())
+		{
+			GC.GetEngineUserInterface()->setDirty(GameData_DIRTY_BIT, true);
+		}
+	}
+}
+void CvPlayer::ChangeYield(YieldTypes eYield, int iChange)
+{
+	switch(eYield)
+	{
+	case YIELD_PERSONNEL:
+		SetYield(eYield, GetYield(eYield) + iChange);
+		break;
+	case YIELD_MATERIEL:
+		SetYield(eYield, GetYield(eYield) + iChange);
+		break;
+	case YIELD_FUEL:
+		SetYield(eYield, GetYield(eYield) + iChange);
+		break;
+	}
+}
+
+int CvPlayer::GetBaseYieldPerTurn(YieldTypes eYield) const
+{
+	int iYieldPerTurn = 0;
+
+	// If we're in anarchy, then no Faith is generated!
+	if(IsAnarchy())
+		return 0;
+#if defined(MOD_BALANCE_CORE)
+	//No barbs or minors, please!
+	if(isBarbarian() || isMinorCiv())
+		return 0;
+#endif
+
+	iYieldPerTurn += GetYieldPerTurnFromCities(eYield);
+
+#if defined(MOD_API_UNIFIED_YIELDS)
+	// Trait bonus which adds Faith for trade partners? 
+	iYieldPerTurn += GetYieldPerTurnFromTraits(eYield);
+#endif
+
+	iYieldPerTurn += GetYieldPerTurnFromMinorCivs(eYield);
+
+	return iYieldPerTurn;
+}
+
+int CvPlayer::GetYieldPerTurnFromCities(YieldTypes eYield) const
+{
+	int iYieldPerTurn = 0;
+
+	const CvCity* pLoopCity;
+	int iLoop;
+	for(pLoopCity = firstCity(&iLoop); pLoopCity != NULL; pLoopCity = nextCity(&iLoop))
+	{
+		iYieldPerTurn += pLoopCity->getBaseYieldRate(eYield);
+	}
+
+	return iYieldPerTurn;
+}
+
+int CvPlayer::GetYieldPerTurnFromMinorCivs(YieldTypes eYield) const
+{
+	int iYieldPerTurn = 0;
+	for(int iMinorLoop = MAX_MAJOR_CIVS; iMinorLoop < MAX_CIV_PLAYERS; iMinorLoop++)
+	{
+		iYieldPerTurn += GetYieldPerTurnFromMinor(eYield, (PlayerTypes) iMinorLoop);
+	}
+	return iYieldPerTurn;
+}
+
+int CvPlayer::GetYieldPerTurnFromMinor(YieldTypes eYield, PlayerTypes eMinor) const
+{
+	int iYieldPerTurn = 0;
+	if(GET_PLAYER(eMinor).isAlive())
+	{
+		iYieldPerTurn += GET_PLAYER(eMinor).GetMinorCivAI()->GetCurrentYieldBonus(eYield, GetID());
+	}
+	return iYieldPerTurn;
+}
+
+int CvPlayer::GetYieldPerTurn(YieldTypes eYield) const
+{
+	int iYieldPerTurn = 0;
+
+	iYieldPerTurn = GetBaseYieldPerTurn(eYield);
+
+	//iYieldPerTurn -= GetRequiredResources(eYield);
+	
+	return iYieldPerTurn;
+}
+
+int CvPlayer::GetRequiredYieldPerTurn(YieldTypes eYield) const
+{
+	return 0;
 }
 #endif
