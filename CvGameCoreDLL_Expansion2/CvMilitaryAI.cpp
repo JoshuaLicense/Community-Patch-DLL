@@ -6726,7 +6726,9 @@ CvPlot* MilitaryAIHelpers::GetCoastalPlotNearPlot(CvPlot *pTarget)
 	{
 		CvPlot* pAdjacentPlot = iterateRingPlots(pTarget->getX(), pTarget->getY(), aiShuffle[iShuffleType][iI]);
 		if(pAdjacentPlot != NULL && 
+#if !defined(MOD_WWII_MISC)
 			pAdjacentPlot->getTeam()==eTeam && //same team
+#endif
 			pAdjacentPlot->isShallowWater() && //coastal
 			pAdjacentPlot->getFeatureType()==NO_FEATURE && //no ice
 			pAdjacentPlot->isLake()==false && //no lake

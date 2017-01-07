@@ -183,6 +183,17 @@ int CvProjectProductionAI::CheckProjectBuildSanity(ProjectTypes eProject, int iT
 		return 0;
 	}
 
+#if defined(MOD_WWII_MISC) //Start building projects!!! pls
+	if(kPlayer.IsAtWar())
+	{
+		iTempWeight *= 10;
+	}
+	else
+	{
+		iTempWeight *= 5;
+	}
+#endif
+
 	if(kPlayer.IsAtWarAnyMajor())
 	{
 		if(pkProjectInfo->IsAllowsNukes())

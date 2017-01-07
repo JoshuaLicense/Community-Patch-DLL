@@ -34,6 +34,8 @@
 #define MOD_WWII_PROJECTS // Projects changes (Restrict projects)
 #define MOD_WWII_YIELDS // Fuel, Personnel and Materiel
 #define MOD_WWII_MISC // stuff like date functions
+#define MOD_WWII_SUPPLY_LINE // Checking units have a supply route!
+#define MOD_WWII_CONVOYS // convoys homeland! Change AI_TREASURE to accomodate these!
 
 //////////////////////////
 //MULTIPLAYER INSTRUCTIONS:
@@ -1075,6 +1077,8 @@ enum BattleTypeTypes
 //    iii means three int params
 //    ibi means an int, then a bool, then a final int
 //    s means a string (char*) and is only allowed as the last parameter
+#define GAMEEVENT_UpdateConvoy					"UpdateConvoy",					"ii"
+#define GAMEEVENT_FinalizeConvoy				"FinalizeConvoy",				"iiii"
 #define GAMEEVENT_AiOverrideChooseNextTech		"AiOverrideChooseNextTech",		"ib"
 #define GAMEEVENT_AreaCanHaveAnyResource		"AreaCanHaveAnyResource",		"ii"
 #define GAMEEVENT_BarbariansCanFoundCamp		"BarbariansCanFoundCamp",		"ii"

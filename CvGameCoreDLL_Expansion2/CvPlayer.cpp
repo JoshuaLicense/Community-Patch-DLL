@@ -11054,7 +11054,13 @@ void CvPlayer::doTurnUnits()
 			}
 		}
 	}
+#if defined(MOD_WWII_YIELDS)
+	DoHealing(); // This deducts the personnel and materiel
 
+	//so lets do fuel
+	ChangeYield(YIELD_FUEL, -GetRequiredYield(YIELD_FUEL));
+
+#endif
 	if(GetID() == GC.getGame().getActivePlayer())
 	{
 		GC.GetEngineUserInterface()->setDirty(Waypoints_DIRTY_BIT, true);
@@ -11100,9 +11106,10 @@ void CvPlayer::DoUnitReset()
 
 	for(pLoopUnit = firstUnit(&iLoop); pLoopUnit != NULL; pLoopUnit = nextUnit(&iLoop))
 	{
+#if !defined(MOD_WWII_MISC) // healing dealt with another way
 		// First heal the unit
 		pLoopUnit->doHeal();
-
+#endif
 		// then damage it again
 		int iCitadelDamage;
 		if(pLoopUnit->IsNearEnemyCitadel(iCitadelDamage) && !pLoopUnit->isInvisible(NO_TEAM,false,false))
@@ -11133,7 +11140,12 @@ void CvPlayer::DoUnitReset()
 				pLoopUnit->setMoves(0);
 			}
 		}
-
+#if defined(MOD_WWII_YIELDS)
+		if(pLoopUnit->getUnitInfo().GetFuelConsumption() > 0 && GetRationedMoves() < 100)
+		{
+			pLoopUnit->setMoves(pLoopUnit->getMoves() * GetRationedMoves() / 100);
+		}
+#endif
 		pLoopUnit->SetIgnoreDangerWakeup(false);
 		pLoopUnit->setMadeAttack(false);
 		pLoopUnit->setMadeInterception(false);
@@ -14204,6 +14216,22 @@ bool CvPlayer::canTrain(UnitTypes eUnit, bool bContinue, bool bTestVisible, bool
 		}
 	}
 
+#if defined(MOD_WWII_MISC)
+	// Project required?
+	ProjectTypes ePrereqProject = (ProjectTypes) pUnitInfo.GetProjectPrereq();
+	if(ePrereqProject != NO_PROJECT)
+	{
+		CvProjectEntry* pkProjectInfo = GC.getProjectInfo(ePrereqProject);
+		if(pkProjectInfo)
+		{
+			if(GET_TEAM(getTeam()).getProjectCount(ePrereqProject) == 0)
+			{
+				return false;
+			}
+		}
+	}
+#endif
+
 	if(!bTestVisible)
 	{
 #if defined(MOD_BALANCE_CORE_MILITARY)
@@ -14224,7 +14252,7 @@ bool CvPlayer::canTrain(UnitTypes eUnit, bool bContinue, bool bTestVisible, bool
 					return false;
 			}
 		}
-
+#if !defined(MOD_WWII_MISC)
 		// Project required?
 		ProjectTypes ePrereqProject = (ProjectTypes) pUnitInfo.GetProjectPrereq();
 		if(ePrereqProject != NO_PROJECT)
@@ -14240,6 +14268,7 @@ bool CvPlayer::canTrain(UnitTypes eUnit, bool bContinue, bool bTestVisible, bool
 				}
 			}
 		}
+#endif
 
 		// Resource Requirements
 		for(int iResourceLoop = 0; iResourceLoop < GC.getNumResourceInfos(); iResourceLoop++)
@@ -44145,9 +44174,13 @@ bool CvPlayer::hasUnitsThatNeedAIUpdate() const
 	for(pLoopUnit = firstUnit(&iLoop); pLoopUnit; pLoopUnit = nextUnit(&iLoop))
 	{
 		if(!pLoopUnit->TurnProcessed() &&
-		        (pLoopUnit->IsAutomated() &&
-		         pLoopUnit->AI_getUnitAIType() != UNITAI_UNKNOWN &&
-		         pLoopUnit->canMove()))
+#if defined(MOD_WWII_CONVOYS)
+		    ((pLoopUnit->IsAutomated() || pLoopUnit->AI_getUnitAIType() == UNITAI_TREASURE) &&
+#else
+			(pLoopUnit->IsAutomated() &&
+#endif
+		    pLoopUnit->AI_getUnitAIType() != UNITAI_UNKNOWN &&
+			pLoopUnit->canMove()))
 		{
 			return true;
 		}
@@ -45470,6 +45503,7 @@ int CvPlayer::GetYield(YieldTypes eYield) const
 }
 void CvPlayer::SetYield(YieldTypes eYield, int iNewValue)
 {
+	iNewValue = iNewValue > 0 ? iNewValue : 0;
 	if(GetYield(eYield) != iNewValue)
 	{
 		switch(eYield)
@@ -45523,6 +45557,7 @@ int CvPlayer::GetBaseYieldPerTurn(YieldTypes eYield) const
 	iYieldPerTurn += GetYieldPerTurnFromCities(eYield);
 
 #if defined(MOD_API_UNIFIED_YIELDS)
+	//iYieldPerTurn *= GetPlayerTraits()->GetYieldRateModifier(eYield);
 	// Trait bonus which adds Faith for trade partners? 
 	iYieldPerTurn += GetYieldPerTurnFromTraits(eYield);
 #endif
@@ -45540,7 +45575,8 @@ int CvPlayer::GetYieldPerTurnFromCities(YieldTypes eYield) const
 	int iLoop;
 	for(pLoopCity = firstCity(&iLoop); pLoopCity != NULL; pLoopCity = nextCity(&iLoop))
 	{
-		iYieldPerTurn += pLoopCity->getBaseYieldRate(eYield);
+		iYieldPerTurn += pLoopCity->getYieldRate(eYield, false, true);
+		//iYieldPerTurn += (pLoopCity->getBasicYieldRateTimes100(YIELD_PRODUCTION, false) / 100) * pLoopCity->getProductionToYieldModifier(eYield) / 100;
 	}
 
 	return iYieldPerTurn;
@@ -45559,7 +45595,7 @@ int CvPlayer::GetYieldPerTurnFromMinorCivs(YieldTypes eYield) const
 int CvPlayer::GetYieldPerTurnFromMinor(YieldTypes eYield, PlayerTypes eMinor) const
 {
 	int iYieldPerTurn = 0;
-	if(GET_PLAYER(eMinor).isAlive())
+	if(GET_PLAYER(eMinor).isAlive() && (GET_PLAYER(eMinor).GetMinorCivAI()->IsAllies(GetID()) || GET_PLAYER(eMinor).GetMinorCivAI()->IsFriends(GetID())))
 	{
 		iYieldPerTurn += GET_PLAYER(eMinor).GetMinorCivAI()->GetCurrentYieldBonus(eYield, GetID());
 	}
@@ -45577,8 +45613,263 @@ int CvPlayer::GetYieldPerTurn(YieldTypes eYield) const
 	return iYieldPerTurn;
 }
 
-int CvPlayer::GetRequiredYieldPerTurn(YieldTypes eYield) const
+int CvPlayer::GetRequiredYield(YieldTypes eYield, bool bCanHeal)
 {
+	int iLoop;
+	int iRequiredYield = 0;
+
+	for(CvUnit* pLoopUnit = firstUnit(&iLoop); pLoopUnit != NULL; pLoopUnit = nextUnit(&iLoop))
+	{
+		if(eYield == YIELD_FUEL || (!bCanHeal || pLoopUnit->canHeal(pLoopUnit->plot(), false, false)))
+		{
+			int iMaxHeal = HealingPossible(pLoopUnit, INT_MAX, INT_MAX, 1);
+
+			switch(eYield)
+			{
+			case YIELD_PERSONNEL:
+				if(pLoopUnit->getUnitInfo().GetMaterielPerHP() > 0)
+					iRequiredYield += pLoopUnit->getUnitInfo().GetPersonnelPerHP() * iMaxHeal;
+				break;
+			case YIELD_MATERIEL:
+				if(pLoopUnit->getUnitInfo().GetMaterielPerHP() > 0)
+					iRequiredYield += pLoopUnit->getUnitInfo().GetMaterielPerHP() * iMaxHeal;
+				break;
+			case YIELD_FUEL:
+				if(pLoopUnit->getUnitInfo().GetFuelConsumption() > 0)
+					iRequiredYield += pLoopUnit->GetFuelConsumption();
+				break;
+			}
+		}
+	}
+
+	return iRequiredYield;
+}
+
+void CvPlayer::DoHealing()
+{
+	int iPersonnelPool = GetYield(YIELD_PERSONNEL);
+	int iMaterielPool = GetYield(YIELD_MATERIEL);
+
+	int iReqPersonnel = GetRequiredYield(YIELD_PERSONNEL, true);
+	int iReqMateriel = GetRequiredYield(YIELD_MATERIEL, true);
+
+	if(iReqPersonnel == 0 || iReqMateriel == 0)
+		return;
+
+	if(iPersonnelPool == 0 || iMaterielPool == 0) // No resources = No healing
+		return;
+
+	if(iPersonnelPool >= iReqPersonnel && iMaterielPool >= iReqMateriel) //Enough resources for a full heal without sharing
+	{
+		int iLoop;
+		CvUnit* pLoopUnit;
+
+		for(pLoopUnit = firstUnit(&iLoop); pLoopUnit != NULL; pLoopUnit = nextUnit(&iLoop))
+		{
+			if(!pLoopUnit->canHeal(pLoopUnit->plot(), false, false))
+			{
+				continue;
+			}
+			int iHeal = HealingPossible(pLoopUnit, iPersonnelPool, iMaterielPool, 1);
+
+			pLoopUnit->changeDamage(-iHeal);
+		}
+		ChangeYield(YIELD_PERSONNEL, -iReqPersonnel);
+		ChangeYield(YIELD_MATERIEL, -iReqMateriel);
+	}
+	else
+	{
+		// Resources have to be shared out :(
+		// We'll do 4 'passes', each time targetting different danger units!
+		// First pass will be the 'front-line', Fourth line will be the opposite.
+
+		for(int iPass = 0; iPass < 4; iPass++)
+		{
+			// Get the amount of units we have to share among...
+			int iUnitsThisPass = GetNumUnitsThisPass(iPass);
+
+			if(iUnitsThisPass == 0)
+				continue;
+
+			int iLoop;
+			CvUnit* pLoopUnit;
+
+			for(pLoopUnit = firstUnit(&iLoop); pLoopUnit != NULL; pLoopUnit = nextUnit(&iLoop))
+			{
+				if(!pLoopUnit->canHeal(pLoopUnit->plot(), false, false))
+					continue;
+
+				if(iPersonnelPool < pLoopUnit->getUnitInfo().GetPersonnelPerHP())
+					continue;
+				if(iMaterielPool < pLoopUnit->getUnitInfo().GetMaterielPerHP())
+					continue;
+
+				int iPlotDanger = GetPlotDanger(*pLoopUnit->plot(), pLoopUnit);
+
+				switch(iPass)
+				{
+				case 0:
+					if(iPlotDanger >= GC.getHEALING_HIGH_DANGER()) // Front line units
+					{
+						int iPossibleHeal = HealingPossible(pLoopUnit, iPersonnelPool, iMaterielPool, iUnitsThisPass);
+						if(iPossibleHeal > 0)
+						{
+							// remove from the pool
+							iPersonnelPool -= iPossibleHeal * pLoopUnit->getUnitInfo().GetPersonnelPerHP();
+							iMaterielPool -= iPossibleHeal * pLoopUnit->getUnitInfo().GetMaterielPerHP();
+
+							pLoopUnit->changeDamage(-iPossibleHeal);
+						}
+					}
+					break;
+				case 1:
+					if(iPlotDanger >= GC.getHEALING_MEDIUM_DANGER())
+					{
+						int iPossibleHeal = HealingPossible(pLoopUnit, iPersonnelPool, iMaterielPool, iUnitsThisPass);
+						if(iPossibleHeal > 0)
+						{
+							// remove from the pool
+							iPersonnelPool -= iPossibleHeal * pLoopUnit->getUnitInfo().GetPersonnelPerHP();
+							iMaterielPool -= iPossibleHeal * pLoopUnit->getUnitInfo().GetMaterielPerHP();
+
+							pLoopUnit->changeDamage(-iPossibleHeal);
+						}
+					}
+					break;
+				case 2:
+					if(iPlotDanger >= GC.getHEALING_LOW_DANGER())
+					{
+						int iPossibleHeal = HealingPossible(pLoopUnit, iPersonnelPool, iMaterielPool, iUnitsThisPass);
+						if(iPossibleHeal > 0)
+						{
+							// remove from the pool
+							iPersonnelPool -= iPossibleHeal * pLoopUnit->getUnitInfo().GetPersonnelPerHP();
+							iMaterielPool -= iPossibleHeal * pLoopUnit->getUnitInfo().GetMaterielPerHP();
+
+							pLoopUnit->changeDamage(-iPossibleHeal);
+						}
+					}
+					break;
+				case 3:
+					if(iPlotDanger < GC.getHEALING_LOW_DANGER())
+					{
+						int iPossibleHeal = HealingPossible(pLoopUnit, iPersonnelPool, iMaterielPool, iUnitsThisPass);
+						if(iPossibleHeal > 0)
+						{
+							// remove from the pool
+							iPersonnelPool -= iPossibleHeal * pLoopUnit->getUnitInfo().GetPersonnelPerHP();
+							iMaterielPool -= iPossibleHeal * pLoopUnit->getUnitInfo().GetMaterielPerHP();
+
+							pLoopUnit->changeDamage(-iPossibleHeal);
+						}
+					}
+					break;
+				}
+			}
+		}
+		SetYield(YIELD_PERSONNEL, iPersonnelPool);
+		SetYield(YIELD_MATERIEL, iMaterielPool);
+	}
+}
+
+int CvPlayer::GetNumUnitsThisPass(int iPass)
+{
+	int iLoop;
+	CvUnit* pLoopUnit;
+
+	int iUnits = 0;
+
+	for(pLoopUnit = firstUnit(&iLoop); pLoopUnit != NULL; pLoopUnit = nextUnit(&iLoop))
+	{
+		int iPlotDanger = GetPlotDanger(*pLoopUnit->plot(), pLoopUnit);
+
+		switch(iPass)
+		{
+		case 0:
+			if(iPlotDanger >= GC.getHEALING_HIGH_DANGER())
+				++iUnits;
+			break;
+		case 1:
+			if(iPlotDanger >= GC.getHEALING_MEDIUM_DANGER() && iPlotDanger < GC.getHEALING_HIGH_DANGER())
+				++iUnits;
+			break;
+		case 2:
+			if(iPlotDanger >= GC.getHEALING_LOW_DANGER() && iPlotDanger < GC.getHEALING_MEDIUM_DANGER())
+				++iUnits;
+			break;
+		case 3: 
+			if(iPlotDanger == 0 && iPlotDanger < GC.getHEALING_LOW_DANGER())
+				++iUnits;
+		}
+	}
 	return 0;
+}
+
+int CvPlayer::HealingPossible(CvUnit* pLoopUnit, int iPersonnel, int iMateriel, int iUnitsThisPass)
+{
+	int iMaxHeal = (pLoopUnit->GetMaxHitPoints() * GC.getMAX_HEALING_PERCENTAGE()) / 100;
+	int iMaxHealFromSupply = (iMaxHeal * pLoopUnit->GetSupplyLineEfficiency()) / 100;
+
+	int iShareOfPersonnel = iPersonnel / iUnitsThisPass;
+	int iShareOfMateriel = iMateriel / iUnitsThisPass;
+
+	int iPersonnelPerHP = pLoopUnit->getUnitInfo().GetPersonnelPerHP();
+	int iMaterielPerHP = pLoopUnit->getUnitInfo().GetMaterielPerHP();
+
+	// Check if this unit can heal atleast one HP
+	if(iShareOfPersonnel < iPersonnelPerHP || iPersonnelPerHP < 1)
+		return 0;
+	if(iShareOfMateriel < iMaterielPerHP || iMaterielPerHP < 1)
+		return 0;
+
+	int iHealFromPersonnelPossible = iShareOfPersonnel / iPersonnelPerHP;
+	int iHealFromMaterielPossible = iShareOfMateriel / iMaterielPerHP;
+
+	if(iHealFromPersonnelPossible < 1 || iHealFromMaterielPossible < 1) // can't heal one hp!
+		return 0;
+
+	// get the heal amount, now we've concluded the unit can heal an amount.
+	iHealFromPersonnelPossible = std::min(std::min(iHealFromPersonnelPossible, pLoopUnit->getDamage()), iMaxHealFromSupply);
+	iHealFromMaterielPossible = std::min(std::min(iHealFromMaterielPossible, pLoopUnit->getDamage()), iMaxHealFromSupply);
+	
+	int iHealPossible = std::min(iHealFromPersonnelPossible, iHealFromMaterielPossible);
+	return iHealPossible;
+}
+
+int CvPlayer::GetRationedConsumption() const
+{
+	if(!IsAtWar()) // only ration at war
+		return 100;
+
+	int iFuel = GetYield(YIELD_FUEL);
+
+	if(iFuel < /*500*/ GC.getHEAVY_FUEL_RATIONING())
+		return GC.getHEAVY_RATIONING_CONSUMPTION();
+
+	if(iFuel <  /*1000*/ GC.getMEDIUM_FUEL_RATIONING())
+		return GC.getMEDIUM_RATIONING_CONSUMPTION();
+
+	if(iFuel < /*2500*/ GC.getLIGHT_FUEL_RATIONING())
+		return GC.getLIGHT_RATIONING_CONSUMPTION();
+
+	return 100; // No rationing	
+}
+int CvPlayer::GetRationedMoves() const
+{
+	if(!IsAtWar())
+		return 100;
+
+	int iFuel = GetYield(YIELD_FUEL);
+
+	if(iFuel < /*500*/ GC.getHEAVY_FUEL_RATIONING())
+		return GC.getHEAVY_RATIONING_MOVES();
+
+	if(iFuel <  /*1000*/ GC.getMEDIUM_FUEL_RATIONING())
+		return GC.getMEDIUM_RATIONING_MOVES();
+
+	if(iFuel < /*2500*/ GC.getLIGHT_FUEL_RATIONING())
+		return GC.getLIGHT_RATIONING_MOVES();
+
+	return 100; // No rationing	
 }
 #endif

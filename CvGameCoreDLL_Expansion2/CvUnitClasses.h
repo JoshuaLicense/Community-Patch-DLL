@@ -248,6 +248,10 @@ public:
 	UnitMoveRate GetMoveRate(int numHexes) const;
 #if defined(MOD_WWII_TERRITORY)
 	bool CanCaptureTerritory() const;
+
+	int GetPersonnelPerHP() const;
+	int GetMaterielPerHP() const;
+	int GetFuelConsumption() const;
 #endif
 private:
 
@@ -424,9 +428,6 @@ private:
 	CvString m_strUnitArtInfoTag;
 	bool m_bUnitArtInfoCulturalVariation;
 	bool m_bUnitArtInfoEraVariation;
-#if defined(MOD_WWII_TERRITORY)
-	bool m_bCanCaptureTerritory;
-#endif
 
 	UnitMoveRate m_unitMoveRate[12];
 
@@ -465,6 +466,14 @@ private:
 	GreatWorkType* m_paeGreatWorks;
 #if defined(MOD_BALANCE_CORE)
 	EraTypes* m_paeGreatPersonEra;
+#endif
+#if defined(MOD_WWII_TERRITORY)
+	bool m_bCanCaptureTerritory;
+#endif
+#if defined(MOD_WWII_YIELDS)
+	int m_iPersonnelPerHP;
+	int m_iMaterielPerHP;
+	int m_iFuelConsumption;
 #endif
 };
 

@@ -1633,20 +1633,7 @@ int StepValidGeneric(const CvAStarNode* parent, const CvAStarNode* node, const S
 	if (finder->HaveFlag(CvUnit::MOVEFLAG_NO_OCEAN) && pToPlot->getTerrainType() == TERRAIN_OCEAN)
 		return FALSE;
 
-#if defined(MOD_WWII_TERRITORY)
-	//are we only allowed in friendly territory?
-	if(finder->HaveFlag(CvUnit::MOVEFLAG_TERRITORY_NO_ENEMY))
-	{
-		if(pToPlot->isOwned() && !pToPlot->IsFriendlyTerritory(ePlayer))
-			return FALSE;
-	}
-	//can't embark!
-	if(finder->HaveFlag(CvUnit::MOVEFLAG_NO_EMBARK))
-	{
-		if(pToPlot->isWater())
-			return false;
-	}
-#endif
+#if !defined(MOD_WWII_TERRITORY)
 	//territory check
 	PlayerTypes ePlotOwnerPlayer = pToPlot->getOwner();
 	if (ePlotOwnerPlayer != NO_PLAYER && ePlayer != NO_PLAYER && ePlotOwnerPlayer != eEnemy && !pToPlot->IsFriendlyTerritory(ePlayer)) // plot is owned, player exists, plot owner is not an enemy and plot is not in friendly territory
@@ -1665,6 +1652,21 @@ int StepValidGeneric(const CvAStarNode* parent, const CvAStarNode* node, const S
 			}
 		}
 	}
+#else // Stop players trying to get inside minors territory when they can't!
+	//territory check
+	PlayerTypes ePlotOwnerPlayer = pToPlot->getOwner();
+	if(ePlotOwnerPlayer != NO_PLAYER && ePlayer != NO_PLAYER && (ePlotOwnerPlayer != eEnemy || finder->HaveFlag(CvUnit::MOVEFLAG_TERRITORY_NO_ENEMY)) && !pToPlot->IsFriendlyTerritory(ePlayer)) // plot is owned, player exists, plot owner is not an enemy and plot is not in friendly territory
+	{
+		return false;
+	}
+	if(finder->HaveFlag(CvUnit::MOVEFLAG_NO_EMBARK))
+	{
+		if(pToPlot->isWater())
+		{
+			return false;
+		}
+	}
+#endif
 
 	//for multi-unit formations it makes sense to have a wide path
 	if (bWide)

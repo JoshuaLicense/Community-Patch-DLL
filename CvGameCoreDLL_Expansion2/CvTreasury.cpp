@@ -259,6 +259,15 @@ int CvTreasury::GetCityConnectionRouteGoldTimes100(CvCity* pNonCapitalCity) cons
 		iGold /= 100;
 	}
 
+#if defined(MOD_WWII_MISC)
+	// Half connection gold in occupied cities!
+	if(pNonCapitalCity->IsPuppet() || pNonCapitalCity->IsOccupied())
+	{
+		iGold *= (100 + GC.getOCCUPIED_CITY_CONNECTION_MODIFIER());
+		iGold /= 100;
+	}
+#endif
+
 	return iGold;
 }
 

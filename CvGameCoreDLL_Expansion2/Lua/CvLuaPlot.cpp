@@ -371,6 +371,9 @@ void CvLuaPlot::PushMethods(lua_State* L, int t)
 	Method(IsAdjacentToTerrain);
 	Method(IsWithinDistanceOfTerrain);
 #endif
+#if defined(MOD_WWII_TERRITORY)
+	Method(GetOriginalOwner);
+#endif
 }
 //------------------------------------------------------------------------------
 void CvLuaPlot::HandleMissingInstance(lua_State* L)
@@ -2242,4 +2245,12 @@ LUAAPIIMPL(Plot, IsAdjacentToResource)
 LUAAPIIMPL(Plot, IsWithinDistanceOfResource)
 LUAAPIIMPL(Plot, IsAdjacentToTerrain)
 LUAAPIIMPL(Plot, IsWithinDistanceOfTerrain)
+#endif
+#if defined(MOD_WWII_TERRITORY)
+//------------------------------------------------------------------------------
+//int getOriginalOwner(TeamTypes ePlayer);
+int CvLuaPlot::lGetOriginalOwner(lua_State* L)
+{
+	return BasicLuaMethod(L, &CvPlot::getOriginalOwner);
+}
 #endif

@@ -5354,11 +5354,12 @@ void CvMinorCivAI::DoTurn()
 		DoTestThreatenedAnnouncement();
 		DoTestProxyWarAnnouncement();
 
+#if !defined(MOD_WWII_MISC)
 		DoTurnQuests();
-
 		DoUnitSpawnTurn();
-
 		DoIntrusion();
+#endif
+
 #if defined(MOD_DIPLOMACY_CITYSTATES_QUESTS)
 		if (MOD_DIPLOMACY_CITYSTATES_QUESTS) 
 		{
@@ -18564,9 +18565,9 @@ int CvMinorCivAI::GetCurrentYieldFlatBonus(YieldTypes eYield, PlayerTypes ePlaye
 
 	int iBonus = 0;
 	if(IsAllies(ePlayer))
-		iBonus = 2;
+		iBonus = 3;
 	if(IsFriends(ePlayer))
-		iBonus = 1;
+		iBonus = 2;
 
 	iAmount *= iBonus;
 

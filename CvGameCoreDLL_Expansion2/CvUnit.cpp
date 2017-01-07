@@ -415,6 +415,13 @@ CvUnit::CvUnit() :
 	, m_terrainDoubleHeal("CvUnit::m_terrainDoubleHeal", m_syncArchive)
 	, m_featureDoubleHeal("CvUnit::m_featureDoubleHeal", m_syncArchive)
 #endif
+#if defined(MOD_WWII_SUPPLY_LINE)
+	, m_iSupplyLineEfficiency("CvUnit::m_iSupplyLineEfficiency", m_syncArchive)
+#endif
+#if defined(MOD_WWII_CONVOYS)
+	, m_iConvoyX("CvUnit::m_iConvoyX", m_syncArchive)
+	, m_iConvoyY("CvUnit::m_iConvoyY", m_syncArchive)
+#endif
 #if defined(MOD_API_UNIFIED_YIELDS)
 	, m_yieldFromKills("CvUnit::m_yieldFromKills", m_syncArchive/*, true*/)
 	, m_yieldFromBarbarianKills("CvUnit::m_yieldFromBarbarianKills", m_syncArchive/*, true*/)
@@ -1981,7 +1988,13 @@ void CvUnit::reset(int iID, UnitTypes eUnit, PlayerTypes eOwner, bool bConstruct
 	m_iScienceBlastStrength = 0;
 	m_iCultureBlastStrength = 0;
 #endif
-
+#if defined(MOD_WWII_SUPPLY_LINE)
+	m_iSupplyLineEfficiency = 100;
+#endif
+#if defined(MOD_WWII_CONVOYS)
+	m_iConvoyX = INVALID_PLOT_COORD;
+	m_iConvoyY = INVALID_PLOT_COORD;
+#endif
 	m_iMapLayer = DEFAULT_UNIT_MAP_LAYER;
 	m_iNumGoodyHutsPopped = 0;
 	m_iLastGameTurnAtFullHealth = -1;
@@ -3112,6 +3125,7 @@ void CvUnit::doTurn()
 	VALIDATE_OBJECT
 	CvAssertMsg(!IsDead(), "isDead did not return false as expected");
 
+	UpdateSupplyLine();
 	// Wake unit if skipped last turn
 	ActivityTypes eActivityType = GetActivityType();
 	bool bHoldCheck = (eActivityType == ACTIVITY_HOLD) && (isHuman() || !getFortifyTurns());
@@ -4670,7 +4684,17 @@ bool CvUnit::canEnterTerritory(TeamTypes eTeam, bool bIgnoreRightOfPassage) cons
 			}
 
 			CvMinorCivAI* pMinorAI = GET_PLAYER(kTheirTeam.getLeaderID()).GetMinorCivAI();
-
+#if defined(MOD_WWII_TERRITORY)
+			// If the minor is allied, treat the plot as being owned by their ally, non-allies can't enter neutral ones!
+			PlayerTypes eMinorAlly = pMinorAI->GetAlly();
+			if (eMinorAlly != NO_PLAYER) // if he has an ally
+			{
+				if(eMinorAlly == getOwner())
+				{
+					return true;
+				}
+			}
+#else
 #if defined(MOD_GLOBAL_CS_OVERSEAS_TERRITORY)
 			// If the minor is allied, treat the plot as being owned by their ally
 			PlayerTypes eMinorAlly = pMinorAI->GetAlly();
@@ -4708,6 +4732,7 @@ bool CvUnit::canEnterTerritory(TeamTypes eTeam, bool bIgnoreRightOfPassage) cons
 				}
 #endif
 			}
+#endif
 		}
 	}
 
@@ -7602,6 +7627,13 @@ bool CvUnit::canHeal(const CvPlot* pPlot, bool bTestVisible, bool bCheckMovement
 		return false;
 	}
 
+#if defined(MOD_WWII_MISC)
+	if(GetSupplyLineEfficiency() < 1)
+	{
+		return false;
+	}
+#endif
+
 	// No healing after movement, except for exceptions
 	if(bCheckMovement && hasMoved() && !isAlwaysHeal())
 	{
@@ -7722,6 +7754,20 @@ int CvUnit::healRate(const CvPlot* pPlot) const
 {
 	VALIDATE_OBJECT
 
+#if defined(MOD_WWII_MISC)
+	if(pPlot->IsFriendlyTerritory(getOwner()))
+	{
+		int iEfficiency = GetEfficiencyFromPlot(pPlot);
+		if(iEfficiency > 0)
+		{
+			int iHeal = GetMaxHitPoints() * GC.getMAX_HEALING_PERCENTAGE() / 100;
+			iHeal =	iHeal * iEfficiency / 100;
+			return iHeal;
+		}
+	}
+	return 0;
+
+#else
 	const IDInfo* pUnitNode;
 	CvCity* pCity = pPlot->getPlotCity();
 
@@ -7918,6 +7964,7 @@ int CvUnit::healRate(const CvPlot* pPlot) const
 	}
 #endif
 	return iTotalHeal;
+#endif
 }
 
 
@@ -19231,6 +19278,9 @@ if (!bDoEvade)
 #endif
 				}
 			}
+#if defined(MOD_WWII_YIELDS)
+			UpdateSupplyLine();
+#endif
 		}
 		DoNearbyUnitPromotion(this, pNewPlot);
 		if(isConvertUnit())
@@ -19974,7 +20024,7 @@ if (!bDoEvade)
 	}
 
 #if defined(MOD_WWII_TERRITORY)
-	capturePlot(pNewPlot);
+	CapturePlot(pNewPlot);
 #endif
 
 	ICvEngineScriptSystem1* pkScriptSystem = gDLL->GetScriptSystem();
@@ -30212,14 +30262,7 @@ void CvUnit::RemoveCargoPromotions(CvUnit& cargounit)
 }
 #endif
 #if defined(MOD_WWII_TERRITORY)
-
-bool CvUnit::canCaptureTerritory() const
-{
-	VALIDATE_OBJECT
-	return getUnitInfo().CanCaptureTerritory();
-}
-
-void CvUnit::capturePlot(CvPlot* pPlot)
+void CvUnit::CapturePlot(CvPlot* pPlot)
 {
 	VALIDATE_OBJECT
 
@@ -30229,7 +30272,7 @@ void CvUnit::capturePlot(CvPlot* pPlot)
 	if(pPlot->isCity() || !pPlot->isOwned()) // no capturing city plots or water
 		return;
 
-	if(!canCaptureTerritory()) // certain unit can only capture
+	if(!getUnitInfo().CanCaptureTerritory()) // certain unit can only capture
 		return;
 
 	if(getOwner() != pPlot->getOwner() && pPlot->getOwner() != NO_PLAYER)
@@ -30282,6 +30325,234 @@ void CvUnit::capturePlot(CvPlot* pPlot)
 			{
 				pPlot->setOwner(eUnitOwner, -1, /*bCheckUnits*/ false);
 			}
+		}
+	}
+}
+int CvUnit::GetEfficiencyFromPlot(const CvPlot* pPlot) const
+{
+	if(getDomainType() == DOMAIN_AIR || getDomainType() == DOMAIN_SEA || isEmbarked()) // Embarked, air and sea need not check!
+		return 100; // can return 100 as they can only heal in friedly areas
+
+	PlayerTypes eUnitOwner = getOwner();
+	CvPlayer& kUnitOwner = GET_PLAYER(eUnitOwner);
+
+	CvCity* pLoopCity;
+
+	CvCity* pBestCity = NULL;
+	int iBestCost = INT_MAX;
+
+	int iI;
+	int iCityLoop;
+
+	int iDistance;
+
+	int iMaxRange = GC.getSUPPLY_TRUCKS_PLOT_LIMIT();
+
+	// Loop through major players units to find the closest!
+	for(iI = 0; iI < MAX_PLAYERS; iI++)
+	{
+		CvPlayer& thisPlayer = GET_PLAYER((PlayerTypes) iI);
+		if(thisPlayer.isAlive()) // No point giving it to a dead civ, and make sure same team
+		{
+			// can supply if an allied minor or on the same team!
+			if((thisPlayer.isMinorCiv() && thisPlayer.GetMinorCivAI()->IsAllies(eUnitOwner)) || (thisPlayer.getTeam() == kUnitOwner.getTeam()))
+			{
+				for(pLoopCity = thisPlayer.firstCity(&iCityLoop); pLoopCity != NULL; pLoopCity = thisPlayer.nextCity(&iCityLoop)) // Loop through their cities
+				{
+					if(!pLoopCity->isMatchingArea(plot())) // Check if it's in the same area.
+						continue;
+
+					int iDistance = plotDistance(pPlot->getX(), pPlot->getY(), pLoopCity->getX(), pLoopCity->getY()); // distance from the plot
+
+					if(iDistance == 0) // actually in garrison
+					{
+						return 100;
+					}
+					else if(iDistance < (iMaxRange + 1)) // only check value if within range
+					{
+						SPathFinderUserData data(thisPlayer.GetID(), PT_GENERIC_ANY_AREA, NO_PLAYER, iMaxRange);
+						data.iFlags |= CvUnit::MOVEFLAG_TERRITORY_NO_ENEMY;
+						data.iFlags |= CvUnit::MOVEFLAG_NO_EMBARK;
+
+						if(GC.GetStepFinder().DoesPathExist(pPlot->getX(), pPlot->getY(), pLoopCity->getX(), pLoopCity->getY(), data)) // check if there is a path from the city to the plot!
+						{
+							// Set supply line efficiency & from where
+							int iCost = GC.GetStepFinder().GetCurrentPath().iTotalCost;
+							iCost *= thisPlayer.isMinorCiv() ? 2 : 1; // doublecost if the route is from a minor
+
+							if(iCost < iBestCost)
+							{
+								pBestCity = pLoopCity;
+								iBestCost = iCost;
+							}
+						}
+					}
+				}
+			}
+		}
+	}
+	if(pBestCity)
+	{
+		int iOptimalPathCost = GC.getMOVE_DENOMINATOR() * GC.getSUPPLY_TRUCKS_MOVEMENT();
+		int iEfficiency;
+
+		if(iBestCost > iOptimalPathCost)
+		{
+			iEfficiency = 100 * iOptimalPathCost / iBestCost;
+		}
+		else
+		{
+			iEfficiency = 100;
+		}
+		return iEfficiency;
+	}
+	else
+	{
+		return -1; // none
+	}
+}
+void CvUnit::UpdateSupplyLine()
+{
+	if(getDomainType() == DOMAIN_AIR || getDomainType() == DOMAIN_SEA || isEmbarked()) // Embarked, air and sea need not check!
+		return;
+
+	PlayerTypes eUnitOwner = getOwner();
+	CvPlayer& kUnitOwner = GET_PLAYER(eUnitOwner);
+
+	CvCity* pLoopCity;
+
+	CvCity* pBestCity = NULL;
+	int iBestCost = INT_MAX;
+
+	int iI;
+	int iCityLoop;
+
+	int iDistance;
+
+	int iMaxRange = GC.getSUPPLY_TRUCKS_PLOT_LIMIT();
+
+	// Loop through major players units to find the closest!
+	for(iI = 0; iI < MAX_PLAYERS; iI++)
+	{
+		CvPlayer& thisPlayer = GET_PLAYER((PlayerTypes) iI);
+		if(thisPlayer.isAlive()) // No point giving it to a dead civ, and make sure same team
+		{
+			// can supply if an allied minor or on the same team!
+			if((thisPlayer.isMinorCiv() && thisPlayer.GetMinorCivAI()->IsAllies(eUnitOwner)) || (thisPlayer.getTeam() == kUnitOwner.getTeam()))
+			{
+				for(pLoopCity = thisPlayer.firstCity(&iCityLoop); pLoopCity != NULL; pLoopCity = thisPlayer.nextCity(&iCityLoop)) // Loop through their cities
+				{
+					if(!pLoopCity->isMatchingArea(plot())) // Check if it's in the same area.
+						continue;
+
+					int iDistance = plotDistance(this->getX(), this->getY(), pLoopCity->getX(), pLoopCity->getY()); // distance from the plot
+
+					if(iDistance == 0) // actually in garrison
+					{
+						SetSupplyLineEfficiency(100);
+					}
+					else if(iDistance < (iMaxRange + 1)) // only check value if within range
+					{
+						SPathFinderUserData data(thisPlayer.GetID(), PT_GENERIC_ANY_AREA, NO_PLAYER, iMaxRange);
+						data.iFlags |= CvUnit::MOVEFLAG_TERRITORY_NO_ENEMY;
+						data.iFlags |= CvUnit::MOVEFLAG_NO_EMBARK;
+
+						if(GC.GetStepFinder().DoesPathExist(this->getX(), this->getY(), pLoopCity->getX(), pLoopCity->getY(), data)) // check if there is a path from the city to the plot!
+						{
+							// Set supply line efficiency & from where
+							int iCost = GC.GetStepFinder().GetCurrentPath().iTotalCost;
+							iCost *= thisPlayer.isMinorCiv() ? 2 : 1; // doublecost if the route is from a minor
+
+							if(iCost < iBestCost)
+							{
+								pBestCity = pLoopCity;
+								iBestCost = iCost;
+							}
+						}
+					}
+				}
+			}
+		}
+	}
+	if(pBestCity)
+	{
+		SetSupplyLineEfficiency(iBestCost);
+	}
+	else
+	{
+		SetSupplyLineEfficiency(-1);
+	}
+}
+int CvUnit::GetSupplyLineEfficiency() const
+{
+	return m_iSupplyLineEfficiency;
+}
+void CvUnit::SetSupplyLineEfficiency(int iCost)
+{
+	int iEfficiency; 
+
+	if(iCost == -1)
+	{
+		m_iSupplyLineEfficiency = 0;
+	}
+	else
+	{
+		int iOptimalPathCost = GC.getMOVE_DENOMINATOR() * GC.getSUPPLY_TRUCKS_MOVEMENT();
+
+		if(iCost > iOptimalPathCost)
+		{
+			iCost = 100 * iOptimalPathCost / iCost;
+			iEfficiency = std::min(iCost, 100);
+		}
+		else
+		{
+			iEfficiency = 100;
+		}
+		m_iSupplyLineEfficiency = iEfficiency;
+	}
+}
+
+int CvUnit::GetFuelConsumption() const
+{
+	PlayerTypes eUnitOwner = getOwner();
+	CvPlayer& kUnitOwner = GET_PLAYER(eUnitOwner);
+
+	// base fuel consumption at 100% health and no rationing
+	int iFuel = getUnitInfo().GetFuelConsumption();
+
+	// Reduce fuel if heavily damaged
+	iFuel = iFuel * GetCurrHitPoints() / GetMaxHitPoints();
+
+	// returns total usage after rationing
+	iFuel = kUnitOwner.GetRationedConsumption() * iFuel / 100;
+
+	return iFuel;
+}
+#endif
+#if defined(MOD_WWII_CONVOYS)
+CvPlot* CvUnit::GetConvoyPlot() const
+{
+	VALIDATE_OBJECT
+	return GC.getMap().plotCheckInvalid(m_iConvoyX, m_iConvoyY);
+}
+void CvUnit::SetConvoyPlot(CvPlot* pNewValue)
+{
+	VALIDATE_OBJECT
+	CvPlot* pOldPlot;
+
+	pOldPlot = GetConvoyPlot();
+
+	if(pOldPlot != pNewValue)
+	{
+		if(pNewValue == NULL)
+		{
+			m_iConvoyX = INVALID_PLOT_COORD;
+			m_iConvoyY = INVALID_PLOT_COORD;
+		}
+		else
+		{
+			m_iConvoyX = pNewValue->getX();
+			m_iConvoyY = pNewValue->getY();
 		}
 	}
 }

@@ -2674,7 +2674,14 @@ public:
 
 	int GetYieldPerTurn(YieldTypes eYield) const;
 
-	int GetRequiredYieldPerTurn(YieldTypes eYield) const;
+	int GetRequiredYield(YieldTypes eYield, bool bCanHeal = false);
+
+	int HealingPossible(CvUnit* pLoopUnit, int iPersonnelPool, int iMaterielPool, int iUnitThisPass);
+	int GetNumUnitsThisPass(int iPass);
+	void DoHealing();
+
+	int GetRationedConsumption() const;
+	int GetRationedMoves() const;
 #endif
 
 protected:

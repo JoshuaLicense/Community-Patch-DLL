@@ -417,6 +417,11 @@ void CvPlayerAI::AI_conquerCity(CvCity* pCity, PlayerTypes eOldOwner)
 #endif
 	}
 
+#if defined(MOD_WWII_MISC)
+	pCity->DoAnnex();
+	return;
+#else
+
 	// Puppet the city
 	if(pCity->getOriginalOwner() != GetID() || GET_PLAYER(m_eID).GetPlayerTraits()->IsNoAnnexing())
 	{
@@ -430,6 +435,7 @@ void CvPlayerAI::AI_conquerCity(CvCity* pCity, PlayerTypes eOldOwner)
 		pCity->DoAnnex();
 		return;
 	}
+#endif
 #endif
 }
 

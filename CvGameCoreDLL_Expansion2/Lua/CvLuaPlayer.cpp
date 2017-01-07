@@ -1450,6 +1450,7 @@ void CvLuaPlayer::PushMethods(lua_State* L, int t)
 #endif
 #if defined(MOD_WWII_YIELDS)
 	Method(GetYield);
+	Method(ChangeYield);
 
 	Method(GetBaseYieldPerTurn);
 	Method(GetYieldPerTurnFromCities);
@@ -1458,7 +1459,7 @@ void CvLuaPlayer::PushMethods(lua_State* L, int t)
 
 	Method(GetYieldPerTurn);
 
-	Method(GetRequiredYieldPerTurn);
+	Method(GetRequiredYield);
 #endif
 }
 //------------------------------------------------------------------------------
@@ -1931,7 +1932,13 @@ int CvLuaPlayer::lIsPlotConnectedToPlot(lua_State* L)
 	CvPlot* pkFromPlot = CvLuaPlot::GetInstance(L, 2);
 	CvPlot* pkToPlot = CvLuaPlot::GetInstance(L, 3);
 
+#if defined(MOD_WWII_MISC)
+	int iRoute = luaL_optint(L, 4, ROUTE_ANY);
+	const bool bResult = IsPlotConnectedToPlot(pkPlayer->GetID(), pkFromPlot, pkToPlot, (RouteTypes) iRoute);
+#else
 	const bool bResult = IsPlotConnectedToPlot(pkPlayer->GetID(), pkFromPlot, pkToPlot);
+#endif
+
 	lua_pushboolean(L, bResult);
 	return 1;
 }
@@ -15148,6 +15155,10 @@ int CvLuaPlayer::lGetYield(lua_State* L)
 {
 	return BasicLuaMethod(L, &CvPlayerAI::GetYield);
 }
+int CvLuaPlayer::lChangeYield(lua_State* L)
+{
+	return BasicLuaMethod(L, &CvPlayerAI::ChangeYield);
+}
 //------------------------------------------------------------------------------
 //int GetBaseYieldPerTurn(eYield);
 int CvLuaPlayer::lGetBaseYieldPerTurn(lua_State* L)
@@ -15180,8 +15191,8 @@ int CvLuaPlayer::lGetYieldPerTurnFromTraits(lua_State* L)
 }
 //------------------------------------------------------------------------------
 //int GetYieldFromTraits();
-int CvLuaPlayer::lGetRequiredYieldPerTurn(lua_State* L)
+int CvLuaPlayer::lGetRequiredYield(lua_State* L)
 {
-	return BasicLuaMethod(L, &CvPlayerAI::GetRequiredYieldPerTurn);
+	return BasicLuaMethod(L, &CvPlayerAI::GetRequiredYield);
 }
 #endif

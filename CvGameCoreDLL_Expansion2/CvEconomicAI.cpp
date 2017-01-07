@@ -646,9 +646,10 @@ void CvEconomicAI::DoTurn()
 	LogCityMonitor();
 
 	// Functions that need to run before we look at strategies
+#if !defined(MOD_WWII_MISC)
 	DoReconState();
 	DoAntiquitySites();
-
+#endif
 	int iStrategiesLoop = 0;
 
 	// Loop through all strategies

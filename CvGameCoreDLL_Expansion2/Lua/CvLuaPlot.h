@@ -388,5 +388,8 @@ protected:
 	LUAAPIEXTN(IsAdjacentToTerrain, bool, iTerrainType);
 	LUAAPIEXTN(IsWithinDistanceOfTerrain, bool, iTerrainType, iDistance);
 #endif
+#if defined(MOD_WWII_TERRITORY)
+	static int lGetOriginalOwner(lua_State* L);
+#endif
 };
 #endif

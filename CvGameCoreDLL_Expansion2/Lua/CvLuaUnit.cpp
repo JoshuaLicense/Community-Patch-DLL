@@ -638,6 +638,20 @@ void CvLuaUnit::PushMethods(lua_State* L, int t)
 	Method(IsAdjacentToTerrain);
 	Method(IsWithinDistanceOfTerrain);
 #endif
+#if defined(MOD_WWII_YIELDS)
+	Method(GetPersonnelPerHP);
+	Method(GetMaterielPerHP);
+	Method(GetBaseFuelConsumption);
+
+	Method(GetFuelConsumption);
+#endif
+#if defined(MOD_WWII_SUPPLY_LINE)
+	Method(GetSupplyLineEfficiency);
+#endif
+#if defined(MOD_WWII_CONVOYS)
+	Method(GetConvoyPlot);
+	Method(SetConvoyPlot);
+#endif
 }
 //------------------------------------------------------------------------------
 const char* CvLuaUnit::GetTypeName()
@@ -5807,4 +5821,64 @@ LUAAPIIMPL(Unit, IsWithinDistanceOfResource)
 LUAAPIIMPL(Unit, IsOnTerrain)
 LUAAPIIMPL(Unit, IsAdjacentToTerrain)
 LUAAPIIMPL(Unit, IsWithinDistanceOfTerrain)
+#endif
+
+#if defined(MOD_WWII_YIELDS)
+int CvLuaUnit::lGetPersonnelPerHP(lua_State* L)
+{
+	CvUnit* pkUnit = GetInstance(L);
+	CvUnitEntry& unitInfo = pkUnit->getUnitInfo();
+	lua_pushinteger(L, unitInfo.GetPersonnelPerHP());
+
+	return 1;
+}
+int CvLuaUnit::lGetMaterielPerHP(lua_State* L)
+{
+	CvUnit* pkUnit = GetInstance(L);
+	CvUnitEntry& unitInfo = pkUnit->getUnitInfo();
+	lua_pushinteger(L, unitInfo.GetMaterielPerHP());
+
+	return 1;
+}
+int CvLuaUnit::lGetBaseFuelConsumption(lua_State* L)
+{
+	CvUnit* pkUnit = GetInstance(L);
+	CvUnitEntry& unitInfo = pkUnit->getUnitInfo();
+	lua_pushinteger(L, unitInfo.GetFuelConsumption());
+
+	return 1;
+}
+int CvLuaUnit::lGetFuelConsumption(lua_State* L)
+{
+	return BasicLuaMethod(L, &CvUnit::GetFuelConsumption);
+}
+#endif
+#if defined(MOD_WWII_SUPPLY_LINE)
+int CvLuaUnit::lGetSupplyLineEfficiency(lua_State* L)
+{
+	return BasicLuaMethod(L, &CvUnit::GetSupplyLineEfficiency);
+}
+#endif
+#if defined(MOD_WWII_CONVOYS)
+//------------------------------------------------------------------------------
+//CyPlot* getReconPlot();
+int CvLuaUnit::lGetConvoyPlot(lua_State* L)
+{
+	CvUnit* pkUnit = GetInstance(L);
+
+	CvPlot* pkPlot = pkUnit->GetConvoyPlot();
+	CvLuaPlot::Push(L, pkPlot);
+
+	return 1;
+}
+//------------------------------------------------------------------------------
+//void setReconPlot(CyPlot* pNewValue);
+int CvLuaUnit::lSetConvoyPlot(lua_State* L)
+{
+	CvUnit* pkUnit = GetInstance(L);
+	CvPlot* pkPlot = CvLuaPlot::GetInstance(L, 2);
+
+	pkUnit->SetConvoyPlot(pkPlot);
+	return 0;
+}
 #endif

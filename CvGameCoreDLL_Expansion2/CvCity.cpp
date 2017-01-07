@@ -7623,6 +7623,35 @@ bool CvCity::canTrain(UnitTypes eUnit, bool bContinue, bool bTestVisible, bool b
 		}
 	}
 #endif
+#if defined(MOD_WWII_MISC)
+	// See if there are any BuildingClass requirements
+	const int iNumBuildingClassInfos = GC.getNumBuildingClassInfos();
+	const CvCivilizationInfo& thisCivilization = getCivilizationInfo();
+	for(int iBuildingClassLoop = 0; iBuildingClassLoop < iNumBuildingClassInfos; iBuildingClassLoop++)
+	{
+		const BuildingClassTypes eBuildingClass = (BuildingClassTypes) iBuildingClassLoop;
+		CvBuildingClassInfo* pkBuildingClassInfo = GC.getBuildingClassInfo(eBuildingClass);
+		if(!pkBuildingClassInfo)
+		{
+			continue;
+		}
+
+		// Requires Building
+		if(pkUnitEntry->GetBuildingClassRequireds(eBuildingClass))
+		{
+			const BuildingTypes ePrereqBuilding = (BuildingTypes) (thisCivilization.getCivilizationBuildings(eBuildingClass));
+
+			if(GetCityBuildings()->GetNumBuilding(ePrereqBuilding) == 0)
+			{
+				CvBuildingEntry* pkBuildingInfo = GC.getBuildingInfo(ePrereqBuilding);
+				if(pkBuildingInfo)
+				{
+					return false;
+				}
+			}
+		}
+	}
+#endif
 	if(!bTestVisible)
 	{
 		CvUnitEntry& thisUnitInfo = *pkUnitEntry;
@@ -7637,7 +7666,7 @@ bool CvCity::canTrain(UnitTypes eUnit, bool bContinue, bool bTestVisible, bool b
 					return false;
 			}
 		}
-
+#if !defined(MOD_WWII_MISC)
 		// See if there are any BuildingClass requirements
 		const int iNumBuildingClassInfos = GC.getNumBuildingClassInfos();
 		const CvCivilizationInfo& thisCivilization = getCivilizationInfo();
@@ -7667,7 +7696,7 @@ bool CvCity::canTrain(UnitTypes eUnit, bool bContinue, bool bTestVisible, bool b
 				}
 			}
 		}
-
+#endif
 		// Air units can't be built above capacity
 		if (pkUnitEntry->GetDomainType() == DOMAIN_AIR)
 		{
@@ -11361,6 +11390,18 @@ int CvCity::getGeneralProductionModifiers(CvString* toolTipSink) const
 		if(toolTipSink && iTempLeagueMod)
 		{
 			GC.getGame().BuildProdModHelpText(toolTipSink, "TXT_KEY_PRODMOD_LEAGUE", iTempLeagueMod);
+		}
+	}
+#endif
+#if defined(MOD_WWII_MISC)
+	// Half production in occupied cities!
+	if(IsPuppet() || IsOccupied())
+	{
+		int iTempMod = GC.getOCCUPIED_PRODUCTION_MODIFIER();
+		iMultiplier += iTempMod;
+		if(toolTipSink && iTempMod)
+		{
+			GC.getGame().BuildProdModHelpText(toolTipSink, "TXT_KEY_PRODMOD_OCCUPIED", iTempMod);
 		}
 	}
 #endif

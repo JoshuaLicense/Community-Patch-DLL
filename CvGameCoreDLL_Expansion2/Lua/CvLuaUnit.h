@@ -648,6 +648,20 @@ protected:
 	LUAAPIEXTN(IsAdjacentToTerrain, bool, iTerrainType);
 	LUAAPIEXTN(IsWithinDistanceOfTerrain, bool, iTerrainType, iDistance);
 #endif
+#if defined(MOD_WWII_YIELDS)
+	static int lGetPersonnelPerHP(lua_State* L);
+	static int lGetMaterielPerHP(lua_State* L);
+	static int lGetBaseFuelConsumption(lua_State* L);
+
+	static int lGetFuelConsumption(lua_State* L);
+#endif
+#if defined(MOD_WWII_SUPPLY_LINE)
+	static int lGetSupplyLineEfficiency(lua_State* L);
+#endif
+#if defined(MOD_WWII_CONVOYS)
+	static int lGetConvoyPlot(lua_State* L);
+	static int lSetConvoyPlot(lua_State* L);
+#endif
 };
 
 

@@ -171,7 +171,11 @@ void CvHomelandAI::FindAutomatedUnits()
 	// Loop through our units
 	for(pLoopUnit = m_pPlayer->firstUnit(&iLoop); pLoopUnit != NULL; pLoopUnit = m_pPlayer->nextUnit(&iLoop))
 	{
+#if defined(MOD_WWII_CONVOYS)
+		if((pLoopUnit->IsAutomated() || pLoopUnit->AI_getUnitAIType() == UNITAI_TREASURE) && !pLoopUnit->TurnProcessed() && pLoopUnit->AI_getUnitAIType() != UNITAI_UNKNOWN && pLoopUnit->canMove())
+#else
 		if(pLoopUnit->IsAutomated() && !pLoopUnit->TurnProcessed() && pLoopUnit->AI_getUnitAIType() != UNITAI_UNKNOWN && pLoopUnit->canMove())
+#endif
 		{
 			m_CurrentTurnUnits.push_back(pLoopUnit->GetID());
 		}
@@ -6282,6 +6286,76 @@ void CvHomelandAI::ExecuteSSPartAdds()
 	}
 }
 
+#if defined(MOD_WWII_CONVOYS)
+void CvHomelandAI::ExecuteTreasureMoves()
+{
+	MoveUnitsArray::iterator it;
+	for(it = m_CurrentMoveUnits.begin(); it != m_CurrentMoveUnits.end(); ++it)
+	{
+		bool bUpdate = false;
+
+		CvUnit* pUnit = m_pPlayer->getUnit(it->GetID());
+		if(!pUnit)
+			continue;
+
+		CvPlot* pPlot = pUnit->GetConvoyPlot();
+		if(!pPlot)
+			continue;
+
+		CvCity* pCity = pPlot->getPlotCity();
+		// doesn't have to be a city
+		if(pCity)
+		{
+			//check if we still own the city, if not, call for a redirection via luahook
+			if(!pPlot->isFriendlyCity(*pUnit, false) || pCity->IsBlockaded(true))
+			{
+				bUpdate = true;
+			}
+		}
+		else
+		{
+			//this is a plot destination
+			if(!pPlot->IsFriendlyTerritory(m_pPlayer->GetID()))
+			{
+				bUpdate = true;
+			}
+		}
+		if(bUpdate)
+		{
+			// can't make it the destination!
+			if(GAMEEVENTINVOKE_TESTALL(GAMEEVENT_UpdateConvoy, pUnit->GetID(), m_pPlayer->GetID()) == GAMEEVENTRETURN_FALSE)
+			{
+				// can't update it, kill it!
+				UnitProcessed(pUnit->GetID());
+				pUnit->kill(true);
+				continue;
+			}
+		}
+
+		pUnit->PushMission(CvTypes::getMISSION_MOVE_TO(), pPlot->getX(), pPlot->getY());
+		pUnit->finishMoves();
+		UnitProcessed(pUnit->GetID());
+
+		if(pUnit->plot() == pPlot)
+		{
+			if(GAMEEVENTINVOKE_TESTALL(GAMEEVENT_FinalizeConvoy, pUnit->GetID(), m_pPlayer->GetID(), pPlot->getX(), pPlot->getY()) == GAMEEVENTRETURN_FALSE)
+			{
+				CUSTOMLOG("Convoy reached destination, but failed to finalize");
+			}
+			pUnit->kill(true);
+		}
+
+		if(GC.getLogging() && GC.getAILogging())
+		{
+			CvString strLogString;
+			CvString strTemp;
+			strTemp = pUnit->getUnitInfo().GetDescription();
+			strLogString.Format("Moving %s to trade destination - now at, X: %d, Y: %d", strTemp.GetCString(), pUnit->getX(), pUnit->getY());
+			LogHomelandMessage(strLogString);
+		}
+	}
+}
+#else
 /// Moves a treasure to the capital
 void CvHomelandAI::ExecuteTreasureMoves()
 {
@@ -6323,6 +6397,7 @@ void CvHomelandAI::ExecuteTreasureMoves()
 		}
 	}
 }
+#endif
 
 #if defined(MOD_AI_SMART_AIR_TACTICS)
 // Similar to interception moves on tacticalAI, grant some interceptions based on number of enemies

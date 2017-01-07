@@ -1655,8 +1655,20 @@ public:
 	bool	getCaptureDefinition(CvUnitCaptureDefinition* pkCaptureDef, PlayerTypes eCapturingPlayer = NO_PLAYER);
 	static CvUnit* createCaptureUnit(const CvUnitCaptureDefinition& kCaptureDef);
 #if defined(MOD_WWII_TERRITORY)
-	bool canCaptureTerritory() const;
-	void capturePlot(CvPlot* pPlot);
+	void CapturePlot(CvPlot* pPlot);
+#endif
+#if defined(MOD_WWII_SUPPLY_LINE)
+	void UpdateSupplyLine();
+	int GetSupplyLineEfficiency() const;
+	void SetSupplyLineEfficiency(int iCost);
+	int GetEfficiencyFromPlot(const CvPlot* pPlot) const;
+#endif
+#if defined(MOD_WWII_YIELDS)
+	int GetFuelConsumption() const;
+#endif
+#if defined(MOD_WWII_CONVOYS)
+	CvPlot* GetConvoyPlot() const;
+	void SetConvoyPlot(CvPlot* pNewValue);
 #endif
 
 protected:
@@ -1996,7 +2008,13 @@ protected:
 	FAutoVariable<int, CvUnit> m_iScienceBlastStrength;
 	FAutoVariable<int, CvUnit> m_iCultureBlastStrength;
 #endif
-		
+#if defined(MOD_WWII_SUPPLY_LINE)
+	FAutoVariable<int, CvUnit> m_iSupplyLineEfficiency;
+#endif
+#if defined(MOD_WWII_CONVOYS)
+	FAutoVariable<int, CvUnit> m_iConvoyX;
+	FAutoVariable<int, CvUnit> m_iConvoyY;
+#endif
 #if defined(MOD_PROMOTIONS_UNIT_NAMING)
 	CvString m_strUnitName;
 #endif

@@ -200,7 +200,12 @@ CvUnitEntry::CvUnitEntry(void) :
 	m_iUnitFlagIconOffset(0),
 	m_iUnitPortraitOffset(0),
 #if defined(MOD_WWII_TERRITORY)
-	m_bCanCaptureTerritory(false)
+	m_bCanCaptureTerritory(false),
+#endif
+#if defined(MOD_WWII_YIELDS)
+	m_iPersonnelPerHP(0),
+	m_iMaterielPerHP(0),
+	m_iFuelConsumption(0)
 #endif
 {
 }
@@ -373,7 +378,11 @@ bool CvUnitEntry::CacheResults(Database::Results& kResults, CvDatabaseUtility& k
 #if defined(MOD_WWII_TERRITORY)
 	m_bCanCaptureTerritory = kResults.GetBool("CanCaptureTerritory");
 #endif
-
+#if defined(MOD_WWII_YIELDS)
+	m_iPersonnelPerHP = kResults.GetInt("Personnel");
+	m_iMaterielPerHP = kResults.GetInt("Materiel");
+	m_iFuelConsumption = kResults.GetInt("FuelConsumption");
+#endif
 	//References
 	const char* szTextVal = NULL;
 	szTextVal = kResults.GetText("Class");
@@ -1691,6 +1700,20 @@ int CvUnitEntry::GetUnitPortraitOffset() const
 bool CvUnitEntry::CanCaptureTerritory() const
 {
 	return m_bCanCaptureTerritory;
+}
+#endif
+#if defined(MOD_WWII_YIELDS)
+int CvUnitEntry::GetPersonnelPerHP() const
+{
+	return m_iPersonnelPerHP;
+}
+int CvUnitEntry::GetMaterielPerHP() const
+{
+	return m_iMaterielPerHP;
+}
+int CvUnitEntry::GetFuelConsumption() const
+{
+	return m_iFuelConsumption;
 }
 #endif
 

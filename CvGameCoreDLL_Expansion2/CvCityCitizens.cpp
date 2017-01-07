@@ -2091,7 +2091,12 @@ bool CvCityCitizens::DoAddBestCitizenFromUnassigned(std::map<SpecialistTypes, in
 
 	//FIRST, WE FEED OURSELVES!
 	int iPotentialExcessTimes100 = m_pCity->getYieldRateTimes100(YIELD_FOOD, false) - (m_pCity->foodConsumption(false, 1) * 100);
+#if defined(MOD_WWII_MISC)
+	//To show the unemployed!
+	if(IsAvoidGrowth() && iPotentialExcessTimes100 < 0)
+#else
 	if(!IsAvoidGrowth() && iPotentialExcessTimes100 <= 200 || (IsAvoidGrowth() && iPotentialExcessTimes100 < 0))
+#endif
 	{
 		int iBestPlotValue = 0;
 		CvPlot* pBestPlot = GetBestCityPlotWithValue(iBestPlotValue, /*bBest*/ true, /*bWorked*/ false);

@@ -10564,7 +10564,11 @@ void CvTacticalAI::MoveGreatGeneral(CvArmyAI* pArmyAI)
 		CvPlot* pArmyCOM = pArmyAI ? pArmyAI->GetCenterOfMass() : NULL;
 
 		ReachablePlots reachablePlots;
+#if defined(MOD_WWII_MISC)
+		TacticalAIHelpers::GetAllPlotsInReachThisTurn(pGeneral,pGeneral->plot(),reachablePlots,true,true,true); // fixes the great general ability to embark? 
+#else
 		TacticalAIHelpers::GetAllPlotsInReachThisTurn(pGeneral,pGeneral->plot(),reachablePlots,true,true,false);
+#endif
 		for (ReachablePlots::const_iterator it=reachablePlots.begin(); it!=reachablePlots.end(); ++it)
 		{
 			CvPlot* pEvalPlot = GC.getMap().plotByIndexUnchecked(it->iPlotIndex);

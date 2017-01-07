@@ -11458,12 +11458,14 @@ bool CvPlot::setRevealed(TeamTypes eTeam, bool bNewValue, bool bTerrainOnly, Tea
 								if(eTeam == eActiveTeam)
 									SetWorldAnchor(WORLD_ANCHOR_NATURAL_WONDER, getFeatureType());
 
+#if !defined(MOD_WWII_MISC)
 								// Notification
 								CvNotifications* pNotifications = GET_PLAYER((PlayerTypes)iI).GetNotifications();
 								if(pNotifications)
 								{
 									pNotifications->Add(NOTIFICATION_EXPLORATION_RACE, strText.toUTF8(), strSummary.toUTF8(), getX(), getY(), getFeatureType());
 								}
+#endif
 							}
 						}
 					}
@@ -15906,7 +15908,8 @@ bool CvPlot::isUnderControl(bool bCaptured)
 	PlayerTypes ePlotOwner = getOwner();
 	CvPlayer& kPlotOwner = GET_PLAYER(ePlotOwner);
 
-	int iMaxRange = bCaptured ? 5 : MAX_INT; //GC.getCITY_MAX_PLOT_CONTROL_RANGE();
+	int iMaxCityRange = bCaptured ? GC.getCITY_MAX_PLOT_CONTROL_RANGE() : MAX_INT;
+	int iMaxUnitRange = GC.getUNIT_MAX_PLOT_CONTROL_RANGE();
 
 	int iCityLoop;
 	for(CvCity* pLoopCity = kPlotOwner.firstCity(&iCityLoop); pLoopCity != NULL; pLoopCity = kPlotOwner.nextCity(&iCityLoop))
@@ -15914,20 +15917,20 @@ bool CvPlot::isUnderControl(bool bCaptured)
 		if(!(pLoopCity->isMatchingArea(this) || isMountain())) // Check if it's in the same area, and isn't a mountain, as mountains have their own area id.
 			continue;
 
-		SPathFinderUserData data(ePlotOwner, PT_GENERIC_ANY_AREA, NO_PLAYER, iMaxRange);
+		SPathFinderUserData data(ePlotOwner, PT_GENERIC_ANY_AREA, NO_PLAYER, iMaxCityRange);
 		data.iFlags |= CvUnit::MOVEFLAG_TERRITORY_NO_ENEMY;
 		data.iFlags |= CvUnit::MOVEFLAG_NO_EMBARK;
 
 		if(GC.GetStepFinder().DoesPathExist(this->getX(), this->getY(), pLoopCity->getX(), pLoopCity->getY(), data))
 		{
-			CUSTOMLOG("City (%d, %d) found for plot (%d, %d)", pLoopCity->getX(), pLoopCity->getY(), this->getX(), this->getY());
+			//CUSTOMLOG("City (%d, %d) found for plot (%d, %d)", pLoopCity->getX(), pLoopCity->getY(), this->getX(), this->getY());
 			CvString strBuffer = GetLocalizedText("TXT_KEY_PLOT_CITY_CONTROL", pLoopCity->getName());
 			setControlString(strBuffer);
 			return true;
 		}
 	}
 	//No closest city or can't find path. Check for units close...
-	CUSTOMLOG("No city found for plot (%d, %d)", this->getX(), this->getY());
+	//CUSTOMLOG("No city found for plot (%d, %d)", this->getX(), this->getY());
 
 	int iUnitLoop;
 	for(CvUnit* pLoopUnit = kPlotOwner.firstUnit(&iUnitLoop); pLoopUnit != NULL; pLoopUnit = kPlotOwner.nextUnit(&iUnitLoop))
@@ -15938,23 +15941,23 @@ bool CvPlot::isUnderControl(bool bCaptured)
 		if(!(pLoopUnit->getArea() == getArea() || isMountain())) // Check if it's in the same area, and isn't a mountain, as mountains have their own area id.
 			continue;
 
-		if(!pLoopUnit->canCaptureTerritory()) // only certain units can capture territory!
+		if(!pLoopUnit->getUnitInfo().CanCaptureTerritory()) // only certain units can capture territory!
 			continue;
 
-		SPathFinderUserData data(ePlotOwner, PT_GENERIC_ANY_AREA, NO_PLAYER, iMaxRange);
+		SPathFinderUserData data(ePlotOwner, PT_GENERIC_ANY_AREA, NO_PLAYER, iMaxUnitRange);
 		data.iFlags |= CvUnit::MOVEFLAG_TERRITORY_NO_ENEMY;
 		data.iFlags |= CvUnit::MOVEFLAG_NO_EMBARK;
 
 		if(GC.GetStepFinder().DoesPathExist(this->getX(), this->getY(), pLoopUnit->getX(), pLoopUnit->getY(), data))
 		{
-			CUSTOMLOG("Unit (%d, %d) found for plot (%d, %d)", pLoopUnit->getX(), pLoopUnit->getY(), this->getX(), this->getY());
+			//CUSTOMLOG("Unit (%d, %d) found for plot (%d, %d)", pLoopUnit->getX(), pLoopUnit->getY(), this->getX(), this->getY());
 			CvString strBuffer = GetLocalizedText("TXT_KEY_PLOT_UNIT_CONTROL", pLoopUnit->getName());
 			setControlString(strBuffer);
 			return true;
 		}
 	}
 	//No unit found or can't find path to such plot
-	CUSTOMLOG("No unit found for plot (%d, %d)", this->getX(), this->getY());
+	//CUSTOMLOG("No unit found for plot (%d, %d)", this->getX(), this->getY());
 	return false; // return false as this plot is not under control of any player!	
 }
 
@@ -15973,7 +15976,8 @@ bool CvPlot::findControl(bool bCaptured) // add 100 to the iValue for friends
 	int iValue = MAX_INT;
 	int iBestValue = MAX_INT;
 
-	int iMaxRange = 5; //GC.getCITY_MAX_PLOT_CONTROL_RANGE();
+	int iMaxCityRange = bCaptured ? GC.getCITY_MAX_PLOT_CONTROL_RANGE() : MAX_INT;
+	int iMaxUnitRange = GC.getUNIT_MAX_PLOT_CONTROL_RANGE();
 
 	// Loop through major players units to find the closest!
 	for(iI = 0; iI < MAX_PLAYERS; iI++)
@@ -15988,13 +15992,17 @@ bool CvPlot::findControl(bool bCaptured) // add 100 to the iValue for friends
 
 				iValue = plotDistance(this->getX(), this->getY(), pLoopCity->getX(), pLoopCity->getY()); // distance from the plot
 			
-				//if unit's team is at war with the current owner or if the tile is actually captured and unit's team is at war with the original owner of the plot
-				if(!(GET_TEAM(pLoopCity->getTeam()).isAtWar(getTeam()) || (bCaptured && GET_TEAM(pLoopCity->getTeam()).isAtWar(GET_PLAYER(getOriginalOwner()).getTeam()))))
-					iValue += 100;
+				//friendly units can control over enemies if path is there!
+				if(!bCaptured && IsFriendlyTerritory((PlayerTypes) iI))
+					iValue -= 10;
 
-				if(iValue < (iMaxRange+1) && iValue < iBestValue) // only store value if within range and is below the best value!
+				//if unit's team is at war with the current owner or if the tile is actually captured and unit's team is at war with the original owner of the plot
+				if(GET_TEAM(pLoopCity->getTeam()).isAtWar(getTeam()) || (bCaptured && GET_TEAM(pLoopCity->getTeam()).isAtWar(GET_PLAYER(getOriginalOwner()).getTeam())))
+					iValue -= 5;
+
+				if(iValue < (iMaxCityRange +1) && iValue < iBestValue) // only store value if within range and is below the best value!
 				{
-					SPathFinderUserData data(thisPlayer.GetID(), PT_GENERIC_ANY_AREA, NO_PLAYER, iMaxRange);
+					SPathFinderUserData data(thisPlayer.GetID(), PT_GENERIC_ANY_AREA, NO_PLAYER, iMaxCityRange);
 					data.iFlags |= CvUnit::MOVEFLAG_TERRITORY_NO_ENEMY;
 					data.iFlags |= CvUnit::MOVEFLAG_NO_EMBARK;
 
@@ -16008,7 +16016,7 @@ bool CvPlot::findControl(bool bCaptured) // add 100 to the iValue for friends
 
 			for(pLoopUnit = thisPlayer.firstUnit(&iUnitLoop); pLoopUnit != NULL; pLoopUnit = thisPlayer.nextUnit(&iUnitLoop))
 			{
-				if(pLoopUnit->canCaptureTerritory())
+				if(pLoopUnit->getUnitInfo().CanCaptureTerritory())
 				{
 					if(!(pLoopUnit->getArea() == this->getArea() || isMountain())) // Check if it's in the same area, and isn't a mountain, as mountains have their own area id.
 						continue;
@@ -16017,11 +16025,11 @@ bool CvPlot::findControl(bool bCaptured) // add 100 to the iValue for friends
 
 					//if unit's team is at war with the current owner or if the tile is actually captured and unit's team is at war with the original owner of the plot
 					if(!(GET_TEAM(pLoopUnit->getTeam()).isAtWar(getTeam()) || (bCaptured && GET_TEAM(pLoopUnit->getTeam()).isAtWar(GET_PLAYER(getOriginalOwner()).getTeam()))))
-						iValue += 100;
+						iValue -= 100;
 
-					if(iValue < (iMaxRange + 1) && iValue < iBestValue) // only store value if within range and is below the best value!
+					if(iValue < (iMaxUnitRange + 1) && iValue < iBestValue) // only store value if within range and is below the best value!
 					{
-						SPathFinderUserData data(thisPlayer.GetID(), PT_GENERIC_ANY_AREA, NO_PLAYER, iMaxRange);
+						SPathFinderUserData data(thisPlayer.GetID(), PT_GENERIC_ANY_AREA, NO_PLAYER, iMaxUnitRange);
 						data.iFlags |= CvUnit::MOVEFLAG_TERRITORY_NO_ENEMY;
 						data.iFlags |= CvUnit::MOVEFLAG_NO_EMBARK;
 
