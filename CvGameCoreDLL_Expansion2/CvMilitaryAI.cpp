@@ -4677,6 +4677,13 @@ void CvMilitaryAI::DisbandObsoleteUnits()
 	int iNavalScore = MAX_INT;
 	int iLandScore = MAX_INT;
 
+#if defined(MOD_WWII_MISC)
+	if(m_pPlayer->calculateGoldRateTimes100() >= (GC.getDEFICIT_UNIT_DISBANDING_THRESHOLD() * 100)) // Don't disband unless below the deficit!
+	{
+		return;
+	}
+#endif
+
 	// Don't do this if at war
 #if defined(MOD_BALANCE_CORE)
 	if(GetNumberCivsAtWarWith(false) > 0)

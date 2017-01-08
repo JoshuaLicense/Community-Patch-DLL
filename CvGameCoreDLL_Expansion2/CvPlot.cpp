@@ -6689,6 +6689,7 @@ bool CvPlot::IsHomeFrontForPlayer(PlayerTypes ePlayer) const
 		}
 	}
 
+
 	CvCity* pLoopCity;
 	int iCityLoop;
 

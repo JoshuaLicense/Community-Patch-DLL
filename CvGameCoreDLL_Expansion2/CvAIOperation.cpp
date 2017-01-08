@@ -685,11 +685,13 @@ CvPlot* CvAIOperation::GetPlotXInStepPath(CvPlot* pCurrentPosition, CvPlot* pTar
 	//on the other hand they may theoretically switch areas, ie embark when moving to target
 	if (!IsNavalOperation())
 	{
+#if !defined(MOD_WWII_MISC) // don't care about how wide 
 		CvMultiUnitFormationInfo* thisFormation = GC.getMultiUnitFormationInfo(GetFormation());
 		int iFormationSize = thisFormation ? thisFormation->getNumFormationSlotEntries() : 6;
-		if (iFormationSize > 5 )
+		if(iFormationSize > 5)
 			ePathType = PT_GENERIC_ANY_AREA_WIDE;
 		else
+#endif
 			ePathType = PT_GENERIC_ANY_AREA;
 	}
 
@@ -732,11 +734,13 @@ int CvAIOperation::GetStepDistanceBetweenPlots(CvPlot* pCurrentPosition, CvPlot*
 	//on the other hand they may theoretically switch areas, ie embark when moving to target
 	if (!IsNavalOperation())
 	{
+#if !defined(MOD_WWII_MISC) // don't care about how wide 
 		CvMultiUnitFormationInfo* thisFormation = GC.getMultiUnitFormationInfo(GetFormation());
 		int iFormationSize = thisFormation ? thisFormation->getNumFormationSlotEntries() : 6;
-		if (iFormationSize > 5 )
+		if (iFormationSize > 5)
 			ePathType = PT_GENERIC_ANY_AREA_WIDE;
 		else
+#endif
 			ePathType = PT_GENERIC_ANY_AREA;
 	}
 

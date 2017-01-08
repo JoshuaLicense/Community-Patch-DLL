@@ -13079,11 +13079,15 @@ void CvMinorCivAI::SetMajorIntruding(PlayerTypes eMajor, bool bValue)
 /// Is a player allowed to be inside someone else's borders?
 bool CvMinorCivAI::IsPlayerHasOpenBorders(PlayerTypes ePlayer)
 {
+#if defined(MOD_WWII_TERRITORY)
+	return IsAllies(ePlayer);
+#else
 	// Special trait?
 	if(IsPlayerHasOpenBordersAutomatically(ePlayer))
 		return true;
 
 	return IsFriends(ePlayer);
+#endif
 }
 
 /// Is a player allowed to be inside someone else's borders automatically?

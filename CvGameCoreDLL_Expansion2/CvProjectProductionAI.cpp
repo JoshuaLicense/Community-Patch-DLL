@@ -186,11 +186,11 @@ int CvProjectProductionAI::CheckProjectBuildSanity(ProjectTypes eProject, int iT
 #if defined(MOD_WWII_MISC) //Start building projects!!! pls
 	if(kPlayer.IsAtWar())
 	{
-		iTempWeight *= 10;
+		iTempWeight *= 15;
 	}
 	else
 	{
-		iTempWeight *= 5;
+		iTempWeight *= 10;
 	}
 #endif
 
