@@ -4532,6 +4532,7 @@ bool EconomicAIHelpers::IsTestStrategy_HaltGrowthBuildings(CvPlayer* pPlayer)
 /// Are we paying more in unit maintenance than we are taking in from our cities?
 bool EconomicAIHelpers::IsTestStrategy_TooManyUnits(CvPlayer* pPlayer)
 {
+#if !defined(MOD_WWII_MISC)
 #if defined(MOD_BALANCE_CORE)
 	if(pPlayer->GetTreasury()->AverageIncome(10) <= -5 && pPlayer->GetTreasury()->GetGold() <= 100)
 	{
@@ -4552,6 +4553,7 @@ bool EconomicAIHelpers::IsTestStrategy_TooManyUnits(CvPlayer* pPlayer)
 			return true;
 		}
 	}
+#endif
 #endif
 	return (pPlayer->GetUnitProductionMaintenanceMod()) != 0;
 }
@@ -5410,6 +5412,11 @@ bool EconomicAIHelpers::IsTestStrategy_StartedPiety(CvPlayer* pPlayer)
 #if defined(MOD_BUGFIX_MINOR_CIV_STRATEGIES)
 bool EconomicAIHelpers::CannotMinorCiv(CvPlayer* pPlayer, EconomicAIStrategyTypes eStrategy)
 {
+#if defined(MOD_WWII_MISC) // fixed
+	if(eStrategy == NO_ECONOMICAISTRATEGY)
+		return true;
+#endif
+
 	if(!pPlayer->isMinorCiv())
 	{
 		return false;

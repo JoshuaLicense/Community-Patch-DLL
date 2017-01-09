@@ -461,7 +461,11 @@ void CvTacticalAI::CommandeerUnits()
 		// is the unit healing?
 		if (m_HealingUnits.find( pLoopUnit->GetID() ) != m_HealingUnits.end())
 		{
+#if defined(MOD_WWII_MISC) 
+			if ( pLoopUnit->getDamage()> (pLoopUnit->GetMaxHitPoints()/3) && bCanHeal && !bHasTarget )
+#else
 			if ( pLoopUnit->getDamage()>30 && bCanHeal && !bHasTarget )
+#endif
 				//need to continue healing
 				continue;
 			else
@@ -471,7 +475,11 @@ void CvTacticalAI::CommandeerUnits()
 		else if (bCanHeal && !bHasTarget)
 		{
 			//does it need healing? unless barbarian or japanese!
+#if defined(MOD_WWII_MISC) // heal if below 20% health
+			if (pLoopUnit->getDamage() > 0 && (((pLoopUnit->GetCurrHitPoints() / pLoopUnit->GetMaxHitPoints() * 100) < 20) || pLoopUnit->isProjectedToDieNextTurn()) && !m_pPlayer->isBarbarian() && !m_pPlayer->GetPlayerTraits()->IsFightWellDamaged() && !pLoopUnit->IsStrongerDamaged())
+#else
 			if ((pLoopUnit->getDamage()>80 || pLoopUnit->isProjectedToDieNextTurn()) && !m_pPlayer->isBarbarian() && !m_pPlayer->GetPlayerTraits()->IsFightWellDamaged() && !pLoopUnit->IsStrongerDamaged())
+#endif
 			{
 				//need to start healing
 				m_HealingUnits.insert( pLoopUnit->GetID() );
@@ -488,7 +496,11 @@ void CvTacticalAI::CommandeerUnits()
 		}
 
 		// We want ALL the barbarians and air units (that are combat ready)
+#if defined(MOD_WWII_MISC)
+		if(pLoopUnit->isBarbarian() || (pLoopUnit->getDomainType() == DOMAIN_AIR && pLoopUnit->getDamage() < (pLoopUnit->GetMaxHitPoints() / 2) && !ShouldRebase(pLoopUnit)))
+#else
 		if(pLoopUnit->isBarbarian() || (pLoopUnit->getDomainType() == DOMAIN_AIR && pLoopUnit->getDamage() < 50 && !ShouldRebase(pLoopUnit)))
+#endif
 		{
 			if (pLoopUnit->getTacticalMove() == NO_TACTICAL_MOVE)
 			{
@@ -3560,11 +3572,17 @@ void CvTacticalAI::PlotHealMoves()
 			//now we need to take care of the units which are damaged and have nothing else to do
 
 			CvPlot* pUnitPlot = pUnit->plot();
+#if defined(MOD_WWII_MISC)
+			int iAcceptableDamage = pUnit->GetMaxHitPoints() / 10;
+			//allow some more damage outside of our borders
+			if (pUnitPlot->getOwner() != pUnit->getOwner())
+				iAcceptableDamage *= 2;
+#else
 			int iAcceptableDamage = 10;
 			//allow some more damage outside of our borders
 			if (pUnitPlot->getOwner() != pUnit->getOwner())
 				iAcceptableDamage = 20;
-
+#endif
 			if (pUnit->getDamage()>iAcceptableDamage && pUnit->getArmyID()==-1 && FindNearbyTarget(pUnit,7)==NULL)
 				m_HealingUnits.insert(pUnit->GetID());
 		}

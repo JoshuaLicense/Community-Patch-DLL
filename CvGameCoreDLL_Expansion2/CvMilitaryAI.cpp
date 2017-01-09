@@ -4173,13 +4173,22 @@ void CvMilitaryAI::CheckSeaDefenses(PlayerTypes ePlayer, CvCity* pThreatenedCity
 void CvMilitaryAI::DoLandAttacks(PlayerTypes ePlayer)
 {
 	//Not perfect, as some operations are mixed, but it will keep us from sending everyone to slaughter all at once.
+#if defined(MOD_WWII_MISC)
+	//So we don't keep just keep sea in reserve
+	int iReservesTotal = m_iNumLandUnits - m_iNumLandUnitsInArmies;
+#else
 	int iReservesTotal = ((m_iNumLandUnits + m_iNumNavalUnits) - (m_iNumNavalUnitsInArmies + m_iNumLandUnitsInArmies));
+#endif
 	if(iReservesTotal > m_iMandatoryReserveSize)
 	{
 		int iOperationID;
 		int iNumRequiredSlots;
 		int iFilledSlots;
+#if defined(MOD_WWII_MISC)
+		int iNumUnitsWillingBuild = 1;
+#else
 		int iNumUnitsWillingBuild = 2;
+#endif
 		WarStateTypes eWarState = m_pPlayer->GetDiplomacyAI()->GetWarState(ePlayer);
 		switch(eWarState)
 		{
@@ -4253,7 +4262,11 @@ void CvMilitaryAI::DoSeaAttacks(PlayerTypes ePlayer)
 		int iNumRequiredSlots;
 		int iFilledSlots;
 		int iReservesUsed;
+#if defined(MOD_WWII_MISC)
+		int iNumUnitsWillingBuild = 1;
+#else
 		int iNumUnitsWillingBuild = 2;
+#endif
 		
 		WarStateTypes eWarState = m_pPlayer->GetDiplomacyAI()->GetWarState(ePlayer);
 		switch(eWarState)
