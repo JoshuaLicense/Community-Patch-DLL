@@ -134,7 +134,6 @@ void CvLuaPlot::PushMethods(lua_State* L, int t)
 	Method(IsVisibleEnemyDefender);
 	Method(GetNumDefenders);
 	Method(GetNumVisibleEnemyDefenders);
-	Method(GetNumVisiblePotentialEnemyDefenders);
 	Method(IsVisibleEnemyUnit);
 	Method(IsVisibleOtherUnit);
 	Method(GetNumFriendlyUnitsOfType);
@@ -991,12 +990,6 @@ int CvLuaPlot::lGetNumDefenders(lua_State* L)
 int CvLuaPlot::lGetNumVisibleEnemyDefenders(lua_State* L)
 {
 	return BasicLuaMethod(L, &CvPlot::getNumVisibleEnemyDefenders);
-}
-//------------------------------------------------------------------------------
-//int getNumVisiblePotentialEnemyDefenders(CyUnit* pUnit);
-int CvLuaPlot::lGetNumVisiblePotentialEnemyDefenders(lua_State* L)
-{
-	return BasicLuaMethod(L, &CvPlot::getNumVisiblePotentialEnemyDefenders);
 }
 //------------------------------------------------------------------------------
 //bool isVisibleEnemyUnit(PlayerTypes ePlayer);

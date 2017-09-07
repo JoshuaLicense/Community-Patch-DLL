@@ -1341,7 +1341,11 @@ void CvHomelandAI::PlotHealMoves()
 			if (MOD_AI_SMART_HEALING) 
 			{
 				CvPlot* unitPlot = pUnit->plot();
-				if (!unitPlot->isCity() && (unitPlot->getOwner() != pUnit->getOwner()) && m_pPlayer->GetPlotDanger(*unitPlot) > 0)
+#if defined(MOD_WWII_MISC)
+				if (!unitPlot->isCity() && (unitPlot->getOriginalOwner() != pUnit->getOwner()) && m_pPlayer->GetPlotDanger(*unitPlot) > 0)
+#else
+				if(!unitPlot->isCity() && (unitPlot->getOwner() != pUnit->getOwner()) && m_pPlayer->GetPlotDanger(*unitPlot) > 0)
+#endif
 				{
 					iHealingLimit /= 2;
 				}
@@ -1409,7 +1413,7 @@ void CvHomelandAI::PlotMovesToSafety()
 			else
 				continue;
 
-			int iDangerLevel = m_pPlayer->GetPlotDanger(*pPlot,pUnit);
+			int iDangerLevel = pUnit->GetDanger(pPlot);
 #else
 			int iDangerLevel = m_pPlayer->GetPlotDanger(*pPlot);
 #endif
@@ -1878,7 +1882,7 @@ void CvHomelandAI::PlotWorkerSeaMoves()
 					if (!pUnit->canBuild(pTarget, (BuildTypes)m_TargetedNavalResources[iI].GetAuxIntData()))
 						continue;
 
-					if (m_pPlayer->GetPlotDanger(*pTarget,pUnit)>0)
+					if (pUnit->GetDanger(pTarget)>0)
 						continue;
 				}
 				else if(MOD_AI_SECONDARY_WORKERS && !pUnit->canBuild(pTarget, (BuildTypes)m_TargetedNavalResources[iI].GetAuxIntData()))
@@ -1910,7 +1914,7 @@ void CvHomelandAI::PlotWorkerSeaMoves()
 				if (!pUnit->canBuild(pTarget, (BuildTypes)m_TargetedNavalResources[iI].GetAuxIntData()))
 					continue;
 
-				if (m_pPlayer->GetPlotDanger(*pTarget,pUnit)>0)
+				if (pUnit->GetDanger(pTarget)>0)
 					continue;
 #if defined(MOD_AI_SECONDARY_WORKERS)
 			}
@@ -3173,6 +3177,8 @@ void CvHomelandAI::PlotAirliftMoves()
 void CvHomelandAI::ReviewUnassignedUnits()
 {
 	ClearCurrentMoveUnits();
+	m_CurrentMoveUnits.setCurrentHomelandMove(AI_HOMELAND_MOVE_UNASSIGNED);
+
 	// Loop through all remaining units
 	for(list<int>::iterator it = m_CurrentTurnUnits.begin(); it != m_CurrentTurnUnits.end(); ++it)
 	{
@@ -3199,7 +3205,6 @@ void CvHomelandAI::ReviewUnassignedUnits()
 				else
 				{
 					pUnit->SetTurnProcessed(true);
-					pUnit->finishMoves();
 				}
 			}
 			else if(pUnit->getDomainType() == DOMAIN_SEA)
@@ -3207,7 +3212,6 @@ void CvHomelandAI::ReviewUnassignedUnits()
 				if(pUnit->plot()->getOwner() == pUnit->getOwner())
 				{
 					pUnit->SetTurnProcessed(true);
-					pUnit->finishMoves();
 
 					CvString strTemp;
 					CvUnitEntry* pkUnitInfo = GC.getUnitInfo(pUnit->getUnitType());
@@ -3304,7 +3308,7 @@ void CvHomelandAI::ExecuteUnassignedUnitMoves()
 		CvPlot* pTarget = FindUnassignedTarget(pUnit);
 		if (pTarget)
 		{
-			if (MoveToEmptySpaceNearTarget(pUnit, pTarget, DOMAIN_LAND, 10))
+			if (MoveToEmptySpaceNearTarget(pUnit, pTarget, DOMAIN_LAND, 42))
 			{
 				if (GC.getLogging() && GC.getAILogging())
 				{
@@ -3658,7 +3662,7 @@ void CvHomelandAI::ExecuteExplorerMoves(bool bSecondPass)
 
 				//careful with plots that are too dangerous
 				int iAcceptableDanger = pUnit->GetCurrHitPoints()/2;
-				int iDanger = m_pPlayer->GetPlotDanger(*pEvalPlot,pUnit);
+				int iDanger = pUnit->GetDanger(pEvalPlot);
 				if(iDanger > iAcceptableDanger)
 					continue;
 				if(iDanger > iAcceptableDanger/2)
@@ -5296,7 +5300,7 @@ void CvHomelandAI::ExecuteGeneralMoves()
 
 				//we want to have many neighboring units in danger, but our plot should be relatively safe
 				//(look at the danger for the defender, the general danger is zero unless the defender is projected to die)
-				int iGeneralDanger = m_pPlayer->GetPlotDanger(*pCandidate,pDefender);
+				int iGeneralDanger = pDefender->GetDanger(pCandidate);
 				//careful with overflow, we expect a lot of INT_MAX value here ...
 				iGeneralDanger = min(100000,iGeneralDanger);
 
@@ -5313,7 +5317,7 @@ void CvHomelandAI::ExecuteGeneralMoves()
 					if (!pSupportedUnit)
 						continue;
 
-					iSupportedDanger += m_pPlayer->GetPlotDanger(*pLoopPlot,pSupportedUnit);
+					iSupportedDanger += pSupportedUnit->GetDanger(pLoopPlot);
 				}
 
 				int iScore = (100*iSupportedDanger)/(iGeneralDanger+1);
@@ -5368,7 +5372,7 @@ void CvHomelandAI::ExecuteGeneralMoves()
 
 				//we want to have many neighboring units in danger, but our plot should be relatively safe
 				//(look at the danger for the defender, the general danger is zero unless the defender is projected to die)
-				int iGeneralDanger = m_pPlayer->GetPlotDanger(*pCandidate,pDefender);
+				int iGeneralDanger = pDefender->GetDanger(pCandidate);
 				//careful with overflow, we expect a lot of INT_MAX value here ...
 				iGeneralDanger = min(100000,iGeneralDanger);
 
@@ -5388,7 +5392,7 @@ void CvHomelandAI::ExecuteGeneralMoves()
 					if(pLoopPlot->IsEnemyCityAdjacent(pUnit->getTeam(),NULL))
 						iScore += 5000;
 
-					iSupportedDanger += m_pPlayer->GetPlotDanger(*pLoopPlot,pSupportedUnit);
+					iSupportedDanger += pSupportedUnit->GetDanger(pLoopPlot);
 				}
 
 				//don't forget adjacency bonus for the candidate plot itself
@@ -6330,7 +6334,9 @@ void CvHomelandAI::ExecuteTreasureMoves()
 				pUnit->kill(true);
 				continue;
 			}
+			pPlot = pUnit->GetConvoyPlot();
 		}
+
 
 		pUnit->PushMission(CvTypes::getMISSION_MOVE_TO(), pPlot->getX(), pPlot->getY());
 		pUnit->finishMoves();
@@ -6924,7 +6930,7 @@ bool CvHomelandAI::MoveCivilianToSafety(CvUnit* pUnit, bool bIgnoreUnits)
 				}
 			}
 
-			if (m_pPlayer->GetPlotDanger(*pLoopPlot,pUnit)==INT_MAX)
+			if (pUnit->GetDanger(pLoopPlot) ==INT_MAX)
 				continue;
 
 			iValue -= m_pPlayer->GetPlotDanger(*pLoopPlot);
@@ -7802,7 +7808,7 @@ CvPlot* CvHomelandAI::FindArchaeologistTarget(CvUnit *pUnit)
 CvPlot* CvHomelandAI::FindUnassignedTarget(CvUnit *pUnit)
 {
 	CvPlot *pBestTarget = NULL;
-	int iBestTurns = 8;
+	int iBestDistance = 54;
 
 	// Reverse the logic from most of the Homeland moves; for this we'll loop through units and find the best targets for them (instead of vice versa)
 	std::vector<CvHomelandTarget>::iterator it;
@@ -7815,11 +7821,11 @@ CvPlot* CvHomelandAI::FindUnassignedTarget(CvUnit *pUnit)
 			break;
 		}
 
-		int iTurns = plotDistance(pUnit->getX(), pUnit->getY(), pTarget->getX(), pTarget->getY());
-		if (iTurns < iBestTurns)
+		int iDist = plotDistance(pUnit->getX(), pUnit->getY(), pTarget->getX(), pTarget->getY());
+		if(iDist < iBestDistance)
 		{
 			pBestTarget = pTarget;
-			iBestTurns = iTurns;
+			iBestDistance = iDist;
 		}
 	}
 
@@ -8346,6 +8352,7 @@ const char* homelandMoveNames[] =
 	"H_MOVE_TO_SAFETY",
 	"H_MOVE_MOBILE_RESERVE",
 	"H_MOVE_SENTRY",
+	"H_MOVE_SENTRY_NAVAL",
 	"H_MOVE_WORKER",
 	"H_MOVE_WORKER_SEA",
 	"H_MOVE_PATROL",
@@ -8402,7 +8409,7 @@ void CHomelandUnitArray::push_back(const CvHomelandUnit& unit)
 			OutputDebugString( CvString::format("turn %03d: using %s %s %d for homeland move %s. hitpoints %d, pos (%d,%d), danger %d\n", 
 				GC.getGame().getGameTurn(), owner.getCivilizationAdjective(), pUnit->getName().c_str(), g_currentHomelandUnitToTrack,
 				homelandMoveNames[(int)m_currentHomelandMove+1], 
-				pUnit->GetCurrHitPoints(), pUnit->getX(), pUnit->getY(), owner.GetPlotDanger(*(pUnit->plot()),pUnit) ) );
+				pUnit->GetCurrHitPoints(), pUnit->getX(), pUnit->getY(), pUnit->GetDanger(pUnit->plot()) ));
 		}
 	}
 }

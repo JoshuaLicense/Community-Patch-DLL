@@ -4357,18 +4357,6 @@ inline static bool isEnemy(const CvUnit* pUnit, TeamTypes eOtherTeam, bool bAlwa
 }
 
 //	-----------------------------------------------------------------------------------------------
-inline static bool isPotentialEnemy(const CvUnit* pUnit, TeamTypes eOtherTeam, bool bAlwaysHostile)
-{
-	if(pUnit->canCoexistWithEnemyUnit(eOtherTeam))
-	{
-		return false;
-	}
-
-	TeamTypes eOurTeam = GET_PLAYER(pUnit->getCombatOwner(eOtherTeam, *(pUnit->plot()))).getTeam();
-	return (bAlwaysHostile ? eOtherTeam != eOurTeam : isPotentialEnemy(eOtherTeam, eOurTeam));
-}
-
-//	-----------------------------------------------------------------------------------------------
 inline static bool isOtherTeam(const CvUnit* pUnit, TeamTypes eOtherTeam)
 {
 	if(pUnit->canCoexistWithEnemyUnit(eOtherTeam))
@@ -4527,41 +4515,6 @@ int CvPlot::getNumVisibleEnemyDefenders(const CvUnit* pUnit) const
 		while(pUnitNode != NULL);
 		return iCount;
 	}
-	return 0;
-}
-
-//	-----------------------------------------------------------------------------------------------
-int CvPlot::getNumVisiblePotentialEnemyDefenders(const CvUnit* pUnit) const
-{
-	TeamTypes eTeam = GET_PLAYER(pUnit->getOwner()).getTeam();
-
-	if (!isVisible(eTeam))
-		return 0;
-
-	CvAssertMsg(pUnit, "Source unit must be valid");
-	const IDInfo* pUnitNode = m_units.head();
-	if(pUnit && pUnitNode)
-	{
-		int iCount = 0;
-		bool bAlwaysHostile = pUnit->isAlwaysHostile(*this);
-
-		do
-		{
-			const CvUnit* pLoopUnit = GetPlayerUnit(*pUnitNode);
-			pUnitNode = m_units.next(pUnitNode);
-
-			if(pLoopUnit && !pLoopUnit->isInvisible(eTeam, false))
-			{
-				if(pLoopUnit->IsCanDefend() && isPotentialEnemy(pLoopUnit, eTeam, bAlwaysHostile))
-				{
-					++iCount;
-				}
-			}
-		}
-		while(pUnitNode != NULL);
-		return iCount;
-	}
-
 	return 0;
 }
 
@@ -4837,10 +4790,8 @@ int CvPlot::getMaxFriendlyUnitsOfType(const CvUnit* pUnit, bool bBreakOnUnitLimi
 
 	CvTeam& kUnitTeam = GET_TEAM(pUnit->getTeam());
 
-	const IDInfo* pUnitNode;
 	const CvUnit* pLoopUnit;
-
-	pUnitNode = headUnitNode();
+	const IDInfo* pUnitNode = headUnitNode();
 
 #if defined(MOD_GLOBAL_STACKING_RULES)
 	int iPlotUnitLimit = getUnitLimit();
@@ -5050,7 +5001,7 @@ bool CvPlot::isValidRoute(const CvUnit* pUnit) const
 {
 	if((RouteTypes)m_eRouteType != NO_ROUTE && !m_bRoutePillaged)
 	{
-		if(!pUnit->isEnemy(getTeam(), this) || pUnit->isEnemyRoute())
+		if(!pUnit || pUnit->isEnemy(getTeam(), this) || pUnit->isEnemyRoute())
 		{
 			return true;
 		}
@@ -5155,11 +5106,14 @@ bool CvPlot::isValidDomainForLocation(const CvUnit& unit) const
 		break;
 
 	case DOMAIN_IMMOBILE:
-		return false;
+		return unit.plot() == this;
 		break;
 
 	case DOMAIN_LAND:
-		return !isCity() || (isCity() && (IsFriendlyTerritory(unit.getOwner()) || unit.isRivalTerritory())) || unit.canLoad(*this);
+		if(unit.isEmbarked())
+			return needsEmbarkation(&unit);
+		else
+			return !isCity() || (isCity() && (IsFriendlyTerritory(unit.getOwner()) || unit.isRivalTerritory())) || unit.canLoad(*this);
 		break;
 
 	default:
@@ -7461,25 +7415,6 @@ int CvPlot::getNumResourceForPlayer(PlayerTypes ePlayer) const
 					iRtnValue *= 100 + iQuantityMod;
 					iRtnValue /= 100;
 				}
-#if defined(MOD_BALANCE_CORE)
-				ReligionTypes eMajority = NO_RELIGION;
-
-				CvCity* pWorkingCity = getWorkingCity();
-				if (pWorkingCity)
-				{
-					eMajority = pWorkingCity->GetCityReligions()->GetReligiousMajority();
-					const CvReligion* pReligion = GC.getGame().GetGameReligions()->GetReligion(eMajority, pWorkingCity->getOwner());
-					if (pReligion)
-					{
-						int iQuantityMod = pReligion->m_Beliefs.GetResourceQuantityModifier(eResource, pWorkingCity->getOwner());
-						if( iQuantityMod != 0)
-						{
-							iRtnValue *= 100 + iQuantityMod;
-							iRtnValue /= 100;
-						}
-					}
-				}
-#endif
 			}
 		}
 	}
@@ -14602,7 +14537,7 @@ bool CvPlot::isValidMovePlot(PlayerTypes ePlayer, bool bCheckTerritory) const
 
 //----------------------------------------------------------
 //conservative estimate whether we can put a combat unit here. does not check different domains etc
-bool CvPlot::canPlaceUnit(PlayerTypes ePlayer) const
+bool CvPlot::canPlaceCombatUnit(PlayerTypes ePlayer) const
 {
 	if (!isValidMovePlot(ePlayer))
 		return false;
@@ -15885,10 +15820,11 @@ void CvPlot::setOriginalOwner(PlayerTypes eNewValue)
 
 void CvPlot::checkOwnership()
 {
-	// isOwned() && isWater() isn't needed, right? Only called in isOwned() and water is never owned, yeah?
-
 	PlayerTypes ePlotOwner = getOwner();
 	PlayerTypes eOriginalOwner = getOriginalOwner();
+
+	if(!GET_PLAYER(getOwner()).IsAtWar()) //no flipping if not at war
+		return;
 
 	bool bCaptured = ePlotOwner != eOriginalOwner;
 
@@ -16023,9 +15959,13 @@ bool CvPlot::findControl(bool bCaptured) // add 100 to the iValue for friends
 
 					iValue = plotDistance(this->getX(), this->getY(), pLoopUnit->getX(), pLoopUnit->getY()); // distance from the plot
 
+					//friendly units can control over enemies if path is there!
+					if(!bCaptured && IsFriendlyTerritory((PlayerTypes) iI))
+						iValue -= 10;
+
 					//if unit's team is at war with the current owner or if the tile is actually captured and unit's team is at war with the original owner of the plot
-					if(!(GET_TEAM(pLoopUnit->getTeam()).isAtWar(getTeam()) || (bCaptured && GET_TEAM(pLoopUnit->getTeam()).isAtWar(GET_PLAYER(getOriginalOwner()).getTeam()))))
-						iValue -= 100;
+					if(GET_TEAM(pLoopUnit->getTeam()).isAtWar(getTeam()) || (bCaptured && GET_TEAM(pLoopUnit->getTeam()).isAtWar(GET_PLAYER(getOriginalOwner()).getTeam())))
+						iValue -= 5;
 
 					if(iValue < (iMaxUnitRange + 1) && iValue < iBestValue) // only store value if within range and is below the best value!
 					{
@@ -16048,6 +15988,12 @@ bool CvPlot::findControl(bool bCaptured) // add 100 to the iValue for friends
 			text[0] = NULL;
 			PlayerTypes eNewOwner = pBestUnit ? pBestUnit->getOwner() : pBestCity->getOwner(); // if pBestUnit is a unit, it means that a unit is closer so use that as owner ID!
 			CvString strOwner = pBestUnit ? pBestUnit->getName() : pBestCity->getName();
+
+			if(GET_PLAYER(eNewOwner).getTeam() == GET_PLAYER(getOwner()).getTeam()) // don't flip if same team
+				return true; //Leave the plot!
+
+			if(GET_PLAYER(getOwner()).isMinorCiv() && GET_PLAYER(getOwner()).GetMinorCivAI()->IsAllies(eNewOwner)) // don't flip if allies
+				return true;
 
 			if(GET_PLAYER(getOwner()).isLocalPlayer())
 			{

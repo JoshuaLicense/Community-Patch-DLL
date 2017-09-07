@@ -598,11 +598,11 @@ int CvUnitProductionAI::CheckUnitBuildSanity(UnitTypes eUnit, bool bForOperation
 				{
 					if(kPlayer.GetMilitaryAI()->GetWarType() == 2)
 					{
-						iValue *= 8;
+						iValue *= 15;
 					}
 					else
 					{
-						iValue *= 4;
+						iValue *= 5;
 					}
 				}
 				else if(bAlone)
@@ -1292,7 +1292,7 @@ int CvUnitProductionAI::CheckUnitBuildSanity(UnitTypes eUnit, bool bForOperation
 			iBonus -= 100;
 		}
 	}
-
+#if !defined(MOD_WWII_MISC)
 	//Debt is worth considering.
 	if(bCombat && !pkUnitEntry->IsNoMaintenance() && !pkUnitEntry->IsTrade())
 	{
@@ -1310,6 +1310,7 @@ int CvUnitProductionAI::CheckUnitBuildSanity(UnitTypes eUnit, bool bForOperation
 			}
 		}
 	}
+#endif
 
 	//Let's check this against supply to keep our military numbers lean.
 	if(bCombat && !bAtWar)

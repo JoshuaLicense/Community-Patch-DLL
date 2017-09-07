@@ -207,7 +207,7 @@ int CvAIOperation::GetGatherTolerance(CvArmyAI* pArmy, CvPlot* pPlot) const
 				if (IsNavalOperation() && !pArmy->IsAllOceanGoing() && pLoopPlot->isDeepWater())
 					continue;
 
-				if (pLoopPlot->canPlaceUnit(GetOwner()))
+				if (pLoopPlot->canPlaceCombatUnit(GetOwner()))
 					iValidPlotsNearby++;
 			}
 		}
@@ -2324,16 +2324,11 @@ CvUnit* CvAIOperationCivilian::FindBestCivilian()
 bool CvAIOperationCivilian::RetargetCivilian(CvUnit* pCivilian, CvArmyAI* pArmy)
 {
 	CvPlot* pCurrentTarget = GetTargetPlot();
-	if (!pCurrentTarget)
-	{
-		SetToAbort( AI_ABORT_NO_TARGET );
-		return false;
-	}
 
 	// Find best target
-	CvPlot* pBetterTarget = FindBestTargetForUnit(pCivilian,pCurrentTarget->getArea(),!IsEscorted());
+	CvPlot* pBetterTarget = FindBestTargetForUnit(pCivilian,pCurrentTarget ? pCurrentTarget->getArea() : -1,!IsEscorted());
 
-	// No targets at all!  Abort
+	// No targets at all!
 	if(pBetterTarget == NULL)
 	{
 		SetToAbort( AI_ABORT_NO_TARGET );
@@ -2401,8 +2396,13 @@ AIOperationAbortReason CvAIOperationCivilianFoundCity::VerifyOrAdjustTarget(CvAr
 	if (!pSettler)
 		return AI_ABORT_NO_UNITS;
 
-	bool bCanFound = pSettler->canFound(GetTargetPlot()) && pSettler->GeneratePath(GetTargetPlot(), CvUnit::MOVEFLAG_TERRITORY_NO_ENEMY);
-	if (!bCanFound)
+	bool bCanFound = pSettler->canFound(GetTargetPlot());
+	bool bHavePath = pSettler->GeneratePath(GetTargetPlot(), CvUnit::MOVEFLAG_TERRITORY_NO_ENEMY);
+
+	if(!bHavePath)
+		LogOperationSpecialMessage(CvString::format("no path to city site (%d:%d)", m_iTargetX, m_iTargetY).c_str());
+
+	if(!bCanFound || !bHavePath)
 	{
 		if (RetargetCivilian(pSettler,pArmy))
 			return NO_ABORT_REASON;
@@ -2445,19 +2445,17 @@ CvPlot* CvAIOperationCivilianFoundCity::FindBestTargetIncludingCurrent(CvUnit* p
 	//b) if the best target is unreachable, move in the general direction and hope the block will clear up
 
 	//ignore the current operation target when searching. default would be to suppress currently targeted plots
-	bool bIsSafe = false;
+	bool bIsSafe; //dummy
 	int iTargetArea = GetTargetPlot() ? GetTargetPlot()->getArea() : -1;
 
-	CvPlot* pResult = GET_PLAYER(m_eOwner).GetBestSettlePlot(pUnit, iTargetArea, bIsSafe, this);
+	//ignore the current operation target when searching. default would be to suppress currently targeted plots
+	CvPlot* pResult = GET_PLAYER(m_eOwner).GetBestSettlePlot(pUnit, iTargetArea, bOnlySafePaths, this);
 
 	//try again if the result is not good
-	if (pResult == NULL || (!bIsSafe && bOnlySafePaths) )
-		pResult = GET_PLAYER(m_eOwner).GetBestSettlePlot(pUnit, -1, bIsSafe, this);
+	if(pResult == NULL && iTargetArea != -1)
+		pResult = GET_PLAYER(m_eOwner).GetBestSettlePlot(pUnit, -1, bOnlySafePaths, this);
 
-	if (pResult == NULL || (!bIsSafe && bOnlySafePaths) )
-		return NULL;
-	else
-		return pResult;
+	return pResult;
 }
 
 CvPlot* CvAIOperationCivilianFoundCity::FindBestTargetForUnit(CvUnit* pUnit, int iAreaID, bool bOnlySafePaths)
@@ -3591,7 +3589,7 @@ AIOperationAbortReason CvAIOperationCivilian::VerifyOrAdjustTarget(CvArmyAI* pAr
 	if (!pCivilian)
 		return AI_ABORT_LOST_CIVILIAN;
 
-	if (GET_PLAYER(m_eOwner).GetPlotDanger(*pTarget, pCivilian) < INT_MAX && GET_PLAYER(m_eOwner).IsAtPeaceWith(pTarget->getOwner()))
+	if (pCivilian->GetDanger(pTarget) < INT_MAX && GET_PLAYER(m_eOwner).IsAtPeaceWith(pTarget->getOwner()))
 	{
 		return NO_ABORT_REASON;
 	}
@@ -3654,7 +3652,7 @@ AIOperationAbortReason CvAIOperationCivilianDiplomatDelegation::VerifyOrAdjustTa
 
 	CvUnit* pCivilian = pArmy->GetFirstUnit();
 	if (!pCivilian)
-		return AI_ABORT_NO_UNITS;
+		return AI_ABORT_LOST_CIVILIAN;
 
 	if (GetTargetPlot()==NULL || !pCivilian->canTrade( GetTargetPlot() ))
 		RetargetCivilian(pCivilian, pArmy);
@@ -4141,7 +4139,7 @@ CvCity* OperationalAIHelpers::GetNearestCoastalCityFriendly(PlayerTypes ePlayer,
 
 	for(pLoopCity = GET_PLAYER(ePlayer).firstCity(&iLoop); pLoopCity != NULL; pLoopCity = GET_PLAYER(ePlayer).nextCity(&iLoop))
 	{
-		if(pLoopCity->isCoastal(GC.getMIN_WATER_SIZE_FOR_OCEAN()) && pLoopCity->isAdjacentToArea(pRefPlot->getArea()))
+		if(pLoopCity->isCoastal() && pLoopCity->isAdjacentToArea(pRefPlot->getArea())) 
 		{
 			int iDistance = plotDistance(pLoopCity->getX(), pLoopCity->getY(), pRefPlot->getX(), pRefPlot->getY());
 			if(iDistance < iBestDistance)
@@ -4169,12 +4167,12 @@ CvCity* OperationalAIHelpers::GetNearestCoastalCityFriendly(PlayerTypes ePlayer,
 
 	for(pLoopCity = GET_PLAYER(ePlayer).firstCity(&iLoop); pLoopCity != NULL; pLoopCity = GET_PLAYER(ePlayer).nextCity(&iLoop))
 	{
-		if(pLoopCity->isCoastal(GC.getMIN_WATER_SIZE_FOR_OCEAN()))
+		if(pLoopCity->isCoastal())
 		{
 			for(pEnemyCity = GET_PLAYER(eEnemy).firstCity(&iEnemyLoop); pEnemyCity != NULL; pEnemyCity = GET_PLAYER(eEnemy).nextCity(&iEnemyLoop))
 			{
 				// Check all revealed enemy cities
-				if(pEnemyCity->isCoastal(GC.getMIN_WATER_SIZE_FOR_OCEAN()))
+				if(pEnemyCity->isCoastal())
 				{
 					// On same body of water?
 					if(pLoopCity->hasSharedAdjacentArea(pEnemyCity))
@@ -4212,12 +4210,12 @@ CvCity* OperationalAIHelpers::GetNearestCoastalCityEnemy(PlayerTypes ePlayer, Pl
 
 	for(pLoopCity = GET_PLAYER(ePlayer).firstCity(&iLoop); pLoopCity != NULL; pLoopCity = GET_PLAYER(ePlayer).nextCity(&iLoop))
 	{
-		if(pLoopCity->isCoastal(GC.getMIN_WATER_SIZE_FOR_OCEAN()))
+		if(pLoopCity->isCoastal())
 		{
 			for(pEnemyCity = GET_PLAYER(eEnemy).firstCity(&iEnemyLoop); pEnemyCity != NULL; pEnemyCity = GET_PLAYER(eEnemy).nextCity(&iEnemyLoop))
 			{
 				// Check all revealed enemy cities
-				if(pEnemyCity->isCoastal(GC.getMIN_WATER_SIZE_FOR_OCEAN()))
+				if(pEnemyCity->isCoastal())
 				{
 					// On same body of water?
 					if(pLoopCity->hasSharedAdjacentArea(pEnemyCity))

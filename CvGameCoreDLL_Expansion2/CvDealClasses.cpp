@@ -1191,6 +1191,9 @@ bool CvDeal::IsPossibleToTradeItem(PlayerTypes ePlayer, PlayerTypes eToPlayer, T
 		// Already have a DoF?
 		if (pFromPlayer->GetDiplomacyAI()->IsDoFAccepted(eToPlayer) && pToPlayer->GetDiplomacyAI()->IsDoFAccepted(ePlayer))
 			return false;
+#if defined(MOD_WWII_MISC)
+		return false;
+#endif
 	}
 	// Promise to Vote in upcoming league session
 	else if (eItem == TRADE_ITEM_VOTE_COMMITMENT)

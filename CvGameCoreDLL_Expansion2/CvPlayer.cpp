@@ -701,6 +701,7 @@ CvPlayer::CvPlayer() :
 	, m_iPersonnel("CvPlayer::m_iPersonnel", m_syncArchive)
 	, m_iMateriel("CvPlayer::m_iMateriel", m_syncArchive)
 	, m_iFuel("CvPlayer::m_iFuel", m_syncArchive)
+	, m_aiStaticRequiredYield("CvPlayer::m_aiStaticRequiredYield", m_syncArchive)
 #endif
 
 {
@@ -913,6 +914,12 @@ void CvPlayer::init(PlayerTypes eID)
 		GetTreasury()->ChangeCityConnectionTradeRouteGoldChange(GetPlayerTraits()->GetCityConnectionTradeRouteChange());
 		changeWonderProductionModifier(GetPlayerTraits()->GetWonderProductionModifier());
 		ChangeImprovementGoldMaintenanceMod(GetPlayerTraits()->GetImprovementMaintenanceModifier());
+
+#if defined(MOD_WWII_YIELDS)
+	UpdateStaticRequiredYield(YIELD_PERSONNEL);
+	UpdateStaticRequiredYield(YIELD_MATERIEL);
+	UpdateStaticRequiredYield(YIELD_FUEL);
+#endif
 
 		for(iJ = 0; iJ < NUM_YIELD_TYPES; iJ++)
 		{
@@ -2188,6 +2195,10 @@ void CvPlayer::reset(PlayerTypes eID, bool bConstructorCall)
 #if defined(MOD_WWII_PROJECTS)
 		m_aiUnitClassExpTimes100.clear();
 		m_aiUnitClassExpTimes100.resize(GC.getNumUnitClassInfos(), 0);
+#endif
+#if defined(MOD_WWII_YIELDS)
+		m_aiStaticRequiredYield.clear();
+		m_aiStaticRequiredYield.resize(NUM_YIELD_TYPES, 0);
 #endif
 		m_aVote.clear();
 		m_aUnitExtraCosts.clear();
@@ -9663,7 +9674,7 @@ CvUnit* CvPlayer::initNamedUnit(UnitTypes eUnit, const char* strKey, int iX, int
 	CvAssertMsg(pUnit != NULL, "Unit is not assigned a valid value");
 	if(NULL != pUnit)
 	{
-		pUnit->initWithSpecificName(pUnit->GetID(), eUnit, strKey, ((eUnitAI == NO_UNITAI) ? pkUnitDef->GetDefaultUnitAIType() : eUnitAI), GetID(), iX, iY, eFacingDirection, bNoMove, bSetupGraphical, iMapLayer, iNumGoodyHutsPopped);
+		pUnit->initWithNameOffset(pUnit->GetID(), eUnit, -1, ((eUnitAI == NO_UNITAI) ? pkUnitDef->GetDefaultUnitAIType() : eUnitAI), GetID(), iX, iY, eFacingDirection, bNoMove, bSetupGraphical, iMapLayer, iNumGoodyHutsPopped, NO_CONTRACT, true, true);
 	}
 
 	return pUnit;
@@ -10863,6 +10874,10 @@ void CvPlayer::doTurnPostDiplomacy()
 	ChangeYield(YIELD_PERSONNEL, GetBaseYieldPerTurn(YIELD_PERSONNEL));
 	ChangeYield(YIELD_MATERIEL, GetBaseYieldPerTurn(YIELD_MATERIEL));
 	ChangeYield(YIELD_FUEL, GetBaseYieldPerTurn(YIELD_FUEL));
+
+	UpdateStaticRequiredYield(YIELD_PERSONNEL);
+	UpdateStaticRequiredYield(YIELD_MATERIEL);
+	UpdateStaticRequiredYield(YIELD_FUEL);
 #endif
 
 	// Gold
@@ -11058,8 +11073,7 @@ void CvPlayer::doTurnUnits()
 	DoHealing(); // This deducts the personnel and materiel
 
 	//so lets do fuel
-	ChangeYield(YIELD_FUEL, -GetRequiredYield(YIELD_FUEL));
-
+	ChangeYield(YIELD_FUEL, -GetRequiredYield(YIELD_FUEL, false, false));
 #endif
 	if(GetID() == GC.getGame().getActivePlayer())
 	{
@@ -11970,25 +11984,19 @@ bool CvPlayer::IsCapitalConnectedToPlayer(PlayerTypes ePlayer)
 //	--------------------------------------------------------------------------------
 void CvPlayer::findNewCapital()
 {
-	CvCity* pOldCapital;
-	CvCity* pLoopCity;
-	CvCity* pBestCity;
-	BuildingTypes eCapitalBuilding;
-	int iValue;
-	int iBestValue;
 	int iLoop;
 
-	eCapitalBuilding = ((BuildingTypes)(getCivilizationInfo().getCivilizationBuildings(GC.getCAPITAL_BUILDINGCLASS())));
-
+	BuildingTypes eCapitalBuilding = ((BuildingTypes) (getCivilizationInfo().getCivilizationBuildings(GC.getCAPITAL_BUILDINGCLASS())));
 	if(eCapitalBuilding == NO_BUILDING)
 	{
 		return;
 	}
 
-	pOldCapital = getCapitalCity();
+	CvCity* pOldCapital = getCapitalCity();
+	int iBestValue = 0;
+	CvCity* pBestCity = NULL;
 
-	iBestValue = 0;
-	pBestCity = NULL;
+	CvCity* pLoopCity;
 
 	for(pLoopCity = firstCity(&iLoop); pLoopCity != NULL; pLoopCity = nextCity(&iLoop))
 	{
@@ -12001,7 +12009,7 @@ void CvPlayer::findNewCapital()
 				if (!(pLoopCity->IsResistance() || pLoopCity->IsPuppet() || pLoopCity->IsRazing()))
 				{
 #endif
-					iValue = (pLoopCity->getPopulation() * 4);
+					int iValue = (pLoopCity->getPopulation() * 4);
 
 					int iYieldValueTimes100 = pLoopCity->getYieldRateTimes100(YIELD_FOOD, false);
 					iYieldValueTimes100 += (pLoopCity->getYieldRateTimes100(YIELD_PRODUCTION, false) * 3);
@@ -12023,7 +12031,7 @@ void CvPlayer::findNewCapital()
 	}
 
 #if defined(MOD_BUGFIX_NO_PUPPET_CAPITALS)
-	if (pBestCity != NULL)
+	if (pBestCity == NULL)
 	{
 		for (pLoopCity = firstCity(&iLoop); pLoopCity != NULL; pLoopCity = nextCity(&iLoop))
 		{
@@ -12031,6 +12039,8 @@ void CvPlayer::findNewCapital()
 			{
 				if (0 == pLoopCity->GetCityBuildings()->GetNumRealBuilding(eCapitalBuilding))
 				{
+					int iValue = 0;
+
 					// Second pass, consider only those we ignored first time
 					if (pLoopCity->IsResistance())
 					{
@@ -12046,10 +12056,6 @@ void CvPlayer::findNewCapital()
 					{
 						// Might be an idea to stop the burning!
 						iValue = pLoopCity->getPopulation();
-					}
-					else
-					{
-						iValue = iBestValue;
 					}
 
 					if (iValue > iBestValue)
@@ -13835,14 +13841,6 @@ void CvPlayer::found(int iX, int iY)
 
 	SetTurnsSinceSettledLastCity(0);
 
-#if defined(MOD_BALANCE_CORE)
-	if (getNumCities() <= 0)
-	{
-		int iFoundValue = GC.getMap().plot(iX,iY)->getFoundValue(GetID());
-		SetFoundValueOfCapital(iFoundValue);
-	}
-#endif
-
 #if defined(MOD_GLOBAL_RELIGIOUS_SETTLERS) && defined(MOD_API_EXTENSIONS)
 	CvCity* pCity = initCity(iX, iY, true, true, eReligion);
 #else
@@ -14075,6 +14073,11 @@ bool CvPlayer::canTrain(UnitTypes eUnit, bool bContinue, bool bTestVisible, bool
 			return false;
 		}
 	}
+#endif
+
+#if defined(MOD_WWII_MISC)
+	if(isMinorCiv() && !IsAtWar())
+		return false;
 #endif
 	// Should we check whether this Unit has been blocked out by the civ XML?
 	if(!bIgnoreUniqueUnitStatus)
@@ -42358,12 +42361,12 @@ void CvPlayer::ChangeUnitPurchaseCostModifier(int iChange)
 }
 
 //	--------------------------------------------------------------------------------
-int CvPlayer::GetPlotDanger(const CvPlot& pPlot, const CvUnit* pUnit, AirActionType iAirAction)
+int CvPlayer::GetPlotDanger(const CvPlot& pPlot, const CvUnit* pUnit, const set<int>& unitsToIgnore, AirActionType iAirAction)
 {
 	if (m_pDangerPlots->IsDirty())
 		m_pDangerPlots->UpdateDanger();
 
-	return m_pDangerPlots->GetDanger(pPlot, pUnit, iAirAction);
+	return m_pDangerPlots->GetDanger(pPlot, pUnit, unitsToIgnore, iAirAction);
 }
 
 //	--------------------------------------------------------------------------------
@@ -45548,11 +45551,6 @@ int CvPlayer::GetBaseYieldPerTurn(YieldTypes eYield) const
 	// If we're in anarchy, then no Faith is generated!
 	if(IsAnarchy())
 		return 0;
-#if defined(MOD_BALANCE_CORE)
-	//No barbs or minors, please!
-	if(isBarbarian() || isMinorCiv())
-		return 0;
-#endif
 
 	iYieldPerTurn += GetYieldPerTurnFromCities(eYield);
 
@@ -45613,8 +45611,13 @@ int CvPlayer::GetYieldPerTurn(YieldTypes eYield) const
 	return iYieldPerTurn;
 }
 
-int CvPlayer::GetRequiredYield(YieldTypes eYield, bool bCanHeal)
+int CvPlayer::GetRequiredYield(YieldTypes eYield, bool bCanHeal, bool bStatic)
 {
+	if(bStatic)
+	{
+		return GetStaticRequiredYield(eYield);
+	}
+
 	int iLoop;
 	int iRequiredYield = 0;
 
@@ -45650,8 +45653,8 @@ void CvPlayer::DoHealing()
 	int iPersonnelPool = GetYield(YIELD_PERSONNEL);
 	int iMaterielPool = GetYield(YIELD_MATERIEL);
 
-	int iReqPersonnel = GetRequiredYield(YIELD_PERSONNEL, true);
-	int iReqMateriel = GetRequiredYield(YIELD_MATERIEL, true);
+	int iReqPersonnel = GetRequiredYield(YIELD_PERSONNEL, true, false);
+	int iReqMateriel = GetRequiredYield(YIELD_MATERIEL, true, false);
 
 	if(iReqPersonnel == 0 || iReqMateriel == 0)
 		return;
@@ -45704,7 +45707,7 @@ void CvPlayer::DoHealing()
 				if(iMaterielPool < pLoopUnit->getUnitInfo().GetMaterielPerHP())
 					continue;
 
-				int iPlotDanger = GetPlotDanger(*pLoopUnit->plot(), pLoopUnit);
+				int iPlotDanger = pLoopUnit->GetDanger(pLoopUnit->plot());
 
 				switch(iPass)
 				{
@@ -45781,7 +45784,7 @@ int CvPlayer::GetNumUnitsThisPass(int iPass)
 
 	for(pLoopUnit = firstUnit(&iLoop); pLoopUnit != NULL; pLoopUnit = nextUnit(&iLoop))
 	{
-		int iPlotDanger = GetPlotDanger(*pLoopUnit->plot(), pLoopUnit);
+		int iPlotDanger = pLoopUnit->GetDanger(pLoopUnit->plot());
 
 		switch(iPass)
 		{
@@ -45798,8 +45801,9 @@ int CvPlayer::GetNumUnitsThisPass(int iPass)
 				++iUnits;
 			break;
 		case 3: 
-			if(iPlotDanger == 0 && iPlotDanger < GC.getHEALING_LOW_DANGER())
+			if(iPlotDanger < GC.getHEALING_LOW_DANGER())
 				++iUnits;
+			break;
 		}
 	}
 	return 0;
@@ -45871,5 +45875,20 @@ int CvPlayer::GetRationedMoves() const
 		return GC.getLIGHT_RATIONING_MOVES();
 
 	return 100; // No rationing	
+}
+
+int CvPlayer::GetStaticRequiredYield(YieldTypes eYield) const
+{
+	return m_aiStaticRequiredYield[eYield];
+}
+
+void CvPlayer::SetStaticRequiredYield(YieldTypes eYield, int iValue)
+{
+	m_aiStaticRequiredYield.setAt(eYield, iValue);
+}
+
+void CvPlayer::UpdateStaticRequiredYield(YieldTypes eYield)
+{
+	SetStaticRequiredYield(eYield, GetRequiredYield(eYield, true, false));
 }
 #endif

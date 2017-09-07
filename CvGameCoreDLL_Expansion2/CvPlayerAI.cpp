@@ -2563,7 +2563,7 @@ CvPlot* CvPlayerAI::ChooseDiplomatTargetPlot(CvUnit* pUnit)
 				continue;
 			}
 			// Don't be captured
-			if(GetPlotDanger(*pLoopPlot,pUnit)>0)
+			if(pUnit->GetDanger(pLoopPlot)>0)
 				continue;
 
 			int	iDistance = plotDistance(pUnit->getX(), pUnit->getY(), pLoopPlot->getX(), pLoopPlot->getY());
@@ -2607,7 +2607,7 @@ CvPlot* CvPlayerAI::ChooseMessengerTargetPlot(CvUnit* pUnit)
 		}
 
 #if defined(MOD_BALANCE_CORE)
-		if(GetPlotDanger(*pLoopPlot,pUnit)>0)
+		if(pUnit->GetDanger(pLoopPlot)>0)
 			continue;
 #endif
 
@@ -2930,7 +2930,7 @@ CvPlot* CvPlayerAI::FindBestGreatGeneralTargetPlot(CvUnit* pGeneral, const std::
 			iScore += iDefenseScore * 2;
 
 			//danger is bad
-			int iDanger = GetPlotDanger(*pAdjacentPlot,pGeneral);
+			int iDanger = pGeneral->GetDanger(pAdjacentPlot);
 			if (iDanger == INT_MAX)
 			{
 				iScore = 0;

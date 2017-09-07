@@ -861,6 +861,32 @@ int CvBuildingProductionAI::CheckBuildingBuildSanity(BuildingTypes eBuilding, in
 				}
 				bGoodforGPTHappiness = true;
 			}
+#if defined(MOD_WWII_MISC)
+			if(eYield == YIELD_PERSONNEL)
+			{
+				int iPT = kPlayer.GetYieldPerTurn(YIELD_PERSONNEL) - kPlayer.GetRequiredYield(YIELD_PERSONNEL, true);
+				if(iPT < 0)
+				{
+					iYieldValue += (iPT * -25);
+				}
+			}
+			if(eYield == YIELD_MATERIEL)
+			{
+				int iPT = kPlayer.GetYieldPerTurn(YIELD_MATERIEL) - kPlayer.GetRequiredYield(YIELD_MATERIEL, true);
+				if(iPT < 0)
+				{
+					iYieldValue += (iPT * -25);
+				}
+			}
+			if(eYield == YIELD_FUEL)
+			{
+				int iPT = kPlayer.GetYieldPerTurn(YIELD_FUEL) - kPlayer.GetRequiredYield(YIELD_FUEL, true);
+				if(iPT < 0)
+				{
+					iYieldValue += (iPT * -25);
+				}
+			}
+#endif
 			//Puppets should focus on yield buildings.
 			if (m_pCity->IsPuppet())
 			{
@@ -875,7 +901,7 @@ int CvBuildingProductionAI::CheckBuildingBuildSanity(BuildingTypes eBuilding, in
 
 	//////////////
 	///Maintenance
-	/////////////////////
+	//////////////
 	if(pkBuildingInfo->GetGoldMaintenance() > 0 && !bGoodforGPTHappiness)
 	{
 		//Maintenace getting close to our GPT? Let's minimize this.

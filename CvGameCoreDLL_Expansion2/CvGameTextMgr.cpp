@@ -41,7 +41,7 @@ void CvGameTextMgr::setDateStr(CvString& strString, int iGameTurn, bool bSave, C
 	const int iNumSeasons = DB.Count("Seasons");
 
 	int iDay = ((iTempGameTurn % GC.getWEEKS_PER_MONTHS()) * 5);
-	strWeekBuffer = GetLocalizedText("TXT_KEY_SCENARIO_WEEK", (iDay == 0 ? 1 : iDay));
+	strWeekBuffer = GetLocalizedText("TXT_KEY_SCENARIO_WEEK", (iDay == 0 ? 1 : iDay), (iDay == 0 ? "st" : "th"));
 
 	const int idx = (iTempGameTurn / GC.getWEEKS_PER_MONTHS()) % iNumMonths;
 

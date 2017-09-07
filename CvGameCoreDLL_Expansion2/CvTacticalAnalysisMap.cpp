@@ -1205,7 +1205,7 @@ bool CvTacticalAnalysisMap::IsInEnemyDominatedZone(CvPlot* pPlot)
 eTacticalDominanceFlags CvTacticalAnalysisMap::ComputeDominance(CvTacticalDominanceZone* pZone)
 {
 	// Look at ratio of friendly to enemy strength
-	if (!pZone)
+	if (!pZone && pZone->GetZoneCity()) //city check is to skip the potentially very large ocean zone
 		return TACTICAL_DOMINANCE_NO_UNITS_VISIBLE;
 
 	if(pZone->GetEnemyRangedStrength()+pZone->GetEnemyStrength()+pZone->GetFriendlyRangedStrength()+pZone->GetFriendlyStrength()<=0)

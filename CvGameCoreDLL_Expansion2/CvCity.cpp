@@ -26503,9 +26503,12 @@ bool CvCity::CleanUpQueue(void)
 int CvCity::CreateUnit(UnitTypes eUnitType, UnitAITypes eAIType, bool bUseToSatisfyOperation)
 {
 	VALIDATE_OBJECT
+		CvPlot* pUnitPlot = GetPlotForNewUnit(eUnitType);
+	if(!pUnitPlot)
+		pUnitPlot = plot();
+
 	CvPlayer& thisPlayer = GET_PLAYER(getOwner());
-	CvUnit* pUnit = thisPlayer.initUnit(eUnitType, getX(), getY(), eAIType);
-	CvAssertMsg(pUnit, "");
+	CvUnit* pUnit = thisPlayer.initUnit(eUnitType, pUnitPlot->getX(), pUnitPlot->getY(), eAIType);
 	if(!pUnit)
 	{
 		CvAssertMsg(false, "CreateUnit failed");
@@ -26521,14 +26524,8 @@ int CvCity::CreateUnit(UnitTypes eUnitType, UnitAITypes eAIType, bool bUseToSati
 	addProductionExperience(pUnit);
 
 #if defined(MOD_BALANCE_CORE)
-	if(pUnit)
-	{
-		pUnit->setMoves(pUnit->maxMoves());
-	}
-#endif
-
-#if defined(MOD_BALANCE_CORE)
-	if(pUnit && pUnit->isTrade())
+	pUnit->setMoves(pUnit->maxMoves());
+	if(pUnit->isTrade())
 	{
 		if(GC.getLogging() && GC.getAILogging())
 		{
@@ -26783,54 +26780,92 @@ bool CvCity::CreateProject(ProjectTypes eProjectType)
 }
 
 //	--------------------------------------------------------------------------------
-bool CvCity::CanPlaceUnitHere(UnitTypes eUnitType)
+CvPlot* CvCity::GetPlotForNewUnit(UnitTypes eUnitType) const
 {
 	VALIDATE_OBJECT
-	bool bCombat = false;
 
 	CvUnitEntry* pkUnitInfo = GC.getUnitInfo(eUnitType);
 	if(pkUnitInfo == NULL)
-		return false;
+		return NULL;
 
 	// slewis - modifying 1upt
-	if (pkUnitInfo->IsTrade())
+	if(pkUnitInfo->IsTrade() || (pkUnitInfo->GetCombat() == 0 && pkUnitInfo->GetRange() == 0))
+		return plot();
+
+	//don't be too predictable with the chosen plot - but zero always maps to zero
+	int aiShuffle[3][7] = {
+		{0, 5, 4, 2, 1, 3, 6},
+		{0, 3, 6, 4, 1, 2, 5},
+		{0, 1, 2, 4, 5, 6, 3}};
+	int iShuffleType = GC.getGame().getSmallFakeRandNum(3, *plot());
+	
+	//check city plot and adjacent plots
+	vector<CvPlot*> validChoices;
+	for(int i = 0; i<RING1_PLOTS; i++)
 	{
-		return true;
-	}
+		bool bCanPlace = true;
+		CvPlot* pPlot = iterateRingPlots(plot(), aiShuffle[iShuffleType][i]);
 
-	if(pkUnitInfo->GetCombat() > 0 || pkUnitInfo->GetRange() > 0)
-	{
-		bCombat = true;
-	}
+		//must be able to go there
+		if(!pPlot->isValidMovePlot(m_eOwner))
+			continue;
 
-	CvPlot* pPlot = plot();
-
-	const IDInfo* pUnitNode;
-	const CvUnit* pLoopUnit;
-
-	pUnitNode = pPlot->headUnitNode();
-
-	while(pUnitNode != NULL)
-	{
-		pLoopUnit = ::getUnit(*pUnitNode);
-		pUnitNode = pPlot->nextUnitNode(pUnitNode);
-
-		if(pLoopUnit != NULL)
+		bool bAccept = false;
+		switch (pkUnitInfo->GetDomainType())
 		{
-			// if a trade unit is here, ignore
-			if (pLoopUnit->isTrade())
-			{
-				continue;
-			}
-
-			// Units of the same type OR Units belonging to different civs
-			if(CvGameQueries::AreUnitsSameType(eUnitType, pLoopUnit->getUnitType()))
-			{
-				return false;
-			}
+		case DOMAIN_AIR:
+			bAccept = pPlot->isCity();
+			break;
+		case DOMAIN_LAND:
+			bAccept = !pPlot->isWater();
+			break;
+		case DOMAIN_SEA:
+			bAccept = pPlot->isWater() || pPlot->isFriendlyCityOrPassableImprovement(getOwner());
+			break;
+		case DOMAIN_HOVER:
+			bAccept = true;
+			break;
 		}
+
+		if(!bAccept)
+			continue;
+
+		const IDInfo* pUnitNode = pPlot->headUnitNode();
+		while(pUnitNode != NULL)
+		{
+			const CvUnit* pLoopUnit = ::getUnit(*pUnitNode);
+			if(pLoopUnit != NULL)
+			{
+				if(CvGameQueries::AreUnitsSameType(eUnitType, pLoopUnit->getUnitType()))
+					bCanPlace = false;
+			}
+			pUnitNode = pPlot->nextUnitNode(pUnitNode);
+		}
+
+		if(bCanPlace)
+			validChoices.push_back(pPlot);
 	}
-	return true;
+	//now check for plots with route
+	for(size_t i = 0; i<validChoices.size(); i++)
+		if(validChoices[i]->isValidRoute(NULL))
+			return validChoices[i];
+
+	//now try to find one without enemies around
+	for(size_t i = 0; i<validChoices.size(); i++)
+		if(validChoices[i]->GetNumEnemyUnitsAdjacent(getTeam(), (DomainTypes) pkUnitInfo->GetDomainType()) == 0)
+			return validChoices[i];
+
+	//ok, let's just take the first one
+	if(!validChoices.empty())
+		return validChoices.front();
+
+	return NULL;
+}
+
+//	--------------------------------------------------------------------------------
+bool CvCity::CanPlaceUnitHere(UnitTypes eUnitType) const
+{
+	return GetPlotForNewUnit(eUnitType) != NULL;
 }
 
 //	--------------------------------------------------------------------------------

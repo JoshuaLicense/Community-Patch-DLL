@@ -2093,7 +2093,7 @@ int CvMilitaryAI::ScoreTarget(CvMilitaryTarget& target, AIOperationTypes eAIOper
 		fDistWeightInterpolated = min( fWeightLow, max( fWeightHigh, fDistWeightInterpolated ) );
 
 		// If coming over sea, inland cities are trickier
-		if(!target.m_pTargetCity->plot()->isCoastalLand(GC.getMIN_WATER_SIZE_FOR_OCEAN()))
+		if(!target.m_pTargetCity->isCoastal())
 			fDistWeightInterpolated /= 2;
 	}
 
@@ -4074,7 +4074,7 @@ void CvMilitaryAI::CheckLandDefenses(PlayerTypes eEnemy, CvCity* pThreatenedCity
 		return;
 	
 	WarStateTypes eWarState = m_pPlayer->GetDiplomacyAI()->GetWarState(eEnemy);
-	if(eWarState >= WAR_STATE_CALM)
+	if(eWarState >= WAR_STATE_STALEMATE)
 		return;
 
 	int iOperationID;
@@ -4112,10 +4112,10 @@ void CvMilitaryAI::CheckLandDefenses(PlayerTypes eEnemy, CvCity* pThreatenedCity
 	}
 
 	bool bIsEnemyZone = m_pPlayer->GetTacticalAI()->GetTacticalAnalysisMap()->IsInEnemyDominatedZone(pThreatenedCity->plot());
-	if(!m_pPlayer->haveAIOperationOfType(AI_OPERATION_CITY_CLOSE_DEFENSE, &iOperationID, eEnemy, pThreatenedCity->plot()))
+	if(bIsEnemyZone || !m_pPlayer->haveAIOperationOfType(AI_OPERATION_CITY_CLOSE_DEFENSE, &iOperationID, eEnemy, pThreatenedCity->plot()))
 	{
 		iFilledSlots = MilitaryAIHelpers::NumberOfFillableSlots(m_pPlayer, eEnemy, MUFORMATION_CLOSE_CITY_DEFENSE, false, false, pThreatenedCity->plot(), pThreatenedCity->plot(), &iNumRequiredSlots);
-		if(iFilledSlots > 0 && (bIsEnemyZone || ((iNumRequiredSlots - iFilledSlots) <= iNumUnitsWillingBuild)))
+		if(iFilledSlots > 1 && (bIsEnemyZone || ((iNumRequiredSlots - iFilledSlots) <= iNumUnitsWillingBuild)))
 		{
 			m_pPlayer->addAIOperation(AI_OPERATION_CITY_CLOSE_DEFENSE, eEnemy, pThreatenedCity->getArea(), pThreatenedCity, pThreatenedCity);
 		}
@@ -4128,7 +4128,7 @@ void CvMilitaryAI::CheckSeaDefenses(PlayerTypes ePlayer, CvCity* pThreatenedCity
 		return;
 
 	WarStateTypes eWarState = m_pPlayer->GetDiplomacyAI()->GetWarState(ePlayer);
-	if(eWarState >= WAR_STATE_CALM)
+	if(eWarState >= WAR_STATE_STALEMATE)
 		return;
 
 	m_pPlayer->StopAllSeaOffensiveOperationsAgainstPlayer(ePlayer, true, AI_ABORT_WAR_STATE_CHANGE);
@@ -4159,11 +4159,12 @@ void CvMilitaryAI::CheckSeaDefenses(PlayerTypes ePlayer, CvCity* pThreatenedCity
 	CvPlot* pCoastalPlot = MilitaryAIHelpers::GetCoastalPlotNearPlot(pThreatenedCity->plot());
 	if(pCoastalPlot != NULL)
 	{
+		bool bIsEnemyZone = m_pPlayer->GetTacticalAI()->GetTacticalAnalysisMap()->IsInEnemyDominatedZone(pThreatenedCity->plot());
 		bool bHasOperationUnderway = m_pPlayer->haveAIOperationOfType(AI_OPERATION_NAVAL_SUPERIORITY, &iOperationID, ePlayer, pThreatenedCity->plot());
-		if (!bHasOperationUnderway)
+		if (!bHasOperationUnderway || bIsEnemyZone)
 		{
 			iFilledSlots = MilitaryAIHelpers::NumberOfFillableSlots(m_pPlayer, ePlayer, MUFORMATION_NAVAL_SQUADRON, true, false, pCoastalPlot, pCoastalPlot, &iNumRequiredSlots);
-			if(iFilledSlots > 0 && ((iNumRequiredSlots - iFilledSlots) <= iNumUnitsWillingBuild))
+			if(iFilledSlots > 1 && (bIsEnemyZone || ((iNumRequiredSlots - iFilledSlots) <= iNumUnitsWillingBuild)))
 			{
 				m_pPlayer->addAIOperation(AI_OPERATION_NAVAL_SUPERIORITY, ePlayer, pCoastalPlot->getArea(), pThreatenedCity, pThreatenedCity, m_pPlayer->CanCrossOcean());
 			}
@@ -4185,7 +4186,7 @@ void CvMilitaryAI::DoLandAttacks(PlayerTypes ePlayer)
 		int iNumRequiredSlots;
 		int iFilledSlots;
 #if defined(MOD_WWII_MISC)
-		int iNumUnitsWillingBuild = 1;
+		int iNumUnitsWillingBuild = 0;
 #else
 		int iNumUnitsWillingBuild = 2;
 #endif
@@ -4263,7 +4264,7 @@ void CvMilitaryAI::DoSeaAttacks(PlayerTypes ePlayer)
 		int iFilledSlots;
 		int iReservesUsed;
 #if defined(MOD_WWII_MISC)
-		int iNumUnitsWillingBuild = 1;
+		int iNumUnitsWillingBuild = 0;
 #else
 		int iNumUnitsWillingBuild = 2;
 #endif
@@ -6648,11 +6649,7 @@ int MilitaryAIHelpers::ComputeRecommendedNavySize(CvPlayer* pPlayer)
 	CvCity* pCity;
 	for(pCity = pPlayer->firstCity(&iLoop); pCity != NULL; pCity = pPlayer->nextCity(&iLoop))
 	{
-#if defined(MOD_BALANCE_CORE_MILITARY)
-		if(pCity->isCoastal(GC.getMIN_WATER_SIZE_FOR_OCEAN()))
-#else
-		if(pCity->isCoastal(-1))
-#endif
+		if(pCity->isCoastal())
 		{
 			iNumCoastalCities++;
 		}
@@ -6732,8 +6729,9 @@ CvPlot* MilitaryAIHelpers::GetCoastalPlotNearPlot(CvPlot *pTarget)
 {
 	if (!pTarget)
 		return NULL;
+#if !defined(MOD_WWII_MISC)
 	TeamTypes eTeam = pTarget->getTeam();
-
+#endif
 	//change iteration order, don't return the same plot every time
 	//don't use the RNG here: too many calls in the log and diplo quirks can lead to desyncs
 	int aiShuffle[3][RING2_PLOTS] = { 
@@ -6916,7 +6914,11 @@ int MilitaryAIHelpers::NumberOfFillableSlots(CvPlayer* pPlayer, PlayerTypes eEne
 		else
 		{
 			//land based ops need a wide path so they don't get stuck - but they don't need to stay within their area
+#if defined(MOD_WWII_MISC)
+			SPathFinderUserData data( pPlayer->GetID(), PT_GENERIC_ANY_AREA, eEnemy );
+#else
 			SPathFinderUserData data( pPlayer->GetID(), iRequiredSlots>5 ? PT_GENERIC_ANY_AREA_WIDE : PT_GENERIC_ANY_AREA, eEnemy );
+#endif
 			data.iFlags = CvUnit::MOVEFLAG_APPROX_TARGET_RING1;
 			if(!GC.GetStepFinder().DoesPathExist(pMuster, pTarget, data))
 			{

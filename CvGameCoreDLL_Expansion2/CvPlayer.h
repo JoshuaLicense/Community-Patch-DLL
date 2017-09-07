@@ -2324,7 +2324,7 @@ public:
 	int GetUnitPurchaseCostModifier() const;
 	void ChangeUnitPurchaseCostModifier(int iChange);
 
-	int GetPlotDanger(const CvPlot& Plot, const CvUnit* pUnit, AirActionType iAirAction = AIR_ACTION_ATTACK);
+	int GetPlotDanger(const CvPlot& Plot, const CvUnit* pUnit, const set<int>& unitsToIgnore, AirActionType iAirAction = AIR_ACTION_ATTACK);
 	int GetPlotDanger(const CvPlot& Plot, CvCity* pCity, const CvUnit* pPretendGarrison = NULL);
 	int GetPlotDanger(const CvPlot& Plot, PlayerTypes ePlayer=NO_PLAYER);
 	std::vector<CvUnit*> GetPossibleAttackers(const CvPlot& Plot);
@@ -2674,7 +2674,10 @@ public:
 
 	int GetYieldPerTurn(YieldTypes eYield) const;
 
-	int GetRequiredYield(YieldTypes eYield, bool bCanHeal = false);
+	int GetRequiredYield(YieldTypes eYield, bool bCanHeal = false, bool bStatic = true);
+	int GetStaticRequiredYield(YieldTypes eYield) const;
+	void SetStaticRequiredYield(YieldTypes eYield, int iNewValue);
+	void UpdateStaticRequiredYield(YieldTypes eYield);
 
 	int HealingPossible(CvUnit* pLoopUnit, int iPersonnelPool, int iMaterielPool, int iUnitThisPass);
 	int GetNumUnitsThisPass(int iPass);
@@ -3476,6 +3479,7 @@ protected:
 	FAutoVariable<int, CvPlayer> m_iPersonnel;
 	FAutoVariable<int, CvPlayer> m_iMateriel;
 	FAutoVariable<int, CvPlayer> m_iFuel;
+	FAutoVariable<std::vector<int>, CvPlayer> m_aiStaticRequiredYield;
 #endif
 };
 

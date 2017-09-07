@@ -435,8 +435,8 @@ void CvGrandStrategyAI::DoTurn()
 /// Returns Priority for Conquest Grand Strategy
 int CvGrandStrategyAI::GetConquestPriority()
 {
-	int iPriority = 0;
-
+	int iPriority = 100;
+#if !defined(MOD_WWII_MISC)
 	// If Conquest Victory isn't even available then don't bother with anything
 	VictoryTypes eVictory = (VictoryTypes) GC.getInfoTypeForString("VICTORY_DOMINATION", true);
 	if(eVictory == NO_VICTORY || !GC.getGame().isVictoryValid(eVictory))
@@ -728,6 +728,7 @@ int CvGrandStrategyAI::GetConquestPriority()
 	iPriorityBonus /= 10;
 	iPriority += iPriorityBonus;
 #endif
+#endif
 	return iPriority;
 }
 
@@ -735,7 +736,7 @@ int CvGrandStrategyAI::GetConquestPriority()
 int CvGrandStrategyAI::GetCulturePriority()
 {
 	int iPriority = 0;
-
+#if !defined(MOD_WWII_MISC)
 	// If Culture Victory isn't even available then don't bother with anything
 	VictoryTypes eVictory = (VictoryTypes) GC.getInfoTypeForString("VICTORY_CULTURAL", true);
 	if(eVictory == NO_VICTORY || !GC.getGame().isVictoryValid(eVictory))
@@ -939,6 +940,7 @@ int CvGrandStrategyAI::GetCulturePriority()
 	iPriorityBonus /= 10;
 	iPriority += iPriorityBonus;
 #endif
+#endif
 	return iPriority;
 }
 
@@ -946,6 +948,7 @@ int CvGrandStrategyAI::GetCulturePriority()
 int CvGrandStrategyAI::GetUnitedNationsPriority()
 {
 	int iPriority = 0;
+#if !defined(MOD_WWII_MISC)
 	PlayerTypes ePlayer = m_pPlayer->GetID();
 
 	// If UN Victory isn't even available then don't bother with anything
@@ -1217,6 +1220,7 @@ int CvGrandStrategyAI::GetUnitedNationsPriority()
 	iPriority += m_pPlayer->GetPlayerTraits()->GetCityStateBonusModifier();
 	iPriority -= m_pPlayer->GetPlayerTraits()->GetCityStateCombatModifier();
 #endif
+#endif
 	return iPriority;
 }
 
@@ -1224,7 +1228,7 @@ int CvGrandStrategyAI::GetUnitedNationsPriority()
 int CvGrandStrategyAI::GetSpaceshipPriority()
 {
 	int iPriority = 0;
-
+#if !defined(MOD_WWII_MISC)
 	// If SS Victory isn't even available then don't bother with anything
 	VictoryTypes eVictory = (VictoryTypes) GC.getInfoTypeForString("VICTORY_SPACE_RACE", true);
 	if(eVictory == NO_VICTORY || !GC.getGame().isVictoryValid(eVictory))
@@ -1395,6 +1399,7 @@ int CvGrandStrategyAI::GetSpaceshipPriority()
 	}
 	iPriorityBonus /= 10;
 	iPriority += iPriorityBonus;
+#endif
 #endif
 	return iPriority;
 }

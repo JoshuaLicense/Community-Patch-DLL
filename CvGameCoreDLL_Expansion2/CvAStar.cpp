@@ -948,9 +948,9 @@ void UpdateNodeCacheData(CvAStarNode* node, const CvUnit* pUnit, const CvAStar* 
 	//special for approximate pathfinding - don't hang around on dangerous plots
 	if (finder->DestinationReached(node->m_iX,node->m_iY) && !bIsDestination && !bIsInitialNode)
 	{
-		int iPlotDanger = pCacheData->isAIControl() && pCacheData->doDanger() ? GET_PLAYER(pUnit->getOwner()).GetPlotDanger(*pPlot, pUnit) : 0;
+		int iPlotDanger = pCacheData->isAIControl() && pCacheData->doDanger() ? pUnit->GetDanger(pPlot) : 0;
 	
-		if (iPlotDanger>pUnit->GetCurrHitPoints())
+		if (iPlotDanger>pUnit->GetCurrHitPoints() * 2)
 			kToNodeCacheData.bCanEnterTerrainPermanent = false;
 	}
 
@@ -1426,12 +1426,22 @@ int PathValid(const CvAStarNode* parent, const CvAStarNode* node, const SPathFin
 				return FALSE;
 
 			//embark required and possible?
-			if(!kFromNodeCacheData.bIsNonNativeDomain && kToNodeCacheData.bIsNonNativeDomain && kToNodeCacheData.bIsRevealedToTeam && !pUnit->canEmbarkOnto(*pFromPlot, *pToPlot, true, kToNodeCacheData.iMoveFlags))
-				return FALSE;
+			if(!kFromNodeCacheData.bIsNonNativeDomain && kToNodeCacheData.bIsNonNativeDomain && kToNodeCacheData.bIsRevealedToTeam)
+			{
+				if(!pUnit->canEmbarkOnto(*pFromPlot, *pToPlot, true, kToNodeCacheData.iMoveFlags))
+					return FALSE;
+
+				//in addition to the danger check (which increases path cost), a hard exclusion if the enemy navy dominates the area
+				if(pCacheData->isAIControl() && GET_PLAYER(pUnit->getOwner()).GetTacticalAI()->GetTacticalAnalysisMap()->IsInEnemyDominatedZone(pToPlot))
+					return FALSE;
+			}
 
 			//disembark required and possible?
-			if(kFromNodeCacheData.bIsNonNativeDomain && !kToNodeCacheData.bIsNonNativeDomain && kToNodeCacheData.bIsRevealedToTeam && !pUnit->canDisembarkOnto(*pFromPlot, *pToPlot, true, kToNodeCacheData.iMoveFlags))
-				return FALSE;
+			if(kFromNodeCacheData.bIsNonNativeDomain && !kToNodeCacheData.bIsNonNativeDomain && kToNodeCacheData.bIsRevealedToTeam)
+			{
+				if(!pUnit->canDisembarkOnto(*pFromPlot, *pToPlot, true, kToNodeCacheData.iMoveFlags))
+					return FALSE;
+			}
 		}
 
 		//normally we would be able to enter enemy territory if at war

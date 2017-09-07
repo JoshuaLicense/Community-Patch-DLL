@@ -151,7 +151,6 @@ protected:
 	static int lIsVisibleEnemyDefender(lua_State* L);
 	static int lGetNumDefenders(lua_State* L);
 	static int lGetNumVisibleEnemyDefenders(lua_State* L);
-	static int lGetNumVisiblePotentialEnemyDefenders(lua_State* L);
 	static int lIsVisibleEnemyUnit(lua_State* L);
 	static int lIsVisibleOtherUnit(lua_State* L);
 	static int lGetNumFriendlyUnitsOfType(lua_State* L);
